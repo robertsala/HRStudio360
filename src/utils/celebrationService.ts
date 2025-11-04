@@ -1,6 +1,35 @@
 import { apiClient } from '../lib/api';
 import i18n from '../i18n';
 
+// Normalization helpers to convert camelCase API responses to snake_case for backward compatibility
+function normalizeBadge(badge: any): Badge | null {
+  if (!badge) return null;
+  return {
+    id: badge.id,
+    year_number: badge.yearNumber,
+    badge_title: badge.badgeTitle,
+    badge_description: badge.badgeDescription,
+    badge_color: badge.badgeColor,
+    badge_icon: badge.badgeIcon,
+    tier_name: badge.tierName,
+    is_milestone: badge.isMilestone ?? false,
+    sort_order: badge.sortOrder
+  };
+}
+
+function normalizeEarnedBadge(earnedBadge: any): EarnedBadge | null {
+  if (!earnedBadge) return null;
+  return {
+    id: earnedBadge.id,
+    employee_id: earnedBadge.userId,
+    badge_id: earnedBadge.badgeId,
+    earned_date: earnedBadge.earnedAt,
+    viewed_at: earnedBadge.viewedAt,
+    is_new: earnedBadge.isNew ?? true,
+    badge: normalizeBadge(earnedBadge.badge) as Badge
+  };
+}
+
 export interface CelebrationData {
   type: 'birthday' | 'anniversary';
   date: Date;
@@ -95,7 +124,8 @@ export const celebrationService = {
           if (yearsOfService > 0) {
             const isMilestone = yearsOfService % 5 === 0;
 
-            const badge = await apiClient.getCelebrationBadgeByYears(yearsOfService);
+            const badgeData = await apiClient.getCelebrationBadgeByYears(yearsOfService);
+            const badge = normalizeBadge(badgeData);
 
             await apiClient.updateProfile(userId, { lastAnniversaryShown: todayStr });
 
@@ -110,11 +140,11 @@ export const celebrationService = {
               isMilestone,
               badgeId: badge?.id,
               badgeInfo: badge ? {
-                title: badge.title,
-                description: badge.description,
-                color: badge.color,
-                icon: badge.icon,
-                tierName: badge.tierName
+                title: badge.badge_title,
+                description: badge.badge_description,
+                color: badge.badge_color,
+                icon: badge.badge_icon,
+                tierName: badge.tier_name
               } : undefined,
               message: {
                 title: isMilestone
@@ -233,7 +263,7 @@ export const celebrationService = {
   async getEarnedBadges(userId: string): Promise<EarnedBadge[]> {
     try {
       const badges = await apiClient.getEarnedBadges(userId);
-      return badges as EarnedBadge[];
+      return badges.map((badge: any) => normalizeEarnedBadge(badge)).filter((b: any) => b !== null) as EarnedBadge[];
     } catch (error) {
       console.error('Error fetching earned badges:', error);
       return [];
@@ -243,7 +273,7 @@ export const celebrationService = {
   async getAllBadges(): Promise<Badge[]> {
     try {
       const badges = await apiClient.getCelebrationBadges();
-      return badges as Badge[];
+      return badges.map((badge: any) => normalizeBadge(badge)).filter((b: any) => b !== null) as Badge[];
     } catch (error) {
       console.error('Error fetching all badges:', error);
       return [];
