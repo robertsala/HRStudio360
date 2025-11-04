@@ -206,34 +206,186 @@ class ApiClient {
     });
   }
 
-  // Channel endpoints
-  async getChannels() {
-    return this.request('/api/channels');
+  // Chat Channel endpoints
+  async getChatChannels() {
+    return this.request('/api/chat/channels');
   }
 
-  async createChannel(channel: any) {
-    return this.request('/api/channels', {
+  async getChatChannel(id: string) {
+    return this.request(`/api/chat/channels/${id}`);
+  }
+
+  async createChatChannel(channel: any) {
+    return this.request('/api/chat/channels', {
       method: 'POST',
       body: JSON.stringify(channel),
     });
   }
 
-  // Message endpoints
-  async getMessages(channelId: string) {
-    return this.request(`/api/channels/${channelId}/messages`);
+  async updateChatChannel(id: string, updates: any) {
+    return this.request(`/api/chat/channels/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
   }
 
-  async createMessage(channelId: string, message: any) {
-    return this.request(`/api/channels/${channelId}/messages`, {
+  // Channel Member endpoints
+  async getChannelMembers(channelId: string) {
+    return this.request(`/api/chat/channels/${channelId}/members`);
+  }
+
+  async addChannelMember(channelId: string, member: any) {
+    return this.request(`/api/chat/channels/${channelId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(member),
+    });
+  }
+
+  async removeChannelMember(channelId: string, userId: string) {
+    return this.request(`/api/chat/channels/${channelId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async markChannelRead(channelId: string, userId: string) {
+    return this.request(`/api/chat/channels/${channelId}/mark-read`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  // Chat Message endpoints
+  async getChatMessages(channelId: string, limit?: number) {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.request(`/api/chat/channels/${channelId}/messages${query}`);
+  }
+
+  async getChatMessage(id: string) {
+    return this.request(`/api/chat/messages/${id}`);
+  }
+
+  async createChatMessage(channelId: string, message: any) {
+    return this.request(`/api/chat/channels/${channelId}/messages`, {
       method: 'POST',
       body: JSON.stringify(message),
     });
   }
 
-  async updateMessage(id: string, updates: any) {
-    return this.request(`/api/messages/${id}`, {
+  async updateChatMessage(id: string, updates: any) {
+    return this.request(`/api/chat/messages/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteChatMessage(id: string) {
+    return this.request(`/api/chat/messages/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Message Reaction endpoints
+  async getMessageReactions(messageId: string) {
+    return this.request(`/api/chat/messages/${messageId}/reactions`);
+  }
+
+  async addMessageReaction(messageId: string, emoji: string, userId: string) {
+    return this.request(`/api/chat/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji, userId }),
+    });
+  }
+
+  async removeMessageReaction(messageId: string, emoji: string, userId: string) {
+    return this.request(`/api/chat/messages/${messageId}/reactions`, {
+      method: 'DELETE',
+      body: JSON.stringify({ emoji, userId }),
+    });
+  }
+
+  // Typing Indicator endpoints
+  async setTyping(channelId: string, userId: string, isTyping: boolean) {
+    return this.request(`/api/chat/channels/${channelId}/typing`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, isTyping }),
+    });
+  }
+
+  async getTypingIndicators(channelId: string) {
+    return this.request(`/api/chat/channels/${channelId}/typing`);
+  }
+
+  // User Presence endpoints
+  async updateUserPresence(userId: string, status: 'online' | 'away' | 'offline') {
+    return this.request(`/api/chat/presence/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getUserPresence(userId: string) {
+    return this.request(`/api/chat/presence/${userId}`);
+  }
+
+  // Change Log endpoints
+  async getChangeLogs(filters?: { changeType?: string; startDate?: string; endDate?: string }, limit?: number) {
+    const params = new URLSearchParams();
+    if (filters?.changeType) params.append('changeType', filters.changeType);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (limit) params.append('limit', limit.toString());
+    
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request(`/api/changelog${query}`);
+  }
+
+  async getChangeLog(id: string) {
+    return this.request(`/api/changelog/${id}`);
+  }
+
+  async createChangeLog(log: any) {
+    return this.request('/api/changelog', {
+      method: 'POST',
+      body: JSON.stringify(log),
+    });
+  }
+
+  async updateChangeLog(id: string, updates: any) {
+    return this.request(`/api/changelog/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Historical Changes endpoints
+  async getHistoricalChanges(limit?: number) {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.request(`/api/changelog/historical${query}`);
+  }
+
+  async createHistoricalChange(change: any) {
+    return this.request('/api/changelog/historical', {
+      method: 'POST',
+      body: JSON.stringify(change),
+    });
+  }
+
+  // Change Notification endpoints
+  async getChangeNotifications(userId: string) {
+    return this.request(`/api/changelog/notifications/${userId}`);
+  }
+
+  async createChangeNotification(notification: any) {
+    return this.request('/api/changelog/notifications', {
+      method: 'POST',
+      body: JSON.stringify(notification),
+    });
+  }
+
+  async markChangeNotificationRead(changeLogId: string, userId: string) {
+    return this.request(`/api/changelog/notifications/mark-read`, {
+      method: 'POST',
+      body: JSON.stringify({ changeLogId, userId }),
     });
   }
 

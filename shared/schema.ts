@@ -58,7 +58,7 @@ export const employees = pgTable('employees', {
   employeeId: text('employee_id').unique().notNull(),
   departmentId: uuid('department_id').references(() => departments.id),
   jobTitleId: uuid('job_title_id').references(() => jobTitles.id),
-  managerId: uuid('manager_id').references(() => employees.id),
+  managerId: uuid('manager_id').references((): any => employees.id),
   startDate: date('start_date').notNull(),
   employmentType: employmentTypeEnum('employment_type').default('Full-time'),
   salary: numeric('salary', { precision: 10, scale: 2 }),
