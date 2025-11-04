@@ -6,15 +6,20 @@ import type {
   Candidate, InsertCandidate,
   Expense, InsertExpense,
   Channel, InsertChannel,
-  Message, InsertMessage
+  Message, InsertMessage,
+  CelebrationBadge, InsertCelebrationBadge,
+  EarnedBadge, InsertEarnedBadge,
+  CelebrationHistory, InsertCelebrationHistory,
+  CelebrationNotification, InsertCelebrationNotification
 } from '../shared/schema.js';
 import { 
   profiles, employees, leaveRequests, departments, jobTitles, leaveBalances,
   candidates, candidateCollaborators, candidateComments, candidateRatings, newHires,
   currencies, expenseCategories, expenseVendors, expenses, employeeExpenseEnrollment,
-  channels, channelMembers, messages
+  channels, channelMembers, messages,
+  celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications
 } from '../shared/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, gte, and } from 'drizzle-orm';
 
 export interface IStorage {
   // Profiles
@@ -57,6 +62,17 @@ export interface IStorage {
   getMessages(channelId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
   updateMessage(id: string, message: Partial<InsertMessage>): Promise<Message | undefined>;
+
+  // Celebrations
+  getCelebrationBadges(): Promise<CelebrationBadge[]>;
+  getCelebrationBadgeByYears(years: number): Promise<CelebrationBadge | undefined>;
+  getEarnedBadges(userId: string): Promise<EarnedBadge[]>;
+  createEarnedBadge(badge: InsertEarnedBadge): Promise<EarnedBadge>;
+  markBadgeViewed(userId: string, badgeId: string): Promise<void>;
+  saveCelebrationHistory(history: InsertCelebrationHistory): Promise<CelebrationHistory>;
+  markCelebrationDismissed(userId: string, type: string, date: string): Promise<void>;
+  getCelebrationNotifications(userId: string): Promise<CelebrationNotification[]>;
+  createCelebrationNotification(notification: InsertCelebrationNotification): Promise<CelebrationNotification>;
 }
 
 // Database storage implementation
@@ -193,6 +209,60 @@ export class DbStorage implements IStorage {
 
   async updateMessage(id: string, message: Partial<InsertMessage>): Promise<Message | undefined> {
     const result = await db.update(messages).set(message).where(eq(messages.id, id)).returning();
+    return result[0];
+  }
+
+  // Celebrations
+  async getCelebrationBadges(): Promise<CelebrationBadge[]> {
+    return db.select().from(celebrationBadges);
+  }
+
+  async getCelebrationBadgeByYears(years: number): Promise<CelebrationBadge | undefined> {
+    const result = await db.select().from(celebrationBadges).where(eq(celebrationBadges.years, years));
+    return result[0];
+  }
+
+  async getEarnedBadges(userId: string): Promise<EarnedBadge[]> {
+    return db.select().from(earnedBadges).where(eq(earnedBadges.userId, userId));
+  }
+
+  async createEarnedBadge(badge: InsertEarnedBadge): Promise<EarnedBadge> {
+    const result = await db.insert(earnedBadges).values(badge).returning();
+    return result[0];
+  }
+
+  async markBadgeViewed(userId: string, badgeId: string): Promise<void> {
+    await db.update(earnedBadges)
+      .set({ viewedAt: new Date(), isNew: false })
+      .where(and(
+        eq(earnedBadges.userId, userId),
+        eq(earnedBadges.badgeId, badgeId)
+      ));
+  }
+
+  async saveCelebrationHistory(history: InsertCelebrationHistory): Promise<CelebrationHistory> {
+    const result = await db.insert(celebrationHistory).values(history).returning();
+    return result[0];
+  }
+
+  async markCelebrationDismissed(userId: string, type: string, date: string): Promise<void> {
+    await db.update(celebrationHistory)
+      .set({ dismissedAt: new Date() })
+      .where(and(
+        eq(celebrationHistory.userId, userId),
+        eq(celebrationHistory.type, type),
+        eq(celebrationHistory.celebrationDate, new Date(date))
+      ));
+  }
+
+  async getCelebrationNotifications(userId: string): Promise<CelebrationNotification[]> {
+    return db.select()
+      .from(celebrationNotifications)
+      .where(eq(celebrationNotifications.userId, userId));
+  }
+
+  async createCelebrationNotification(notification: InsertCelebrationNotification): Promise<CelebrationNotification> {
+    const result = await db.insert(celebrationNotifications).values(notification).returning();
     return result[0];
   }
 }

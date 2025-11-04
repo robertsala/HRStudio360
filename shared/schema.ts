@@ -306,6 +306,10 @@ export const insertCandidateSchema = createInsertSchema(candidates).omit({ id: t
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
 export const insertChannelSchema = createInsertSchema(channels).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCelebrationBadgeSchema = createInsertSchema(celebrationBadges).omit({ id: true, createdAt: true });
+export const insertEarnedBadgeSchema = createInsertSchema(earnedBadges).omit({ id: true, earnedAt: true });
+export const insertCelebrationHistorySchema = createInsertSchema(celebrationHistory).omit({ id: true, shownAt: true });
+export const insertCelebrationNotificationSchema = createInsertSchema(celebrationNotifications).omit({ id: true, createdAt: true });
 
 // Types
 export type Profile = typeof profiles.$inferSelect;
@@ -324,3 +328,11 @@ export type Channel = typeof channels.$inferSelect;
 export type InsertChannel = z.infer<typeof insertChannelSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type CelebrationBadge = typeof celebrationBadges.$inferSelect;
+export type InsertCelebrationBadge = z.infer<typeof insertCelebrationBadgeSchema>;
+export type EarnedBadge = typeof earnedBadges.$inferSelect;
+export type InsertEarnedBadge = z.infer<typeof insertEarnedBadgeSchema>;
+export type CelebrationHistory = typeof celebrationHistory.$inferSelect;
+export type InsertCelebrationHistory = z.infer<typeof insertCelebrationHistorySchema>;
+export type CelebrationNotification = typeof celebrationNotifications.$inferSelect;
+export type InsertCelebrationNotification = z.infer<typeof insertCelebrationNotificationSchema>;
