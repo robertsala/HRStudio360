@@ -2,7 +2,7 @@ import type { Express } from 'express';
 import { storage } from './storage.js';
 import { 
   insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema,
-  insertCandidateSchema, insertExpenseSchema, insertChannelSchema, insertMessageSchema,
+  insertCandidateSchema, insertExpenseSchema, insertChatChannelSchema, insertChatMessageSchema,
   insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema
 } from '../shared/schema.js';
 
@@ -191,7 +191,7 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/channels', async (req, res) => {
     try {
-      const validated = insertChannelSchema.parse(req.body);
+      const validated = insertChatChannelSchema.parse(req.body);
       const channel = await storage.createChannel(validated);
       res.status(201).json(channel);
     } catch (error: any) {
@@ -215,7 +215,7 @@ export function registerRoutes(app: Express) {
         ...req.body,
         channelId: req.params.channelId
       };
-      const validated = insertMessageSchema.parse(messageData);
+      const validated = insertChatMessageSchema.parse(messageData);
       const message = await storage.createMessage(validated);
       res.status(201).json(message);
     } catch (error: any) {

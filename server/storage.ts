@@ -5,8 +5,8 @@ import type {
   LeaveRequest, InsertLeaveRequest,
   Candidate, InsertCandidate,
   Expense, InsertExpense,
-  Channel, InsertChannel,
-  Message, InsertMessage,
+  ChatChannel, InsertChatChannel,
+  ChatMessage, InsertChatMessage,
   CelebrationBadge, InsertCelebrationBadge,
   EarnedBadge, InsertEarnedBadge,
   CelebrationHistory, InsertCelebrationHistory,
@@ -16,7 +16,7 @@ import {
   profiles, employees, leaveRequests, departments, jobTitles, leaveBalances,
   candidates, candidateCollaborators, candidateComments, candidateRatings, newHires,
   currencies, expenseCategories, expenseVendors, expenses, employeeExpenseEnrollment,
-  channels, channelMembers, messages,
+  chatChannels, channelMembers, chatMessages,
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications
 } from '../shared/schema.js';
 import { eq, gte, and } from 'drizzle-orm';
@@ -54,14 +54,14 @@ export interface IStorage {
   updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
 
   // Channels
-  getChannels(): Promise<Channel[]>;
-  getChannelById(id: string): Promise<Channel | undefined>;
-  createChannel(channel: InsertChannel): Promise<Channel>;
+  getChannels(): Promise<ChatChannel[]>;
+  getChannelById(id: string): Promise<ChatChannel | undefined>;
+  createChannel(channel: InsertChatChannel): Promise<ChatChannel>;
 
   // Messages
-  getMessages(channelId: string): Promise<Message[]>;
-  createMessage(message: InsertMessage): Promise<Message>;
-  updateMessage(id: string, message: Partial<InsertMessage>): Promise<Message | undefined>;
+  getMessages(channelId: string): Promise<ChatMessage[]>;
+  createMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  updateMessage(id: string, message: Partial<InsertChatMessage>): Promise<ChatMessage | undefined>;
 
   // Celebrations
   getCelebrationBadges(): Promise<CelebrationBadge[]>;
@@ -183,32 +183,32 @@ export class DbStorage implements IStorage {
   }
 
   // Channels
-  async getChannels(): Promise<Channel[]> {
-    return db.select().from(channels);
+  async getChannels(): Promise<ChatChannel[]> {
+    return db.select().from(chatChannels);
   }
 
-  async getChannelById(id: string): Promise<Channel | undefined> {
-    const result = await db.select().from(channels).where(eq(channels.id, id));
+  async getChannelById(id: string): Promise<ChatChannel | undefined> {
+    const result = await db.select().from(chatChannels).where(eq(chatChannels.id, id));
     return result[0];
   }
 
-  async createChannel(channel: InsertChannel): Promise<Channel> {
-    const result = await db.insert(channels).values(channel).returning();
+  async createChannel(channel: InsertChatChannel): Promise<ChatChannel> {
+    const result = await db.insert(chatChannels).values(channel).returning();
     return result[0];
   }
 
   // Messages
-  async getMessages(channelId: string): Promise<Message[]> {
-    return db.select().from(messages).where(eq(messages.channelId, channelId));
+  async getMessages(channelId: string): Promise<ChatMessage[]> {
+    return db.select().from(chatMessages).where(eq(chatMessages.channelId, channelId));
   }
 
-  async createMessage(message: InsertMessage): Promise<Message> {
-    const result = await db.insert(messages).values(message).returning();
+  async createMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const result = await db.insert(chatMessages).values(message).returning();
     return result[0];
   }
 
-  async updateMessage(id: string, message: Partial<InsertMessage>): Promise<Message | undefined> {
-    const result = await db.update(messages).set(message).where(eq(messages.id, id)).returning();
+  async updateMessage(id: string, message: Partial<InsertChatMessage>): Promise<ChatMessage | undefined> {
+    const result = await db.update(chatMessages).set(message).where(eq(chatMessages.id, id)).returning();
     return result[0];
   }
 
