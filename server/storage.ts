@@ -1,6 +1,19 @@
 import { db } from './db.js';
-import type { Profile, InsertProfile, Employee, InsertEmployee, LeaveRequest, InsertLeaveRequest } from '../shared/schema.js';
-import { profiles, employees, leaveRequests, departments, jobTitles, leaveBalances } from '../shared/schema.js';
+import type { 
+  Profile, InsertProfile, 
+  Employee, InsertEmployee, 
+  LeaveRequest, InsertLeaveRequest,
+  Candidate, InsertCandidate,
+  Expense, InsertExpense,
+  Channel, InsertChannel,
+  Message, InsertMessage
+} from '../shared/schema.js';
+import { 
+  profiles, employees, leaveRequests, departments, jobTitles, leaveBalances,
+  candidates, candidateCollaborators, candidateComments, candidateRatings, newHires,
+  currencies, expenseCategories, expenseVendors, expenses, employeeExpenseEnrollment,
+  channels, channelMembers, messages
+} from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
 
 export interface IStorage {
@@ -22,6 +35,28 @@ export interface IStorage {
   getLeaveRequestById(id: string): Promise<LeaveRequest | undefined>;
   createLeaveRequest(request: InsertLeaveRequest): Promise<LeaveRequest>;
   updateLeaveRequest(id: string, request: Partial<InsertLeaveRequest>): Promise<LeaveRequest | undefined>;
+
+  // Candidates
+  getCandidates(): Promise<Candidate[]>;
+  getCandidateById(id: string): Promise<Candidate | undefined>;
+  createCandidate(candidate: InsertCandidate): Promise<Candidate>;
+  updateCandidate(id: string, candidate: Partial<InsertCandidate>): Promise<Candidate | undefined>;
+
+  // Expenses
+  getExpenses(): Promise<Expense[]>;
+  getExpenseById(id: string): Promise<Expense | undefined>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
+
+  // Channels
+  getChannels(): Promise<Channel[]>;
+  getChannelById(id: string): Promise<Channel | undefined>;
+  createChannel(channel: InsertChannel): Promise<Channel>;
+
+  // Messages
+  getMessages(channelId: string): Promise<Message[]>;
+  createMessage(message: InsertMessage): Promise<Message>;
+  updateMessage(id: string, message: Partial<InsertMessage>): Promise<Message | undefined>;
 }
 
 // Database storage implementation
@@ -88,6 +123,76 @@ export class DbStorage implements IStorage {
 
   async updateLeaveRequest(id: string, request: Partial<InsertLeaveRequest>): Promise<LeaveRequest | undefined> {
     const result = await db.update(leaveRequests).set(request).where(eq(leaveRequests.id, id)).returning();
+    return result[0];
+  }
+
+  // Candidates
+  async getCandidates(): Promise<Candidate[]> {
+    return db.select().from(candidates);
+  }
+
+  async getCandidateById(id: string): Promise<Candidate | undefined> {
+    const result = await db.select().from(candidates).where(eq(candidates.id, id));
+    return result[0];
+  }
+
+  async createCandidate(candidate: InsertCandidate): Promise<Candidate> {
+    const result = await db.insert(candidates).values(candidate).returning();
+    return result[0];
+  }
+
+  async updateCandidate(id: string, candidate: Partial<InsertCandidate>): Promise<Candidate | undefined> {
+    const result = await db.update(candidates).set(candidate).where(eq(candidates.id, id)).returning();
+    return result[0];
+  }
+
+  // Expenses
+  async getExpenses(): Promise<Expense[]> {
+    return db.select().from(expenses);
+  }
+
+  async getExpenseById(id: string): Promise<Expense | undefined> {
+    const result = await db.select().from(expenses).where(eq(expenses.id, id));
+    return result[0];
+  }
+
+  async createExpense(expense: InsertExpense): Promise<Expense> {
+    const result = await db.insert(expenses).values(expense).returning();
+    return result[0];
+  }
+
+  async updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const result = await db.update(expenses).set(expense).where(eq(expenses.id, id)).returning();
+    return result[0];
+  }
+
+  // Channels
+  async getChannels(): Promise<Channel[]> {
+    return db.select().from(channels);
+  }
+
+  async getChannelById(id: string): Promise<Channel | undefined> {
+    const result = await db.select().from(channels).where(eq(channels.id, id));
+    return result[0];
+  }
+
+  async createChannel(channel: InsertChannel): Promise<Channel> {
+    const result = await db.insert(channels).values(channel).returning();
+    return result[0];
+  }
+
+  // Messages
+  async getMessages(channelId: string): Promise<Message[]> {
+    return db.select().from(messages).where(eq(messages.channelId, channelId));
+  }
+
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const result = await db.insert(messages).values(message).returning();
+    return result[0];
+  }
+
+  async updateMessage(id: string, message: Partial<InsertMessage>): Promise<Message | undefined> {
+    const result = await db.update(messages).set(message).where(eq(messages.id, id)).returning();
     return result[0];
   }
 }

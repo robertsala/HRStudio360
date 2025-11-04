@@ -144,6 +144,83 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // Candidate endpoints
+  async getCandidates() {
+    return this.request('/api/candidates');
+  }
+
+  async getCandidate(id: string) {
+    return this.request(`/api/candidates/${id}`);
+  }
+
+  async createCandidate(candidate: any) {
+    return this.request('/api/candidates', {
+      method: 'POST',
+      body: JSON.stringify(candidate),
+    });
+  }
+
+  async updateCandidate(id: string, updates: any) {
+    return this.request(`/api/candidates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Expense endpoints
+  async getExpenses() {
+    return this.request('/api/expenses');
+  }
+
+  async createExpense(expense: any) {
+    return this.request('/api/expenses', {
+      method: 'POST',
+      body: JSON.stringify(expense),
+    });
+  }
+
+  // Channel endpoints
+  async getChannels() {
+    return this.request('/api/channels');
+  }
+
+  async createChannel(channel: any) {
+    return this.request('/api/channels', {
+      method: 'POST',
+      body: JSON.stringify(channel),
+    });
+  }
+
+  // Message endpoints
+  async getMessages(channelId: string) {
+    return this.request(`/api/channels/${channelId}/messages`);
+  }
+
+  async createMessage(channelId: string, message: any) {
+    return this.request(`/api/channels/${channelId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(message),
+    });
+  }
+
+  async updateMessage(id: string, updates: any) {
+    return this.request(`/api/messages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async getExpense(id: string) {
+    return this.request(`/api/expenses/${id}`);
+  }
+
+  async updateExpense(id: string, updates: any) {
+    return this.request(`/api/expenses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

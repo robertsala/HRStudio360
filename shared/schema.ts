@@ -96,11 +96,174 @@ export const leaveBalances = pgTable('leave_balances', {
   updatedAt: timestamp('updated_at').defaultNow()
 });
 
+// Candidates table (for hiring/recruitment)
+export const candidates = pgTable('candidates', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  email: text('email').unique().notNull(),
+  phone: text('phone'),
+  position: text('position').notNull(),
+  department: text('department').notNull(),
+  experience: text('experience'),
+  location: text('location'),
+  salaryExpectation: numeric('salary_expectation', { precision: 10, scale: 2 }),
+  appliedDate: date('applied_date').defaultNow(),
+  status: text('status').default('New Candidate'),
+  skills: text('skills').array(),
+  education: text('education'),
+  previousCompany: text('previous_company'),
+  profilePicture: text('profile_picture'),
+  likes: integer('likes').default(0),
+  views: integer('views').default(0),
+  commentsCount: integer('comments_count').default(0),
+  aiMatchScore: integer('ai_match_score').default(0),
+  rating: integer('rating').default(0),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Candidate collaborators (hiring team collaboration)
+export const candidateCollaborators = pgTable('candidate_collaborators', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: uuid('candidate_id').references(() => candidates.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  invitedBy: uuid('invited_by').references(() => profiles.id).notNull(),
+  role: text('role').notNull(),
+  status: text('status').default('pending'),
+  invitedAt: timestamp('invited_at').defaultNow(),
+  respondedAt: timestamp('responded_at')
+});
+
+// Candidate comments
+export const candidateComments = pgTable('candidate_comments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: uuid('candidate_id').references(() => candidates.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  commentText: text('comment_text').notNull(),
+  isPrivate: boolean('is_private').default(false),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Candidate ratings
+export const candidateRatings = pgTable('candidate_ratings', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  candidateId: uuid('candidate_id').references(() => candidates.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  rating: integer('rating').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// New hires (candidates converted to hires)
+export const newHires = pgTable('new_hires', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  email: text('email').unique().notNull(),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  position: text('position').notNull(),
+  department: text('department').notNull(),
+  startDate: date('start_date').notNull(),
+  salary: numeric('salary', { precision: 10, scale: 2 }),
+  managerId: uuid('manager_id').references(() => employees.id),
+  status: text('status').default('Pending'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Currencies table (for payroll)
+export const currencies = pgTable('currencies', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  code: text('code').unique().notNull(),
+  name: text('name').notNull(),
+  symbol: text('symbol').notNull(),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Expense categories
+export const expenseCategories = pgTable('custom_expense_categories', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  icon: text('icon'),
+  displayOrder: integer('display_order').default(0),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Expense vendors
+export const expenseVendors = pgTable('expense_vendors', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  category: text('category'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Expenses
+export const expenses = pgTable('expenses', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => employees.id).notNull(),
+  categoryId: uuid('category_id').references(() => expenseCategories.id),
+  vendorId: uuid('vendor_id').references(() => expenseVendors.id),
+  amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
+  currency: text('currency').default('USD'),
+  description: text('description'),
+  date: date('date').notNull(),
+  status: text('status').default('pending'),
+  receiptUrl: text('receipt_url'),
+  reportingToAtSubmission: uuid('reporting_to_at_submission').references(() => employees.id),
+  submittedAt: timestamp('submitted_at').defaultNow(),
+  approvedAt: timestamp('approved_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Employee expense enrollment
+export const employeeExpenseEnrollment = pgTable('employee_expense_enrollment', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  isEnrolled: boolean('is_enrolled').default(false),
+  enrolledAt: timestamp('enrolled_at')
+});
+
+// Chat channels
+export const channels = pgTable('channels', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  description: text('description'),
+  type: text('type').default('public'),
+  createdBy: uuid('created_by').references(() => profiles.id),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Channel members
+export const channelMembers = pgTable('channel_members', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  channelId: uuid('channel_id').references(() => channels.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  role: text('role').default('member'),
+  joinedAt: timestamp('joined_at').defaultNow()
+});
+
+// Messages
+export const messages = pgTable('messages', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  channelId: uuid('channel_id').references(() => channels.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  content: text('content').notNull(),
+  parentId: uuid('parent_id').references((): any => messages.id),
+  isEdited: boolean('is_edited').default(false),
+  isDeleted: boolean('is_deleted').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCandidateSchema = createInsertSchema(candidates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertChannelSchema = createInsertSchema(channels).omit({ id: true, createdAt: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type Profile = typeof profiles.$inferSelect;
@@ -111,3 +274,11 @@ export type Employee = typeof employees.$inferSelect;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type LeaveRequest = typeof leaveRequests.$inferSelect;
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
+export type Candidate = typeof candidates.$inferSelect;
+export type InsertCandidate = z.infer<typeof insertCandidateSchema>;
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Channel = typeof channels.$inferSelect;
+export type InsertChannel = z.infer<typeof insertChannelSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;

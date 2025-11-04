@@ -1,6 +1,9 @@
 import type { Express } from 'express';
 import { storage } from './storage.js';
-import { insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema } from '../shared/schema.js';
+import { 
+  insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema,
+  insertCandidateSchema, insertExpenseSchema, insertChannelSchema, insertMessageSchema
+} from '../shared/schema.js';
 
 export function registerRoutes(app: Express) {
   // Profile routes
@@ -106,6 +109,150 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Leave request not found' });
       }
       res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Candidate routes
+  app.get('/api/candidates', async (req, res) => {
+    try {
+      const candidates = await storage.getCandidates();
+      res.json(candidates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/candidates/:id', async (req, res) => {
+    try {
+      const candidate = await storage.getCandidateById(req.params.id);
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidate not found' });
+      }
+      res.json(candidate);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/candidates', async (req, res) => {
+    try {
+      const validated = insertCandidateSchema.parse(req.body);
+      const candidate = await storage.createCandidate(validated);
+      res.status(201).json(candidate);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/candidates/:id', async (req, res) => {
+    try {
+      const candidate = await storage.updateCandidate(req.params.id, req.body);
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidate not found' });
+      }
+      res.json(candidate);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Expense routes
+  app.get('/api/expenses', async (req, res) => {
+    try {
+      const expenses = await storage.getExpenses();
+      res.json(expenses);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/expenses', async (req, res) => {
+    try {
+      const validated = insertExpenseSchema.parse(req.body);
+      const expense = await storage.createExpense(validated);
+      res.status(201).json(expense);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Channel routes
+  app.get('/api/channels', async (req, res) => {
+    try {
+      const channels = await storage.getChannels();
+      res.json(channels);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/channels', async (req, res) => {
+    try {
+      const validated = insertChannelSchema.parse(req.body);
+      const channel = await storage.createChannel(validated);
+      res.status(201).json(channel);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Message routes
+  app.get('/api/channels/:channelId/messages', async (req, res) => {
+    try {
+      const messages = await storage.getMessages(req.params.channelId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/channels/:channelId/messages', async (req, res) => {
+    try {
+      const messageData = {
+        ...req.body,
+        channelId: req.params.channelId
+      };
+      const validated = insertMessageSchema.parse(messageData);
+      const message = await storage.createMessage(validated);
+      res.status(201).json(message);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/messages/:id', async (req, res) => {
+    try {
+      const message = await storage.updateMessage(req.params.id, req.body);
+      if (!message) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/expenses/:id', async (req, res) => {
+    try {
+      const expense = await storage.getExpenseById(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      res.json(expense);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/expenses/:id', async (req, res) => {
+    try {
+      const expense = await storage.updateExpense(req.params.id, req.body);
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      res.json(expense);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
