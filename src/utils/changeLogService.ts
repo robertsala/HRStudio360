@@ -1,4 +1,49 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from '../lib/api';
+
+// Helper to convert camelCase API response to snake_case for backward compatibility
+function normalizeChangeLog(log: any): any {
+  if (!log) return null;
+  return {
+    id: log.id,
+    change_type: log.changeType,
+    title: log.title,
+    description: log.description,
+    affected_modules: log.affectedModules,
+    impact_level: log.impactLevel,
+    visibility_scope: log.visibilityScope,
+    user_id: log.userId,
+    technical_details: log.technicalDetails,
+    notification_sent: log.notificationSent,
+    version: log.version,
+    created_at: log.createdAt
+  };
+}
+
+function normalizeHistoricalChange(change: any): any {
+  if (!change) return null;
+  return {
+    id: change.id,
+    change_date: change.changeDate,
+    title: change.title,
+    description: change.description,
+    change_type: change.changeType,
+    created_at: change.createdAt
+  };
+}
+
+function normalizeChangeNotification(notification: any): any {
+  if (!notification) return null;
+  return {
+    id: notification.id,
+    change_log_id: notification.changeLogId,
+    user_id: notification.userId,
+    notification_type: notification.notificationType,
+    delivered_at: notification.deliveredAt,
+    read_at: notification.readAt,
+    acknowledged: notification.acknowledged,
+    change_log: notification.change_log ? normalizeChangeLog(notification.change_log) : undefined
+  };
+}
 
 export interface ChangeLogEntry {
   id?: string;
@@ -28,27 +73,21 @@ export interface ChangeNotification {
 class ChangeLogService {
   async createChangeLog(entry: ChangeLogEntry): Promise<string | null> {
     try {
-      const { data, error } = await supabase
-        .from('change_log')
-        .insert({
-          change_type: entry.change_type,
-          title: entry.title,
-          description: entry.description,
-          affected_modules: entry.affected_modules || [],
-          impact_level: entry.impact_level,
-          visibility_scope: entry.visibility_scope,
-          user_id: entry.user_id,
-          technical_details: entry.technical_details,
-          notification_sent: false,
-          version: entry.version
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      const changeLog: any = await apiClient.createChangeLog({
+        changeType: entry.change_type,
+        title: entry.title,
+        description: entry.description,
+        affectedModules: entry.affected_modules || [],
+        impactLevel: entry.impact_level,
+        visibilityScope: entry.visibility_scope,
+        userId: entry.user_id,
+        technicalDetails: entry.technical_details,
+        notificationSent: false,
+        version: entry.version
+      });
 
       console.log(`Change log created: ${entry.title}`);
-      return data?.id || null;
+      return changeLog?.id || null;
     } catch (error) {
       console.error('Error creating change log:', error);
       return null;
@@ -66,36 +105,28 @@ class ChangeLogService {
     limit: number = 100
   ): Promise<ChangeLogEntry[]> {
     try {
-      let query = supabase
-        .from('change_log')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const apiFilters: any = {};
+      if (filters?.change_type) apiFilters.changeType = filters.change_type;
+      if (filters?.start_date) apiFilters.startDate = filters.start_date;
+      if (filters?.end_date) apiFilters.endDate = filters.end_date;
 
-      if (filters?.change_type) {
-        query = query.eq('change_type', filters.change_type);
-      }
+      let logs: any[] = await apiClient.getChangeLogs(apiFilters, limit);
 
+      // Apply client-side filtering for features not supported by backend
       if (filters?.impact_level) {
-        query = query.eq('impact_level', filters.impact_level);
-      }
-
-      if (filters?.start_date) {
-        query = query.gte('created_at', filters.start_date);
-      }
-
-      if (filters?.end_date) {
-        query = query.lte('created_at', filters.end_date);
+        logs = logs.filter((log: any) => log.impactLevel === filters.impact_level);
       }
 
       if (filters?.search) {
-        query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+        const searchLower = filters.search.toLowerCase();
+        logs = logs.filter((log: any) =>
+          log.title?.toLowerCase().includes(searchLower) ||
+          log.description?.toLowerCase().includes(searchLower)
+        );
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data || [];
+      // Normalize to snake_case for backward compatibility
+      return logs.map(normalizeChangeLog);
     } catch (error) {
       console.error('Error fetching change logs:', error);
       return [];
@@ -104,14 +135,9 @@ class ChangeLogService {
 
   async getHistoricalChanges(limit: number = 100): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from('historical_changes')
-        .select('*')
-        .order('change_date', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data || [];
+      const changes = await apiClient.getHistoricalChanges(limit);
+      // Normalize to snake_case for backward compatibility
+      return (changes || []).map(normalizeHistoricalChange);
     } catch (error) {
       console.error('Error fetching historical changes:', error);
       return [];
@@ -171,28 +197,20 @@ class ChangeLogService {
 
   async getUnreadChangesCount(userId: string): Promise<number> {
     try {
-      const { data: recentChanges, error: changesError } = await supabase
-        .from('change_log')
-        .select('id')
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const recentChanges: any[] = await apiClient.getChangeLogs({ startDate: sevenDaysAgo });
 
-      if (changesError) throw changesError;
-
-      const changeIds = recentChanges?.map(c => c.id) || [];
-
+      const changeIds = recentChanges.map(c => c.id);
       if (changeIds.length === 0) return 0;
 
-      const { data: readNotifications, error: notifError } = await supabase
-        .from('change_notifications')
-        .select('change_log_id')
-        .eq('user_id', userId)
-        .not('read_at', 'is', null);
+      const notifications: any[] = await apiClient.getChangeNotifications(userId);
+      const readChangeIds = new Set(
+        notifications
+          .filter(n => n.readAt)
+          .map(n => n.changeLogId)
+      );
 
-      if (notifError) throw notifError;
-
-      const readChangeIds = new Set(readNotifications?.map(n => n.change_log_id) || []);
       const unreadCount = changeIds.filter(id => !readChangeIds.has(id)).length;
-
       return unreadCount;
     } catch (error) {
       console.error('Error getting unread changes count:', error);
@@ -202,23 +220,17 @@ class ChangeLogService {
 
   async createNotifications(changeLogId: string, userIds: string[]): Promise<void> {
     try {
-      const notifications = userIds.map(userId => ({
-        change_log_id: changeLogId,
-        user_id: userId,
-        notification_type: 'in_app' as const
-      }));
+      await Promise.all(
+        userIds.map(userId =>
+          apiClient.createChangeNotification({
+            changeLogId,
+            userId,
+            notificationType: 'in_app'
+          })
+        )
+      );
 
-      const { error } = await supabase
-        .from('change_notifications')
-        .insert(notifications);
-
-      if (error) throw error;
-
-      await supabase
-        .from('change_log')
-        .update({ notification_sent: true })
-        .eq('id', changeLogId);
-
+      await apiClient.updateChangeLog(changeLogId, { notificationSent: true });
       console.log(`Notifications created for ${userIds.length} users`);
     } catch (error) {
       console.error('Error creating notifications:', error);
@@ -227,35 +239,7 @@ class ChangeLogService {
 
   async markNotificationAsRead(changeLogId: string, userId: string): Promise<void> {
     try {
-      let { data: existing, error: fetchError } = await supabase
-        .from('change_notifications')
-        .select('id')
-        .eq('change_log_id', changeLogId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from('change_notifications')
-          .update({ read_at: new Date().toISOString() })
-          .eq('change_log_id', changeLogId)
-          .eq('user_id', userId);
-
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('change_notifications')
-          .insert({
-            change_log_id: changeLogId,
-            user_id: userId,
-            notification_type: 'in_app',
-            read_at: new Date().toISOString()
-          });
-
-        if (insertError) throw insertError;
-      }
+      await apiClient.markChangeNotificationRead(changeLogId, userId);
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -263,15 +247,25 @@ class ChangeLogService {
 
   async getUserNotifications(userId: string, limit: number = 50): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from('change_notifications')
-        .select('*, change_log(*)')
-        .eq('user_id', userId)
-        .order('delivered_at', { ascending: false })
-        .limit(limit);
+      let notifications: any[] = await apiClient.getChangeNotifications(userId);
+      
+      // Fetch change log details for each notification
+      const notificationsWithDetails = await Promise.all(
+        notifications.slice(0, limit).map(async (notification: any) => {
+          try {
+            const changeLog = await apiClient.getChangeLog(notification.changeLogId);
+            return normalizeChangeNotification({
+              ...notification,
+              change_log: changeLog
+            });
+          } catch (error) {
+            console.error('Failed to fetch change log details:', error);
+            return normalizeChangeNotification(notification);
+          }
+        })
+      );
 
-      if (error) throw error;
-      return data || [];
+      return notificationsWithDetails;
     } catch (error) {
       console.error('Error fetching user notifications:', error);
       return [];
@@ -284,25 +278,21 @@ class ChangeLogService {
     recent_changes: number;
   }> {
     try {
-      const { data: allChanges, error } = await supabase
-        .from('change_log')
-        .select('change_type, created_at');
-
-      if (error) throw error;
+      const allChanges: any[] = await apiClient.getChangeLogs({}, 1000);
 
       const byType: Record<string, number> = {};
       let recentChanges = 0;
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-      allChanges?.forEach(change => {
-        byType[change.change_type] = (byType[change.change_type] || 0) + 1;
-        if (new Date(change.created_at) > sevenDaysAgo) {
+      allChanges.forEach(change => {
+        byType[change.changeType] = (byType[change.changeType] || 0) + 1;
+        if (new Date(change.createdAt) > sevenDaysAgo) {
           recentChanges++;
         }
       });
 
       return {
-        total_changes: allChanges?.length || 0,
+        total_changes: allChanges.length,
         by_type: byType,
         recent_changes: recentChanges
       };
@@ -316,29 +306,19 @@ class ChangeLogService {
     try {
       let userIds: string[] = [];
 
+      // Get all profiles
+      const profiles: any[] = await apiClient.getProfiles();
+
       if (visibilityScope === 'all_employees') {
-        const { data: users, error } = await supabase
-          .from('profiles')
-          .select('id');
-
-        if (error) throw error;
-        userIds = users?.map(u => u.id) || [];
+        userIds = profiles.map(u => u.id);
       } else if (visibilityScope === 'hr_only') {
-        const { data: users, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .or('role.eq.hr,department.eq.HR');
-
-        if (error) throw error;
-        userIds = users?.map(u => u.id) || [];
+        userIds = profiles
+          .filter(u => u.role === 'hr' || u.department === 'HR')
+          .map(u => u.id);
       } else if (visibilityScope === 'product_owner_only') {
-        const { data: users, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('role', 'admin');
-
-        if (error) throw error;
-        userIds = users?.map(u => u.id) || [];
+        userIds = profiles
+          .filter(u => u.role === 'admin')
+          .map(u => u.id);
       }
 
       if (userIds.length > 0) {

@@ -1,5 +1,100 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from '../lib/api';
 import { chatEncryption } from './chatEncryptionService';
+
+// Normalization helpers to convert camelCase API responses to snake_case for backward compatibility
+function normalizeUser(user: any): any {
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    first_name: user.firstName,
+    last_name: user.lastName,
+    full_name: user.fullName,
+    avatar_url: user.avatarUrl,
+    role: user.role,
+    department: user.department,
+    job_title: user.jobTitle,
+    status: user.status,
+    created_at: user.createdAt,
+    updated_at: user.updatedAt
+  };
+}
+
+function normalizeChannel(channel: any): any {
+  if (!channel) return null;
+  
+  // Handle both camelCase API response and already-normalized fields
+  const unreadCount = channel.unread_count ?? channel.unreadCount ?? 0;
+  const lastMessage = channel.last_message ?? channel.lastMessage;
+  
+  return {
+    id: channel.id,
+    name: channel.name,
+    channel_type: channel.channelType,
+    department: channel.department,
+    description: channel.description,
+    is_active: channel.isActive,
+    created_by: channel.createdBy,
+    created_at: channel.createdAt,
+    updated_at: channel.updatedAt,
+    members: channel.members?.map(normalizeChannelMember),
+    unread_count: unreadCount,
+    last_message: lastMessage ? normalizeMessage(lastMessage) : null
+  };
+}
+
+function normalizeChannelMember(member: any): any {
+  if (!member) return null;
+  return {
+    id: member.id,
+    channel_id: member.channelId,
+    user_id: member.userId,
+    role: member.role,
+    joined_at: member.joinedAt,
+    last_read_at: member.lastReadAt,
+    notifications_enabled: member.notificationsEnabled,
+    user: normalizeUser(member.user)
+  };
+}
+
+function normalizeMessage(message: any): any {
+  if (!message) return null;
+  return {
+    id: message.id,
+    channel_id: message.channelId,
+    sender_id: message.senderId,
+    encrypted_content: message.encryptedContent,
+    decrypted_content: message.decrypted_content,
+    message_type: message.messageType,
+    file_url: message.fileUrl,
+    file_name: message.fileName,
+    file_size: message.fileSize,
+    reply_to_message_id: message.replyToMessageId,
+    edited_at: message.editedAt,
+    deleted_at: message.deletedAt,
+    created_at: message.createdAt,
+    sender: normalizeUser(message.sender),
+    read_by: message.readBy?.map((userId: string) => userId)
+  };
+}
+
+function normalizeUserPresence(presence: any): any {
+  if (!presence) return null;
+  return {
+    user_id: presence.userId,
+    status: presence.status,
+    last_seen_at: presence.lastSeenAt
+  };
+}
+
+function normalizeTypingIndicator(indicator: any): any {
+  if (!indicator) return null;
+  return {
+    channel_id: indicator.channelId,
+    user_id: indicator.userId,
+    started_typing_at: indicator.startedTypingAt
+  };
+}
 
 export interface Channel {
   id: string;
@@ -133,117 +228,6 @@ export class ChatService {
     }
   }
 
-  async ensureAIAssistantChannel(): Promise<void> {
-    if (!this.currentUserId) {
-      console.error('Cannot ensure AI Assistant channel: No user ID');
-      return;
-    }
-
-    try {
-      console.log('Ensuring AI Assistant channel exists...');
-      window.dispatchEvent(new CustomEvent('chat:ai-channel-progress', { detail: 'Checking your AI Assistant...' }));
-
-      // Use the new security definer function to ensure AI channel exists
-      const { data: channelId, error } = await supabase
-        .rpc('ensure_user_ai_channel', { target_user_id: this.currentUserId });
-
-      if (error) {
-        console.error('Failed to ensure AI Assistant channel:', error);
-        window.dispatchEvent(new CustomEvent('chat:channel-check-error', {
-          detail: { message: error.message }
-        }));
-        return;
-      }
-
-      console.log('AI Assistant channel confirmed:', channelId);
-      window.dispatchEvent(new CustomEvent('chat:channels-ready'));
-    } catch (error) {
-      console.error('Error ensuring AI Assistant channel:', error);
-      window.dispatchEvent(new CustomEvent('chat:channel-check-error', {
-        detail: { message: 'Failed to set up AI Assistant' }
-      }));
-    }
-  }
-
-  private async setupRealtimeSubscription(): Promise<void> {
-    if (!this.currentUserId) return;
-
-    this.realtimeChannel = supabase
-      .channel('chat-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages'
-        },
-        (payload) => {
-          this.handleNewMessage(payload.new as Message);
-          this.handleAIResponse(payload.new as Message);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'typing_indicators'
-        },
-        (payload) => {
-          this.handleTypingIndicator(payload.new as TypingIndicator);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_presence'
-        },
-        (payload) => {
-          this.handlePresenceUpdate(payload.new as UserPresence);
-        }
-      )
-      .subscribe();
-  }
-
-  private async handleAIResponse(message: Message): Promise<void> {
-    if (!this.currentUserId || message.message_type === 'system') return;
-
-    try {
-      const channel = await this.getChannel(message.channel_id);
-      if (channel?.channel_type === 'ai_assistant' && message.sender_id === this.currentUserId) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-        if (!supabaseUrl || !supabaseAnonKey) {
-          console.error('Supabase configuration missing');
-          return;
-        }
-
-        const functionUrl = `${supabaseUrl}/functions/v1/ai-assistant-chat`;
-
-        const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: message,
-            userId: this.currentUserId
-          })
-        });
-
-        if (!response.ok) {
-          console.error('AI assistant response failed:', await response.text());
-        }
-      }
-    } catch (error) {
-      console.error('Error handling AI response:', error);
-    }
-  }
-
   private handleNewMessage(message: Message): void {
     window.dispatchEvent(new CustomEvent('chat:new-message', { detail: message }));
   }
@@ -259,79 +243,58 @@ export class ChatService {
   async getChannels(): Promise<Channel[]> {
     if (!this.currentUserId) throw new Error('Not initialized');
 
-    const { data, error } = await supabase
-      .from('chat_channels')
-      .select(`
-        *,
-        members:channel_members!channel_members_channel_id_fkey(
-          id,
-          user_id,
-          role,
-          last_read_at,
-          user:profiles!channel_members_user_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            profile_picture,
-            department
-          )
-        )
-      `)
-      .eq('is_active', true)
-      .order('updated_at', { ascending: false });
+    try {
+      const channels = await apiClient.getChatChannels();
+      
+      // Filter out AI Assistant channels that don't belong to the current user
+      const filteredChannels = channels.filter((channel: any) => {
+        if (channel.channelType === 'ai_assistant') {
+          return channel.createdBy === this.currentUserId;
+        }
+        return true;
+      });
 
-    if (error) throw error;
+      // Get members for each channel
+      const channelsWithMembers = await Promise.all(
+        filteredChannels.map(async (channel: any) => {
+          const members = await apiClient.getChannelMembers(channel.id);
+          const unreadCount = await this.getUnreadCount(channel.id);
+          const lastMessage = await this.getLastMessage(channel.id);
 
-    // Filter out AI Assistant channels that don't belong to the current user
-    const filteredData = (data || []).filter(channel => {
-      if (channel.channel_type === 'ai_assistant') {
-        return channel.created_by === this.currentUserId;
-      }
-      return true;
-    });
+          const normalized = normalizeChannel(channel);
+          return {
+            ...normalized,
+            members: members.map(normalizeChannelMember),
+            unread_count: unreadCount,
+            last_message: lastMessage
+          };
+        })
+      );
 
-    const channelsWithUnread = await Promise.all(
-      filteredData.map(async (channel) => {
-        const unreadCount = await this.getUnreadCount(channel.id);
-        const lastMessage = await this.getLastMessage(channel.id);
-
-        return {
-          ...channel,
-          unread_count: unreadCount,
-          last_message: lastMessage
-        };
-      })
-    );
-
-    return channelsWithUnread;
+      return channelsWithMembers;
+    } catch (error) {
+      console.error('Failed to get channels:', error);
+      throw error;
+    }
   }
 
   async getChannel(channelId: string): Promise<Channel | null> {
-    const { data, error } = await supabase
-      .from('chat_channels')
-      .select(`
-        *,
-        members:channel_members!channel_members_channel_id_fkey(
-          id,
-          user_id,
-          role,
-          last_read_at,
-          user:profiles!channel_members_user_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            profile_picture,
-            department
-          )
-        )
-      `)
-      .eq('id', channelId)
-      .maybeSingle();
+    try {
+      const channel = await apiClient.getChatChannel(channelId);
+      if (!channel) return null;
 
-    if (error) throw error;
-    return data;
+      // Get members for the channel
+      const members = await apiClient.getChannelMembers(channelId);
+      
+      const normalized = normalizeChannel(channel);
+      return {
+        ...normalized,
+        members: members.map(normalizeChannelMember)
+      };
+    } catch (error) {
+      console.error('Failed to get channel:', error);
+      return null;
+    }
   }
 
   async createChannel(
@@ -343,35 +306,35 @@ export class ChatService {
   ): Promise<Channel> {
     if (!this.currentUserId) throw new Error('Not initialized');
 
-    const { data: channel, error: channelError } = await supabase
-      .from('chat_channels')
-      .insert({
+    try {
+      // Create the channel
+      const channel = await apiClient.createChatChannel({
         name,
-        channel_type: type,
+        channelType: type,
         department: department || null,
         description: description || null,
-        created_by: this.currentUserId
-      })
-      .select()
-      .single();
+        createdBy: this.currentUserId,
+        isActive: true
+      });
 
-    if (channelError) throw channelError;
+      // Add all members
+      const allMemberIds = [this.currentUserId, ...memberUserIds.filter(id => id !== this.currentUserId)];
 
-    const allMemberIds = [this.currentUserId, ...memberUserIds.filter(id => id !== this.currentUserId)];
+      await Promise.all(
+        allMemberIds.map((userId, index) =>
+          apiClient.addChannelMember(channel.id, {
+            userId,
+            role: index === 0 ? 'admin' : 'member',
+            notificationsEnabled: true
+          })
+        )
+      );
 
-    const membersToInsert = allMemberIds.map((userId, index) => ({
-      channel_id: channel.id,
-      user_id: userId,
-      role: index === 0 ? 'admin' : 'member'
-    }));
-
-    const { error: membersError } = await supabase
-      .from('channel_members')
-      .insert(membersToInsert);
-
-    if (membersError) throw membersError;
-
-    return channel;
+      return normalizeChannel(channel);
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+      throw error;
+    }
   }
 
   async uploadFile(
@@ -380,27 +343,21 @@ export class ChatService {
   ): Promise<{ url: string; path: string }> {
     if (!this.currentUserId) throw new Error('Not initialized');
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `${channelId}/${fileName}`;
-
-    const { data, error } = await supabase.storage
-      .from('chat-attachments')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (error) throw error;
-
-    const { data: urlData } = supabase.storage
-      .from('chat-attachments')
-      .getPublicUrl(filePath);
-
+    // TODO: Implement file upload endpoint in backend
+    // For now, file uploads are disabled
+    throw new Error('File uploads not yet implemented in migrated backend');
+    
+    /* Future implementation:
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('channelId', channelId);
+    
+    const response = await apiClient.uploadChatFile(channelId, formData);
     return {
-      url: urlData.publicUrl,
-      path: filePath
+      url: response.url,
+      path: response.path
     };
+    */
   }
 
   async sendMessage(
@@ -414,404 +371,292 @@ export class ChatService {
   ): Promise<Message> {
     if (!this.currentUserId) throw new Error('Not initialized');
 
-    const encryptedContent = messageType === 'system'
-      ? content
-      : await chatEncryption.encryptMessage(content);
+    try {
+      const encryptedContent = messageType === 'system'
+        ? content
+        : await chatEncryption.encryptMessage(content);
 
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert({
-        channel_id: channelId,
-        sender_id: this.currentUserId,
-        encrypted_content: encryptedContent,
-        message_type: messageType,
-        reply_to_message_id: replyToMessageId || null,
-        file_url: fileUrl || null,
-        file_name: fileName || null,
-        file_size: fileSize || null
-      })
-      .select(`
-        *,
-        sender:profiles!chat_messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          profile_picture
-        )
-      `)
-      .single();
+      const message = await apiClient.createChatMessage(channelId, {
+        senderId: this.currentUserId,
+        encryptedContent,
+        messageType,
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        fileSize: fileSize || null,
+        replyToMessageId: replyToMessageId || null
+      });
 
-    if (error) throw error;
+      // Update channel's updatedAt
+      await apiClient.updateChatChannel(channelId, {
+        updatedAt: new Date()
+      });
 
-    await supabase
-      .from('chat_channels')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', channelId);
-
-    const decryptedData = {
-      ...data,
-      decrypted_content: content
-    };
-
-    return decryptedData;
+      const normalized = normalizeMessage(message);
+      return {
+        ...normalized,
+        decrypted_content: messageType === 'system' ? content : await chatEncryption.decryptMessage(encryptedContent)
+      };
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      throw error;
+    }
   }
 
   async getMessages(
     channelId: string,
-    limit: number = 50,
-    before?: string
+    limit: number = 50
   ): Promise<Message[]> {
-    let query = supabase
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:profiles!chat_messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          profile_picture
-        )
-      `)
-      .eq('channel_id', channelId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    if (!this.currentUserId) throw new Error('Not initialized');
 
-    if (before) {
-      query = query.lt('created_at', before);
-    }
+    try {
+      const messages = await apiClient.getChatMessages(channelId, limit);
 
-    const { data, error } = await query;
+      // Decrypt and normalize messages
+      const decryptedMessages = await Promise.all(
+        messages.map(async (message: any) => {
+          try {
+            const decryptedContent = message.messageType === 'system'
+              ? message.encryptedContent
+              : await chatEncryption.decryptMessage(message.encryptedContent);
 
-    if (error) throw error;
-
-    const decryptedMessages = await Promise.all(
-      (data || []).map(async (message) => {
-        try {
-          if (message.message_type === 'system') {
+            const normalized = normalizeMessage(message);
             return {
-              ...message,
-              decrypted_content: message.encrypted_content
+              ...normalized,
+              decrypted_content: decryptedContent
+            };
+          } catch (decryptError) {
+            console.error('Failed to decrypt message:', decryptError);
+            const normalized = normalizeMessage(message);
+            return {
+              ...normalized,
+              decrypted_content: '[Decryption failed]'
             };
           }
+        })
+      );
 
-          try {
-            const parsed = JSON.parse(message.encrypted_content);
-            if (parsed && typeof parsed === 'object' && parsed.algorithm) {
-              const decrypted = await chatEncryption.decryptMessage(message.encrypted_content);
-              return {
-                ...message,
-                decrypted_content: decrypted
-              };
-            }
-          } catch {
-          }
-
-          const decrypted = await chatEncryption.decryptMessage(message.encrypted_content);
-          return {
-            ...message,
-            decrypted_content: decrypted
-          };
-        } catch (error) {
-          console.error('Failed to decrypt message:', message.id, error);
-          return {
-            ...message,
-            decrypted_content: null
-          };
-        }
-      })
-    );
-
-    return decryptedMessages.reverse();
+      return decryptedMessages;
+    } catch (error) {
+      console.error('Failed to get messages:', error);
+      throw error;
+    }
   }
 
   async getLastMessage(channelId: string): Promise<Message | null> {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:profiles!chat_messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          profile_picture
-        )
-      `)
-      .eq('channel_id', channelId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) return null;
-
     try {
-      if (data.message_type === 'system') {
-        return {
-          ...data,
-          decrypted_content: data.encrypted_content
-        };
-      }
-
-      const decrypted = await chatEncryption.decryptMessage(data.encrypted_content);
-      return {
-        ...data,
-        decrypted_content: decrypted
-      };
+      const messages = await this.getMessages(channelId, 1);
+      return messages.length > 0 ? messages[0] : null;
     } catch (error) {
-      console.error('Failed to decrypt last message:', data.id, error);
-      return {
-        ...data,
-        decrypted_content: null
-      };
+      console.error('Failed to get last message:', error);
+      return null;
     }
   }
 
   async markAsRead(channelId: string): Promise<void> {
-    if (!this.currentUserId) return;
+    if (!this.currentUserId) throw new Error('Not initialized');
 
-    await supabase
-      .from('channel_members')
-      .update({ last_read_at: new Date().toISOString() })
-      .eq('channel_id', channelId)
-      .eq('user_id', this.currentUserId);
+    try {
+      await apiClient.markChannelRead(channelId, this.currentUserId);
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+    }
   }
 
   async getUnreadCount(channelId: string): Promise<number> {
-    if (!this.currentUserId) return 0;
+    if (!this.currentUserId) throw new Error('Not initialized');
 
-    const { data: membership } = await supabase
-      .from('channel_members')
-      .select('last_read_at')
-      .eq('channel_id', channelId)
-      .eq('user_id', this.currentUserId)
-      .maybeSingle();
+    try {
+      // Get all messages
+      const messages = await apiClient.getChatMessages(channelId);
+      
+      // Get member's last read time
+      const members = await apiClient.getChannelMembers(channelId);
+      const currentMember = members.find((m: any) => m.userId === this.currentUserId);
+      
+      if (!currentMember || !currentMember.lastReadAt) {
+        return messages.length;
+      }
 
-    if (!membership) return 0;
+      const lastReadTime = new Date(currentMember.lastReadAt);
+      const unreadMessages = messages.filter((msg: any) => {
+        return new Date(msg.createdAt) > lastReadTime;
+      });
 
-    const { count } = await supabase
-      .from('chat_messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('channel_id', channelId)
-      .gt('created_at', membership.last_read_at)
-      .neq('sender_id', this.currentUserId);
-
-    return count || 0;
+      return unreadMessages.length;
+    } catch (error) {
+      console.error('Failed to get unread count:', error);
+      return 0;
+    }
   }
 
   async setTyping(channelId: string, isTyping: boolean): Promise<void> {
-    if (!this.currentUserId) return;
+    if (!this.currentUserId) throw new Error('Not initialized');
 
-    if (isTyping) {
-      await supabase
-        .from('typing_indicators')
-        .upsert({
-          channel_id: channelId,
-          user_id: this.currentUserId,
-          started_typing_at: new Date().toISOString()
-        });
-    } else {
-      await supabase
-        .from('typing_indicators')
-        .delete()
-        .eq('channel_id', channelId)
-        .eq('user_id', this.currentUserId);
+    try {
+      await apiClient.setTyping(channelId, this.currentUserId, isTyping);
+    } catch (error) {
+      console.error('Failed to set typing:', error);
     }
   }
 
   async getTypingUsers(channelId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('typing_indicators')
-      .select('user_id')
-      .eq('channel_id', channelId)
-      .neq('user_id', this.currentUserId || '')
-      .gte('started_typing_at', new Date(Date.now() - 10000).toISOString());
-
-    if (error) return [];
-    return (data || []).map(d => d.user_id);
+    try {
+      const indicators = await apiClient.getTypingIndicators(channelId);
+      return indicators.map((i: any) => i.userId).filter((id: string) => id !== this.currentUserId);
+    } catch (error) {
+      console.error('Failed to get typing users:', error);
+      return [];
+    }
   }
 
   async updatePresence(status: 'online' | 'away' | 'offline'): Promise<void> {
-    if (!this.currentUserId) return;
+    if (!this.currentUserId) throw new Error('Not initialized');
 
-    await supabase
-      .from('user_presence')
-      .upsert({
-        user_id: this.currentUserId,
-        status,
-        last_seen_at: new Date().toISOString()
-      });
+    try {
+      await apiClient.updateUserPresence(this.currentUserId, status);
+    } catch (error) {
+      console.error('Failed to update presence:', error);
+    }
   }
 
   async getUserPresence(userId: string): Promise<UserPresence | null> {
-    const { data, error } = await supabase
-      .from('user_presence')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) return null;
-    return data;
+    try {
+      const presence = await apiClient.getUserPresence(userId);
+      return presence ? normalizeUserPresence(presence) : null;
+    } catch (error) {
+      console.error('Failed to get user presence:', error);
+      return null;
+    }
   }
 
   async searchMessages(query: string, channelId?: string): Promise<Message[]> {
-    let searchQuery = supabase
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:profiles!chat_messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          profile_picture
-        )
-      `)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    // TODO: Implement server-side search endpoint for better performance
+    // For now, filter client-side
+    try {
+      let messages: Message[] = [];
+      
+      if (channelId) {
+        messages = await this.getMessages(channelId, 500);
+      } else {
+        // Search across all channels
+        const channels = await this.getChannels();
+        const allMessages = await Promise.all(
+          channels.map(channel => this.getMessages(channel.id, 100))
+        );
+        messages = allMessages.flat();
+      }
 
-    if (channelId) {
-      searchQuery = searchQuery.eq('channel_id', channelId);
+      // Filter by query
+      const lowerQuery = query.toLowerCase();
+      return messages.filter(msg => 
+        msg.decrypted_content?.toLowerCase().includes(lowerQuery)
+      );
+    } catch (error) {
+      console.error('Failed to search messages:', error);
+      return [];
     }
-
-    const { data, error } = await searchQuery;
-
-    if (error) throw error;
-
-    const decryptedMessages = await Promise.all(
-      (data || []).map(async (message) => {
-        try {
-          const decrypted = message.message_type === 'system'
-            ? message.encrypted_content
-            : await chatEncryption.decryptMessage(message.encrypted_content);
-
-          return {
-            ...message,
-            decrypted_content: decrypted
-          };
-        } catch (error) {
-          return null;
-        }
-      })
-    );
-
-    return decryptedMessages
-      .filter((msg): msg is Message => msg !== null && msg.decrypted_content?.toLowerCase().includes(query.toLowerCase()));
   }
 
   async addChannelMember(channelId: string, userId: string, role: 'admin' | 'member' = 'member'): Promise<void> {
-    const { error } = await supabase
-      .from('channel_members')
-      .insert({
-        channel_id: channelId,
-        user_id: userId,
-        role
+    try {
+      await apiClient.addChannelMember(channelId, {
+        userId,
+        role,
+        notificationsEnabled: true
       });
-
-    if (error) throw error;
+    } catch (error) {
+      console.error('Failed to add channel member:', error);
+      throw error;
+    }
   }
 
   async removeChannelMember(channelId: string, userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('channel_members')
-      .delete()
-      .eq('channel_id', channelId)
-      .eq('user_id', userId);
-
-    if (error) throw error;
+    try {
+      await apiClient.removeChannelMember(channelId, userId);
+    } catch (error) {
+      console.error('Failed to remove channel member:', error);
+      throw error;
+    }
   }
 
   async leaveChannel(channelId: string): Promise<void> {
-    if (!this.currentUserId) return;
-
+    if (!this.currentUserId) throw new Error('Not initialized');
     await this.removeChannelMember(channelId, this.currentUserId);
   }
 
   async deleteMessage(messageId: string): Promise<void> {
-    await supabase
-      .from('chat_messages')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', messageId);
+    try {
+      await apiClient.deleteChatMessage(messageId);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      throw error;
+    }
   }
 
   async editMessage(messageId: string, newContent: string): Promise<void> {
-    const encryptedContent = await chatEncryption.encryptMessage(newContent);
-
-    await supabase
-      .from('chat_messages')
-      .update({
-        encrypted_content: encryptedContent,
-        edited_at: new Date().toISOString()
-      })
-      .eq('id', messageId);
+    try {
+      const encryptedContent = await chatEncryption.encryptMessage(newContent);
+      await apiClient.updateChatMessage(messageId, {
+        encryptedContent,
+        editedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      throw error;
+    }
   }
 
-  // Message Reactions
   async addReaction(messageId: string, emoji: string): Promise<void> {
     if (!this.currentUserId) throw new Error('Not initialized');
 
-    const { error } = await supabase
-      .from('message_reactions')
-      .insert({
-        message_id: messageId,
-        user_id: this.currentUserId,
-        emoji
-      });
-
-    if (error) throw error;
+    try {
+      await apiClient.addMessageReaction(messageId, emoji, this.currentUserId);
+    } catch (error) {
+      console.error('Failed to add reaction:', error);
+      throw error;
+    }
   }
 
   async removeReaction(messageId: string, emoji: string): Promise<void> {
     if (!this.currentUserId) throw new Error('Not initialized');
 
-    const { error } = await supabase
-      .from('message_reactions')
-      .delete()
-      .eq('message_id', messageId)
-      .eq('user_id', this.currentUserId)
-      .eq('emoji', emoji);
-
-    if (error) throw error;
+    try {
+      await apiClient.removeMessageReaction(messageId, emoji, this.currentUserId);
+    } catch (error) {
+      console.error('Failed to remove reaction:', error);
+      throw error;
+    }
   }
 
   async getMessageReactions(messageId: string): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('message_reactions')
-      .select(`
-        *,
-        user:profiles!message_reactions_user_id_fkey(
-          id,
-          first_name,
-          last_name,
-          profile_picture
-        )
-      `)
-      .eq('message_id', messageId);
+    try {
+      const reactions = await apiClient.getMessageReactions(messageId);
+      
+      // Group by emoji
+      const grouped = reactions.reduce((acc: any, reaction: any) => {
+        if (!acc[reaction.emoji]) {
+          acc[reaction.emoji] = {
+            emoji: reaction.emoji,
+            count: 0,
+            users: []
+          };
+        }
+        acc[reaction.emoji].count++;
+        acc[reaction.emoji].users.push(reaction.userId);
+        return acc;
+      }, {});
 
-    if (error) throw error;
-    return data || [];
+      return Object.values(grouped);
+    } catch (error) {
+      console.error('Failed to get message reactions:', error);
+      return [];
+    }
   }
 
-  // Threaded Conversations
+  // Stub out remaining methods that rely on features not yet implemented
   async createThread(parentMessageId: string, channelId: string): Promise<any> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { data, error } = await supabase
-      .from('message_threads')
-      .insert({
-        parent_message_id: parentMessageId,
-        channel_id: channelId
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    // TODO: Implement threads in backend
+    throw new Error('Threads not yet implemented in migrated backend');
   }
 
   async sendThreadReply(
@@ -819,277 +664,127 @@ export class ChatService {
     channelId: string,
     content: string
   ): Promise<Message> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const encryptedContent = await chatEncryption.encryptMessage(content);
-
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert({
-        channel_id: channelId,
-        thread_id: threadId,
-        sender_id: this.currentUserId,
-        encrypted_content: encryptedContent,
-        message_type: 'text'
-      })
-      .select(`
-        *,
-        sender:profiles!chat_messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          profile_picture
-        )
-      `)
-      .single();
-
-    if (error) throw error;
-
-    return {
-      ...data,
-      decrypted_content: content
-    };
+    // TODO: Implement threads in backend
+    throw new Error('Threads not yet implemented in migrated backend');
   }
 
   async getThreadMessages(threadId: string): Promise<Message[]> {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select(`
-        *,
-        sender:profiles!chat_messages_sender_id_fkey(
-          id,
-          first_name,
-          last_name,
-          email,
-          profile_picture
-        )
-      `)
-      .eq('thread_id', threadId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-
-    const decryptedMessages = await Promise.all(
-      (data || []).map(async (message) => {
-        try {
-          const decrypted = await chatEncryption.decryptMessage(message.encrypted_content);
-          return {
-            ...message,
-            decrypted_content: decrypted
-          };
-        } catch (error) {
-          console.error('Failed to decrypt thread message:', message.id, error);
-          return {
-            ...message,
-            decrypted_content: null
-          };
-        }
-      })
-    );
-
-    return decryptedMessages;
+    // TODO: Implement threads in backend
+    return [];
   }
 
-  // Pinned Messages
   async pinMessage(messageId: string, channelId: string): Promise<void> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { error } = await supabase
-      .from('pinned_messages')
-      .insert({
-        message_id: messageId,
-        channel_id: channelId,
-        pinned_by: this.currentUserId
-      });
-
-    if (error) throw error;
+    // TODO: Implement pinned messages in backend schema
+    console.warn('Pinned messages not yet implemented in migrated backend');
   }
 
   async unpinMessage(messageId: string, channelId: string): Promise<void> {
-    const { error } = await supabase
-      .from('pinned_messages')
-      .delete()
-      .eq('message_id', messageId)
-      .eq('channel_id', channelId);
-
-    if (error) throw error;
+    // TODO: Implement pinned messages in backend schema
+    console.warn('Pinned messages not yet implemented in migrated backend');
   }
 
   async getPinnedMessages(channelId: string): Promise<Message[]> {
-    const { data, error } = await supabase
-      .from('pinned_messages')
-      .select(`
-        message:chat_messages(
-          *,
-          sender:profiles!chat_messages_sender_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            profile_picture
-          )
-        )
-      `)
-      .eq('channel_id', channelId)
-      .order('pinned_at', { ascending: false });
-
-    if (error) throw error;
-
-    const messages = (data || []).map(item => item.message).filter(Boolean);
-
-    const decryptedMessages = await Promise.all(
-      messages.map(async (message: any) => {
-        try {
-          const decrypted = message.message_type === 'system'
-            ? message.encrypted_content
-            : await chatEncryption.decryptMessage(message.encrypted_content);
-          return {
-            ...message,
-            decrypted_content: decrypted
-          };
-        } catch (error) {
-          return {
-            ...message,
-            decrypted_content: null
-          };
-        }
-      })
-    );
-
-    return decryptedMessages;
+    // TODO: Implement pinned messages in backend schema
+    return [];
   }
 
-  // Message Bookmarks
   async bookmarkMessage(messageId: string, note?: string): Promise<void> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { error } = await supabase
-      .from('message_bookmarks')
-      .insert({
-        message_id: messageId,
-        user_id: this.currentUserId,
-        note: note || null
-      });
-
-    if (error) throw error;
+    // TODO: Implement bookmarks in backend schema
+    console.warn('Bookmarks not yet implemented in migrated backend');
   }
 
   async removeBookmark(messageId: string): Promise<void> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { error } = await supabase
-      .from('message_bookmarks')
-      .delete()
-      .eq('message_id', messageId)
-      .eq('user_id', this.currentUserId);
-
-    if (error) throw error;
+    // TODO: Implement bookmarks in backend schema
+    console.warn('Bookmarks not yet implemented in migrated backend');
   }
 
   async getBookmarkedMessages(): Promise<any[]> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { data, error } = await supabase
-      .from('message_bookmarks')
-      .select(`
-        *,
-        message:chat_messages(
-          *,
-          sender:profiles!chat_messages_sender_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            profile_picture
-          )
-        )
-      `)
-      .eq('user_id', this.currentUserId)
-      .order('bookmarked_at', { ascending: false });
-
-    if (error) throw error;
-
-    const bookmarks = await Promise.all(
-      (data || []).map(async (bookmark: any) => {
-        const message = bookmark.message;
-        try {
-          const decrypted = message.message_type === 'system'
-            ? message.encrypted_content
-            : await chatEncryption.decryptMessage(message.encrypted_content);
-          return {
-            ...bookmark,
-            message: {
-              ...message,
-              decrypted_content: decrypted
-            }
-          };
-        } catch (error) {
-          return {
-            ...bookmark,
-            message: {
-              ...message,
-              decrypted_content: null
-            }
-          };
-        }
-      })
-    );
-
-    return bookmarks;
+    // TODO: Implement bookmarks in backend schema
+    return [];
   }
 
-  // Channel Favorites
   async favoriteChannel(channelId: string): Promise<void> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { error } = await supabase
-      .from('channel_favorites')
-      .insert({
-        channel_id: channelId,
-        user_id: this.currentUserId
-      });
-
-    if (error) throw error;
+    // TODO: Implement channel favorites in backend schema
+    console.warn('Channel favorites not yet implemented in migrated backend');
   }
 
   async unfavoriteChannel(channelId: string): Promise<void> {
-    if (!this.currentUserId) throw new Error('Not initialized');
-
-    const { error } = await supabase
-      .from('channel_favorites')
-      .delete()
-      .eq('channel_id', channelId)
-      .eq('user_id', this.currentUserId);
-
-    if (error) throw error;
+    // TODO: Implement channel favorites in backend schema
+    console.warn('Channel favorites not yet implemented in migrated backend');
   }
 
   async getFavoriteChannels(): Promise<string[]> {
-    if (!this.currentUserId) throw new Error('Not initialized');
+    // TODO: Implement channel favorites in backend schema
+    return [];
+  }
 
-    const { data, error } = await supabase
-      .from('channel_favorites')
-      .select('channel_id')
-      .eq('user_id', this.currentUserId);
+  // Real-time subscription methods - stubbed for now
+  private async setupRealtimeSubscription(): Promise<void> {
+    // TODO: Implement WebSocket or polling for real-time updates
+    console.log('Real-time subscriptions will be implemented via WebSocket/polling in future update');
+    
+    /* Future WebSocket implementation:
+    const ws = new WebSocket(`${websocketUrl}/chat?userId=${this.currentUserId}`);
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'new_message') {
+        this.handleNewMessage(data.message);
+      } else if (data.type === 'typing') {
+        this.handleTypingIndicator(data.indicator);
+      } else if (data.type === 'presence') {
+        this.handlePresenceUpdate(data.presence);
+      }
+    };
+    */
+  }
 
-    if (error) throw error;
-    return (data || []).map(item => item.channel_id);
+  async ensureAIAssistantChannel(): Promise<void> {
+    if (!this.currentUserId) return;
+
+    try {
+      const channels = await this.getChannels();
+      const aiChannel = channels.find(c => 
+        c.channel_type === 'ai_assistant' && c.created_by === this.currentUserId
+      );
+
+      if (!aiChannel) {
+        await this.createChannel(
+          'AI Assistant',
+          'ai_assistant' as any,
+          [],
+          undefined,
+          'Chat with your AI HR assistant'
+        );
+      }
+    } catch (error) {
+      console.error('Failed to ensure AI assistant channel:', error);
+    }
+  }
+
+  private async handleAIResponse(message: Message): Promise<void> {
+    // TODO: Update AI assistant endpoint call
+    try {
+      if (message.channel_id && this.currentUserId) {
+        const response = await apiClient.chatWithAssistant(
+          message.decrypted_content || message.encrypted_content,
+          this.currentUserId
+        );
+        // AI response will be handled by the backend
+      }
+    } catch (error) {
+      console.error('Error handling AI response:', error);
+    }
   }
 
   cleanup(): void {
     if (this.realtimeChannel) {
-      supabase.removeChannel(this.realtimeChannel);
+      // TODO: Close WebSocket connection when implemented
       this.realtimeChannel = null;
     }
 
     if (this.currentUserId) {
-      this.updatePresence('offline');
+      this.updatePresence('offline').catch(console.error);
     }
-
-    this.currentUserId = null;
-    chatEncryption.clearKeys();
   }
 }
 
