@@ -13,11 +13,16 @@ interface Session {
 interface Profile {
   id: string;
   email: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  profile_picture: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profilePicture: string | null;
   role: string | null;
-  preferred_language: string | null;
+  dateOfBirth: string | null;
+  hireDate: string | null;
+  lastBirthdayShown: string | null;
+  lastAnniversaryShown: string | null;
+  languagePreference: string | null;
+  themePreference: string | null;
 }
 
 class ApiClient {

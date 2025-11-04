@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { apiClient } from '../lib/api';
 import i18n from '../i18n';
 
 export interface CelebrationData {
@@ -45,16 +45,7 @@ export interface EarnedBadge {
 export const celebrationService = {
   async checkForCelebrations(userId: string): Promise<CelebrationData | null> {
     try {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('date_of_birth, hire_date, last_birthday_shown, last_anniversary_shown')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Error fetching profile for celebration check:', profileError);
-        return null;
-      }
+      const profile = await apiClient.getProfile(userId);
 
       if (!profile) {
         return null;
@@ -63,18 +54,15 @@ export const celebrationService = {
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
 
-      if (profile.date_of_birth) {
-        const birthDate = new Date(profile.date_of_birth);
+      if (profile.dateOfBirth) {
+        const birthDate = new Date(profile.dateOfBirth);
         const isBirthday = this.isSameMonthDay(today, birthDate);
 
-        if (isBirthday && profile.last_birthday_shown !== todayStr) {
+        if (isBirthday && profile.lastBirthdayShown !== todayStr) {
           const age = this.calculateAge(birthDate, today);
           const isMilestone = this.isBirthdayMilestone(age);
 
-          await supabase
-            .from('profiles')
-            .update({ last_birthday_shown: todayStr })
-            .eq('id', userId);
+          await apiClient.updateProfile(userId, { lastBirthdayShown: todayStr });
 
           const celebration: CelebrationData = {
             type: 'birthday',
@@ -97,26 +85,19 @@ export const celebrationService = {
         }
       }
 
-      if (profile.hire_date) {
-        const hireDate = new Date(profile.hire_date);
+      if (profile.hireDate) {
+        const hireDate = new Date(profile.hireDate);
         const isAnniversary = this.isSameMonthDay(today, hireDate);
 
-        if (isAnniversary && profile.last_anniversary_shown !== todayStr) {
+        if (isAnniversary && profile.lastAnniversaryShown !== todayStr) {
           const yearsOfService = this.calculateYearsOfService(hireDate, today);
 
           if (yearsOfService > 0) {
             const isMilestone = yearsOfService % 5 === 0;
 
-            const { data: badge } = await supabase
-              .from('anniversary_badges')
-              .select('*')
-              .eq('year_number', yearsOfService)
-              .maybeSingle();
+            const badge = await apiClient.getCelebrationBadgeByYears(yearsOfService);
 
-            await supabase
-              .from('profiles')
-              .update({ last_anniversary_shown: todayStr })
-              .eq('id', userId);
+            await apiClient.updateProfile(userId, { lastAnniversaryShown: todayStr });
 
             const yearLabel = yearsOfService === 1
               ? i18n.t('celebrations.year')
@@ -129,11 +110,11 @@ export const celebrationService = {
               isMilestone,
               badgeId: badge?.id,
               badgeInfo: badge ? {
-                title: badge.badge_title,
-                description: badge.badge_description,
-                color: badge.badge_color,
-                icon: badge.badge_icon,
-                tierName: badge.tier_name
+                title: badge.title,
+                description: badge.description,
+                color: badge.color,
+                icon: badge.icon,
+                tierName: badge.tierName
               } : undefined,
               message: {
                 title: isMilestone
@@ -197,15 +178,13 @@ export const celebrationService = {
 
   async saveCelebrationHistory(userId: string, celebration: CelebrationData): Promise<void> {
     try {
-      await supabase
-        .from('celebration_history')
-        .insert({
-          employee_id: userId,
-          celebration_type: celebration.type,
-          celebration_date: celebration.date.toISOString().split('T')[0],
-          years_count: celebration.yearsCount || null,
-          is_milestone: celebration.isMilestone
-        });
+      await apiClient.saveCelebrationHistory({
+        userId,
+        type: celebration.type,
+        celebrationDate: celebration.date.toISOString().split('T')[0],
+        yearsCount: celebration.yearsCount || null,
+        isMilestone: celebration.isMilestone
+      });
     } catch (error) {
       console.error('Error saving celebration history:', error);
     }
@@ -216,20 +195,18 @@ export const celebrationService = {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      await supabase
-        .from('celebration_notifications')
-        .insert({
-          employee_id: userId,
-          celebration_type: celebration.type,
-          celebration_date: celebration.date.toISOString().split('T')[0],
-          years_count: celebration.yearsCount || null,
-          is_milestone: celebration.isMilestone,
-          badge_id: celebration.badgeId || null,
-          message_title: celebration.message.title,
-          message_body: celebration.message.body,
-          can_replay: true,
-          expires_at: expiresAt.toISOString()
-        });
+      await apiClient.createCelebrationNotification({
+        userId,
+        type: celebration.type,
+        celebrationDate: celebration.date.toISOString().split('T')[0],
+        yearsCount: celebration.yearsCount || null,
+        isMilestone: celebration.isMilestone,
+        badgeId: celebration.badgeId || null,
+        messageTitle: celebration.message.title,
+        messageBody: celebration.message.body,
+        canReplay: true,
+        expiresAt: expiresAt.toISOString()
+      });
     } catch (error) {
       console.error('Error creating celebration notification:', error);
     }
@@ -237,12 +214,7 @@ export const celebrationService = {
 
   async markCelebrationDismissed(userId: string, celebrationType: 'birthday' | 'anniversary', celebrationDate: string): Promise<void> {
     try {
-      await supabase
-        .from('celebration_history')
-        .update({ dismissed_at: new Date().toISOString() })
-        .eq('employee_id', userId)
-        .eq('celebration_type', celebrationType)
-        .eq('celebration_date', celebrationDate);
+      await apiClient.markCelebrationDismissed(userId, celebrationType, celebrationDate);
     } catch (error) {
       console.error('Error marking celebration dismissed:', error);
     }
@@ -250,28 +222,9 @@ export const celebrationService = {
 
   async replayCelebration(notificationId: string): Promise<void> {
     try {
-      const { data: notification } = await supabase
-        .from('celebration_notifications')
-        .select('*')
-        .eq('id', notificationId)
-        .maybeSingle();
-
-      if (!notification) return;
-
-      await supabase
-        .from('celebration_history')
-        .update({
-          replay_count: supabase.rpc('increment_replay_count', { celebration_id: notification.id }),
-          last_replayed_at: new Date().toISOString()
-        })
-        .eq('employee_id', notification.employee_id)
-        .eq('celebration_type', notification.celebration_type)
-        .eq('celebration_date', notification.celebration_date);
-
-      await supabase
-        .from('celebration_notifications')
-        .update({ replayed_at: new Date().toISOString() })
-        .eq('id', notificationId);
+      // TODO: Implement replay celebration functionality
+      // This requires additional backend support for replay tracking
+      console.log('Replay celebration:', notificationId);
     } catch (error) {
       console.error('Error replaying celebration:', error);
     }
@@ -279,21 +232,8 @@ export const celebrationService = {
 
   async getEarnedBadges(userId: string): Promise<EarnedBadge[]> {
     try {
-      const { data, error } = await supabase
-        .from('earned_badges')
-        .select(`
-          *,
-          badge:anniversary_badges(*)
-        `)
-        .eq('employee_id', userId)
-        .order('earned_date', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching earned badges:', error);
-        return [];
-      }
-
-      return data as EarnedBadge[];
+      const badges = await apiClient.getEarnedBadges(userId);
+      return badges as EarnedBadge[];
     } catch (error) {
       console.error('Error fetching earned badges:', error);
       return [];
@@ -302,17 +242,8 @@ export const celebrationService = {
 
   async getAllBadges(): Promise<Badge[]> {
     try {
-      const { data, error } = await supabase
-        .from('anniversary_badges')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching all badges:', error);
-        return [];
-      }
-
-      return data as Badge[];
+      const badges = await apiClient.getCelebrationBadges();
+      return badges as Badge[];
     } catch (error) {
       console.error('Error fetching all badges:', error);
       return [];
@@ -321,11 +252,7 @@ export const celebrationService = {
 
   async markBadgeViewed(badgeId: string, userId: string): Promise<void> {
     try {
-      await supabase
-        .from('earned_badges')
-        .update({ viewed_at: new Date().toISOString(), is_new: false })
-        .eq('employee_id', userId)
-        .eq('badge_id', badgeId);
+      await apiClient.markBadgeViewed(userId, badgeId);
     } catch (error) {
       console.error('Error marking badge viewed:', error);
     }
@@ -333,19 +260,10 @@ export const celebrationService = {
 
   async getCelebrationNotifications(userId: string): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from('celebration_notifications')
-        .select('*')
-        .eq('employee_id', userId)
-        .gte('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching celebration notifications:', error);
-        return [];
-      }
-
-      return data || [];
+      const notifications = await apiClient.getCelebrationNotifications(userId);
+      // Filter for non-expired notifications
+      const now = new Date().toISOString();
+      return notifications.filter((n: any) => n.expiresAt && n.expiresAt >= now);
     } catch (error) {
       console.error('Error fetching celebration notifications:', error);
       return [];
@@ -358,36 +276,26 @@ export const celebrationService = {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(today.getDate() + 30);
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, date_of_birth, hire_date')
-        .not('date_of_birth', 'is', null)
-        .not('hire_date', 'is', null);
-
-      if (error) {
-        console.error('Error fetching upcoming celebrations:', error);
-        return [];
-      }
-
+      const profiles = await apiClient.getProfiles();
       const celebrations: any[] = [];
 
-      data?.forEach(profile => {
-        if (profile.date_of_birth) {
-          const birthday = new Date(profile.date_of_birth);
+      profiles?.forEach((profile: any) => {
+        if (profile.dateOfBirth) {
+          const birthday = new Date(profile.dateOfBirth);
           const thisYearBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
 
           if (thisYearBirthday >= today && thisYearBirthday <= thirtyDaysFromNow) {
             celebrations.push({
               type: 'birthday',
               date: thisYearBirthday,
-              employeeName: `${profile.first_name} ${profile.last_name}`,
+              employeeName: `${profile.firstName} ${profile.lastName}`,
               employeeId: profile.id
             });
           }
         }
 
-        if (profile.hire_date) {
-          const hireDate = new Date(profile.hire_date);
+        if (profile.hireDate) {
+          const hireDate = new Date(profile.hireDate);
           const thisYearAnniversary = new Date(today.getFullYear(), hireDate.getMonth(), hireDate.getDate());
           const yearsOfService = this.calculateYearsOfService(hireDate, thisYearAnniversary);
 
@@ -395,7 +303,7 @@ export const celebrationService = {
             celebrations.push({
               type: 'anniversary',
               date: thisYearAnniversary,
-              employeeName: `${profile.first_name} ${profile.last_name}`,
+              employeeName: `${profile.firstName} ${profile.lastName}`,
               employeeId: profile.id,
               yearsCount: yearsOfService,
               isMilestone: yearsOfService % 5 === 0
