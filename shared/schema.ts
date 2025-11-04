@@ -331,10 +331,14 @@ export const changeNotifications = pgTable('change_notifications', {
 // Celebration badges
 export const celebrationBadges = pgTable('celebration_badges', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  name: text('name').notNull(),
-  description: text('description'),
-  icon: text('icon'),
-  years: integer('years').notNull(),
+  yearNumber: integer('year_number').notNull(),
+  badgeTitle: text('badge_title').notNull(),
+  badgeDescription: text('badge_description'),
+  badgeColor: text('badge_color').notNull(),
+  badgeIcon: text('badge_icon').notNull(),
+  tierName: text('tier_name').notNull(),
+  isMilestone: boolean('is_milestone').default(false),
+  sortOrder: integer('sort_order').notNull(),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -353,7 +357,9 @@ export const celebrationHistory = pgTable('celebration_history', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid('user_id').references(() => profiles.id).notNull(),
   type: text('type').notNull(),
-  celebrationDate: timestamp('celebration_date').notNull(),
+  celebrationDate: text('celebration_date').notNull(),
+  yearsCount: integer('years_count'),
+  isMilestone: boolean('is_milestone').default(false),
   shownAt: timestamp('shown_at').defaultNow(),
   dismissedAt: timestamp('dismissed_at'),
   replayCount: integer('replay_count').default(0)
@@ -364,9 +370,16 @@ export const celebrationNotifications = pgTable('celebration_notifications', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid('user_id').references(() => profiles.id).notNull(),
   type: text('type').notNull(),
-  celebrationDate: timestamp('celebration_date').notNull(),
-  message: text('message'),
-  replayedAt: timestamp('replayed_at'),
+  celebrationDate: text('celebration_date').notNull(),
+  yearsCount: integer('years_count'),
+  isMilestone: boolean('is_milestone').default(false),
+  badgeId: uuid('badge_id').references(() => celebrationBadges.id),
+  messageTitle: text('message_title').notNull(),
+  messageBody: text('message_body').notNull(),
+  canReplay: boolean('can_replay').default(true),
+  expiresAt: text('expires_at').notNull(),
+  viewedAt: timestamp('viewed_at'),
+  dismissedAt: timestamp('dismissed_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
