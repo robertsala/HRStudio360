@@ -228,35 +228,104 @@ export const employeeExpenseEnrollment = pgTable('employee_expense_enrollment', 
 });
 
 // Chat channels
-export const channels = pgTable('channels', {
+export const chatChannels = pgTable('chat_channels', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   name: text('name').notNull(),
+  channelType: text('channel_type').notNull(),
+  department: text('department'),
   description: text('description'),
-  type: text('type').default('public'),
+  isActive: boolean('is_active').default(true),
   createdBy: uuid('created_by').references(() => profiles.id),
-  createdAt: timestamp('created_at').defaultNow()
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
 
 // Channel members
 export const channelMembers = pgTable('channel_members', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  channelId: uuid('channel_id').references(() => channels.id).notNull(),
+  channelId: uuid('channel_id').references(() => chatChannels.id).notNull(),
   userId: uuid('user_id').references(() => profiles.id).notNull(),
   role: text('role').default('member'),
-  joinedAt: timestamp('joined_at').defaultNow()
+  joinedAt: timestamp('joined_at').defaultNow(),
+  lastReadAt: timestamp('last_read_at').defaultNow(),
+  notificationsEnabled: boolean('notifications_enabled').default(true)
 });
 
-// Messages
-export const messages = pgTable('messages', {
+// Chat messages
+export const chatMessages = pgTable('chat_messages', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  channelId: uuid('channel_id').references(() => channels.id).notNull(),
+  channelId: uuid('channel_id').references(() => chatChannels.id).notNull(),
+  senderId: uuid('sender_id').references(() => profiles.id),
+  encryptedContent: text('encrypted_content').notNull(),
+  messageType: text('message_type').default('text'),
+  fileUrl: text('file_url'),
+  fileName: text('file_name'),
+  fileSize: integer('file_size'),
+  replyToMessageId: uuid('reply_to_message_id').references((): any => chatMessages.id),
+  editedAt: timestamp('edited_at'),
+  deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Message reactions
+export const messageReactions = pgTable('message_reactions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  messageId: uuid('message_id').references(() => chatMessages.id).notNull(),
   userId: uuid('user_id').references(() => profiles.id).notNull(),
-  content: text('content').notNull(),
-  parentId: uuid('parent_id').references((): any => messages.id),
-  isEdited: boolean('is_edited').default(false),
-  isDeleted: boolean('is_deleted').default(false),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
+  emoji: text('emoji').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Typing indicators
+export const typingIndicators = pgTable('typing_indicators', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  channelId: uuid('channel_id').references(() => chatChannels.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  startedTypingAt: timestamp('started_typing_at').defaultNow()
+});
+
+// User presence
+export const userPresence = pgTable('user_presence', {
+  userId: uuid('user_id').primaryKey().references(() => profiles.id).notNull(),
+  status: text('status').default('offline'),
+  lastSeenAt: timestamp('last_seen_at').defaultNow()
+});
+
+// Change log
+export const changeLog = pgTable('change_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  changeType: text('change_type').notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  affectedModules: text('affected_modules').array(),
+  impactLevel: text('impact_level').notNull(),
+  visibilityScope: text('visibility_scope').notNull(),
+  userId: uuid('user_id').references(() => profiles.id),
+  technicalDetails: text('technical_details'),
+  notificationSent: boolean('notification_sent').default(false),
+  version: text('version'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Historical changes
+export const historicalChanges = pgTable('historical_changes', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  changeDate: timestamp('change_date').notNull(),
+  changeType: text('change_type').notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Change notifications
+export const changeNotifications = pgTable('change_notifications', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  changeLogId: uuid('change_log_id').references(() => changeLog.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  notificationType: text('notification_type').notNull(),
+  deliveredAt: timestamp('delivered_at').defaultNow(),
+  readAt: timestamp('read_at'),
+  acknowledged: boolean('acknowledged').default(false)
 });
 
 // Celebration badges
@@ -308,8 +377,15 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: tru
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCandidateSchema = createInsertSchema(candidates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
-export const insertChannelSchema = createInsertSchema(channels).omit({ id: true, createdAt: true });
-export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertChatChannelSchema = createInsertSchema(chatChannels).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertChannelMemberSchema = createInsertSchema(channelMembers).omit({ id: true, joinedAt: true, lastReadAt: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({ id: true, createdAt: true });
+export const insertTypingIndicatorSchema = createInsertSchema(typingIndicators).omit({ id: true, startedTypingAt: true });
+export const insertUserPresenceSchema = createInsertSchema(userPresence).omit({ lastSeenAt: true });
+export const insertChangeLogSchema = createInsertSchema(changeLog).omit({ id: true, createdAt: true });
+export const insertHistoricalChangeSchema = createInsertSchema(historicalChanges).omit({ id: true, createdAt: true });
+export const insertChangeNotificationSchema = createInsertSchema(changeNotifications).omit({ id: true, deliveredAt: true });
 export const insertCelebrationBadgeSchema = createInsertSchema(celebrationBadges).omit({ id: true, createdAt: true });
 export const insertEarnedBadgeSchema = createInsertSchema(earnedBadges).omit({ id: true, earnedAt: true });
 export const insertCelebrationHistorySchema = createInsertSchema(celebrationHistory).omit({ id: true, shownAt: true });
@@ -328,10 +404,24 @@ export type Candidate = typeof candidates.$inferSelect;
 export type InsertCandidate = z.infer<typeof insertCandidateSchema>;
 export type Expense = typeof expenses.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
-export type Channel = typeof channels.$inferSelect;
-export type InsertChannel = z.infer<typeof insertChannelSchema>;
-export type Message = typeof messages.$inferSelect;
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type ChatChannel = typeof chatChannels.$inferSelect;
+export type InsertChatChannel = z.infer<typeof insertChatChannelSchema>;
+export type ChannelMember = typeof channelMembers.$inferSelect;
+export type InsertChannelMember = z.infer<typeof insertChannelMemberSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type MessageReaction = typeof messageReactions.$inferSelect;
+export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;
+export type TypingIndicator = typeof typingIndicators.$inferSelect;
+export type InsertTypingIndicator = z.infer<typeof insertTypingIndicatorSchema>;
+export type UserPresence = typeof userPresence.$inferSelect;
+export type InsertUserPresence = z.infer<typeof insertUserPresenceSchema>;
+export type ChangeLog = typeof changeLog.$inferSelect;
+export type InsertChangeLog = z.infer<typeof insertChangeLogSchema>;
+export type HistoricalChange = typeof historicalChanges.$inferSelect;
+export type InsertHistoricalChange = z.infer<typeof insertHistoricalChangeSchema>;
+export type ChangeNotification = typeof changeNotifications.$inferSelect;
+export type InsertChangeNotification = z.infer<typeof insertChangeNotificationSchema>;
 export type CelebrationBadge = typeof celebrationBadges.$inferSelect;
 export type InsertCelebrationBadge = z.infer<typeof insertCelebrationBadgeSchema>;
 export type EarnedBadge = typeof earnedBadges.$inferSelect;
