@@ -255,6 +255,48 @@ export const messages = pgTable('messages', {
   updatedAt: timestamp('updated_at').defaultNow()
 });
 
+// Celebration badges
+export const celebrationBadges = pgTable('celebration_badges', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'),
+  years: integer('years').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Earned badges
+export const earnedBadges = pgTable('earned_badges', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  badgeId: uuid('badge_id').references(() => celebrationBadges.id).notNull(),
+  earnedAt: timestamp('earned_at').defaultNow(),
+  viewedAt: timestamp('viewed_at'),
+  isNew: boolean('is_new').default(true)
+});
+
+// Celebration history
+export const celebrationHistory = pgTable('celebration_history', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  type: text('type').notNull(),
+  celebrationDate: timestamp('celebration_date').notNull(),
+  shownAt: timestamp('shown_at').defaultNow(),
+  dismissedAt: timestamp('dismissed_at'),
+  replayCount: integer('replay_count').default(0)
+});
+
+// Celebration notifications
+export const celebrationNotifications = pgTable('celebration_notifications', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  type: text('type').notNull(),
+  celebrationDate: timestamp('celebration_date').notNull(),
+  message: text('message'),
+  replayedAt: timestamp('replayed_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
