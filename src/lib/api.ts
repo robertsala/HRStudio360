@@ -1,9 +1,23 @@
 // API Client for HRStudio360 Backend
 
-interface ApiResponse<T = any> {
-  data?: T;
-  error?: string;
-  success?: boolean;
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+}
+
+interface Session {
+  user: User | null;
+}
+
+interface Profile {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  profile_picture: string | null;
+  role: string | null;
+  preferred_language: string | null;
 }
 
 class ApiClient {
@@ -14,10 +28,10 @@ class ApiClient {
     this.baseUrl = '';
   }
 
-  private async request<T>(
+  async request<T = any>(
     endpoint: string,
     options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
+  ): Promise<T> {
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
@@ -30,37 +44,44 @@ class ApiClient {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        return { error: error.error || `HTTP ${response.status}` };
+        throw new Error(error.error || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
-      return { data, success: true };
+      return data;
     } catch (error: any) {
       console.error('API request failed:', error);
-      return { error: error.message || 'Network error' };
+      throw error;
     }
   }
 
   // Auth endpoints
-  async login(email: string, password: string) {
+  async login(email: string, password: string): Promise<{ user: User }> {
     return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
-  async logout() {
+  async signup(email: string, password: string, firstName?: string, lastName?: string): Promise<{ user: User }> {
+    return this.request('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, firstName, lastName }),
+    });
+  }
+
+  async logout(): Promise<{ success: boolean }> {
     return this.request('/api/auth/logout', {
       method: 'POST',
     });
   }
 
-  async getSession() {
+  async getSession(): Promise<Session> {
     return this.request('/api/auth/session');
   }
 
   // Profile endpoints
-  async getProfile(id: string) {
+  async getProfile(id: string): Promise<Profile> {
     return this.request(`/api/profiles/${id}`);
   }
 
