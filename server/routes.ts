@@ -2,7 +2,8 @@ import type { Express } from 'express';
 import { storage } from './storage.js';
 import { 
   insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema,
-  insertCandidateSchema, insertExpenseSchema, insertChannelSchema, insertMessageSchema
+  insertCandidateSchema, insertExpenseSchema, insertChannelSchema, insertMessageSchema,
+  insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema
 } from '../shared/schema.js';
 
 export function registerRoutes(app: Express) {
@@ -375,6 +376,105 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error in AI assistant:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Celebration Badge routes
+  app.get('/api/celebration-badges', async (req, res) => {
+    try {
+      const badges = await storage.getCelebrationBadges();
+      res.json(badges);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/celebration-badges/years/:years', async (req, res) => {
+    try {
+      const badge = await storage.getCelebrationBadgeByYears(parseInt(req.params.years));
+      if (!badge) {
+        return res.status(404).json({ error: 'Badge not found' });
+      }
+      res.json(badge);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Earned Badge routes
+  app.get('/api/earned-badges/:userId', async (req, res) => {
+    try {
+      const badges = await storage.getEarnedBadges(req.params.userId);
+      res.json(badges);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/earned-badges', async (req, res) => {
+    try {
+      const validated = insertEarnedBadgeSchema.parse(req.body);
+      const badge = await storage.createEarnedBadge(validated);
+      res.status(201).json(badge);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/earned-badges/mark-viewed', async (req, res) => {
+    try {
+      const { userId, badgeId } = req.body;
+      if (!userId || !badgeId) {
+        return res.status(400).json({ error: 'userId and badgeId are required' });
+      }
+      await storage.markBadgeViewed(userId, badgeId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Celebration History routes
+  app.post('/api/celebration-history', async (req, res) => {
+    try {
+      const validated = insertCelebrationHistorySchema.parse(req.body);
+      const history = await storage.saveCelebrationHistory(validated);
+      res.status(201).json(history);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/celebration-history/dismiss', async (req, res) => {
+    try {
+      const { userId, type, date } = req.body;
+      if (!userId || !type || !date) {
+        return res.status(400).json({ error: 'userId, type, and date are required' });
+      }
+      await storage.markCelebrationDismissed(userId, type, date);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Celebration Notification routes
+  app.get('/api/celebration-notifications/:userId', async (req, res) => {
+    try {
+      const notifications = await storage.getCelebrationNotifications(req.params.userId);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/celebration-notifications', async (req, res) => {
+    try {
+      const validated = insertCelebrationNotificationSchema.parse(req.body);
+      const notification = await storage.createCelebrationNotification(validated);
+      res.status(201).json(notification);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 }

@@ -242,6 +242,58 @@ class ApiClient {
       body: JSON.stringify(updates),
     });
   }
+
+  // Celebration endpoints
+  async getCelebrationBadges() {
+    return this.request('/api/celebration-badges');
+  }
+
+  async getCelebrationBadgeByYears(years: number) {
+    return this.request(`/api/celebration-badges/years/${years}`);
+  }
+
+  async getEarnedBadges(userId: string) {
+    return this.request(`/api/earned-badges/${userId}`);
+  }
+
+  async createEarnedBadge(badge: any) {
+    return this.request('/api/earned-badges', {
+      method: 'POST',
+      body: JSON.stringify(badge),
+    });
+  }
+
+  async markBadgeViewed(userId: string, badgeId: string) {
+    return this.request('/api/earned-badges/mark-viewed', {
+      method: 'POST',
+      body: JSON.stringify({ userId, badgeId }),
+    });
+  }
+
+  async saveCelebrationHistory(history: any) {
+    return this.request('/api/celebration-history', {
+      method: 'POST',
+      body: JSON.stringify(history),
+    });
+  }
+
+  async markCelebrationDismissed(userId: string, type: string, date: string) {
+    return this.request('/api/celebration-history/dismiss', {
+      method: 'POST',
+      body: JSON.stringify({ userId, type, date }),
+    });
+  }
+
+  async getCelebrationNotifications(userId: string) {
+    return this.request(`/api/celebration-notifications/${userId}`);
+  }
+
+  async createCelebrationNotification(notification: any) {
+    return this.request('/api/celebration-notifications', {
+      method: 'POST',
+      body: JSON.stringify(notification),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
