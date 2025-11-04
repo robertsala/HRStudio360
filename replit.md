@@ -10,6 +10,70 @@ Built as a modern single-page application (SPA), the system features a modular d
 
 Preferred communication style: Simple, everyday language.
 
+## Migration Progress (November 2025)
+
+### Completed Foundation Work
+
+**Database Schema Expansion** ✅
+- Expanded from 5 tables to 29 comprehensive tables covering full HR domain
+- Added candidate management tables (candidates, candidateCollaborators, candidateComments, candidateRatings, newHires)
+- Added expense management tables (currencies, expenseCategories, expenseVendors, expenses, employeeExpenseEnrollment)
+- Added celebration system tables (celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications)
+- Added chat infrastructure tables (channels, channelMembers, messages)
+- All tables use proper TypeScript types with Drizzle ORM schema inference
+
+**Storage Layer** ✅
+- `IStorage` interface expanded with methods for all 29 tables
+- All storage methods properly typed using shared schema types (Profile, Employee, LeaveRequest, etc.)
+- Celebration methods use InsertCelebrationBadge, EarnedBadge, CelebrationHistory types
+- Fixed critical bug: using and() predicate for combining multiple WHERE conditions instead of chaining .where() calls
+- Database storage implementation (DbStorage) complete with type-safe queries
+
+**API Layer** ✅
+- RESTful endpoints for all resources in server/routes.ts
+- Authentication endpoints: POST /api/auth/login, POST /api/auth/logout, GET /api/auth/session
+- Profile endpoints: GET /api/profiles, GET /api/profiles/:id, PATCH /api/profiles/:id
+- Employee endpoints: GET /api/employees, POST /api/employees, PATCH /api/employees/:id
+- Leave request endpoints with full CRUD operations
+- Candidate endpoints for hiring workflow management
+- Expense endpoints for financial tracking
+- Channel and message endpoints for chat system
+
+**API Client** ✅
+- Fully typed API client in src/lib/api.ts
+- TypeScript interfaces for User, Session, Profile with proper type safety
+- Authentication methods: login(), logout(), getSession(), getProfile()
+- All methods return properly typed promises for type-safe consumption
+
+**Authentication Migration** ✅
+- AuthContext completely migrated from Supabase to backend API
+- All sign in/sign up/sign out operations now use Express backend
+- Session management using backend /api/auth/session endpoint
+- Profile loading via backend /api/profiles endpoint
+- Removed Supabase auth dependencies from authentication flow
+- User impersonation feature preserved and working
+
+**Server Infrastructure** ✅
+- Express server running on port 5000
+- Integrated with Vite development middleware for seamless SPA serving
+- All tests passing, server boots cleanly
+
+### Remaining Work
+
+**Frontend Component Migration** (60+ modals)
+- Migrate celebrationService to use new API client instead of Supabase
+- Update all modal components to use API client instead of direct Supabase queries
+- Migrate utility services (chatService, changeLogService, etc.)
+- Update real-time subscriptions from Supabase Realtime to WebSocket/polling strategy
+- Migrate file storage from Supabase Storage to new solution
+
+**Testing & Validation**
+- End-to-end testing of all migrated features
+- Validate celebration flows (earning, viewing, dismissing badges)
+- Ensure all frontend payload shapes match Insert* schemas
+
+**Status**: Foundation complete and architect-validated. Ready for systematic component migration.
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -30,11 +94,11 @@ Preferred communication style: Simple, everyday language.
 
 **Server**: Express.js server running on port 5000, integrated with Vite development middleware for seamless SPA serving.
 
-**API Layer**: RESTful API routes defined in `server/routes.ts` providing endpoints for profiles, employees, leave requests, authentication, onboarding emails, and AI assistant chat.
+**API Layer**: RESTful API routes defined in `server/routes.ts` providing comprehensive endpoints for all 29 database tables including profiles, employees, leave requests, candidates, expenses, channels, messages, celebration system, and authentication.
 
-**Storage Interface**: Abstracted through `IStorage` interface in `server/storage.ts`, implemented with database-backed storage (`DbStorage` class) using Drizzle ORM for type-safe database queries.
+**Storage Interface**: Abstracted through `IStorage` interface in `server/storage.ts`, implemented with database-backed storage (`DbStorage` class) using Drizzle ORM for type-safe database queries. All methods properly typed with shared schema types.
 
-**Migration Status**: The application is in mid-migration from Supabase to a self-hosted backend. Backend infrastructure is complete, but frontend still uses Supabase client for authentication, database queries, realtime subscriptions, and file storage. API client exists at `src/lib/api.ts` but is not yet integrated into components.
+**Migration Status**: Backend infrastructure 100% complete with all 29 tables, typed storage methods, and API endpoints. AuthContext fully migrated to backend API. Frontend components (60+ modals) still using Supabase for database queries and need systematic migration to API client. Real-time features and file storage migration pending.
 
 ### Data Storage
 
@@ -52,17 +116,20 @@ Preferred communication style: Simple, everyday language.
 
 **Schema Management**: Drizzle Kit for migrations with `npm run db:push` for schema synchronization.
 
-**Current Database Access**: Components currently query Supabase directly. Migration to Express API endpoints is documented but not yet implemented in the frontend.
+**Current Database Access**: Backend provides complete RESTful API for all 29 tables with full CRUD operations. AuthContext migrated to backend API. Frontend modal components (60+) still using Supabase client - systematic migration to API endpoints in progress.
 
 ### Authentication & Authorization
 
-**Current System**: Supabase Auth with session management, JWT tokens, and Row Level Security (RLS) policies.
+**Current System**: Fully migrated from Supabase Auth to backend Express API. All authentication operations (login, logout, session management) now use backend endpoints.
 
-**Session Handling**: `AuthContext` manages authentication state with automatic session refresh, retry logic for network failures, and session expiry warnings.
+**Session Handling**: `AuthContext` manages authentication state using backend `/api/auth/session` endpoint with automatic session refresh, retry logic for network failures, and session expiry warnings.
 
-**Impersonation**: Built-in user impersonation capability for administrators/HR staff to view the application as other users. Managed through separate `impersonatedUser` and `actualUser` state with visual banner indicator.
+**Impersonation**: Built-in user impersonation capability for administrators/HR staff to view the application as other users. Managed through separate `impersonatedUser` and `actualUser` state with visual banner indicator. Fully preserved during migration.
 
-**Planned Migration**: Backend has authentication endpoints (`/api/auth/login`, `/api/auth/logout`, `/api/auth/session`) ready but frontend not yet converted.
+**Backend Endpoints**: 
+- POST `/api/auth/login`: User authentication
+- POST `/api/auth/logout`: Session termination
+- GET `/api/auth/session`: Session validation and refresh
 
 ### Real-time Features
 
