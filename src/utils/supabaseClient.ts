@@ -12,8 +12,8 @@ const getEnvVar = (key: string): string => {
   }
 };
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || 'https://cgqoazepziswoziybhiz.supabase.co';
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNncW9hemVwemlzd296aXliaGl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTgwNDEsImV4cCI6MjA3NzQzNDA0MX0.WGxrf8LVcSXVfRH1OM2mlnNJfxwWKP-PewgSeq_rHeM';
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || 'https://auuqmldhxjhnmqhgeeav.supabase.co';
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1dXFtbGRoeGpobm1xaGdlZWF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNDY0ODUsImV4cCI6MjA3NDkyMjQ4NX0.bqK3up9bAW2Q1N8l29Xqnx6nqg5HDT5ZusyEYihNO1Q';
 
 console.log('Supabase URL:', supabaseUrl ? 'Present' : 'Missing');
 console.log('Supabase Anon Key:', supabaseAnonKey ? 'Present' : 'Missing');

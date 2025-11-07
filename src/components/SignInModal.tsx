@@ -99,10 +99,10 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
 
           // Manually confirm the email in the database
           try {
-            const confirmResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://cgqoazepziswoziybhiz.supabase.co'}/rest/v1/rpc/confirm_demo_user`, {
+            const confirmResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://auuqmldhxjhnmqhgeeav.supabase.co'}/rest/v1/rpc/confirm_demo_user`, {
               method: 'POST',
               headers: {
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNncW9hemVwemlzd296aXliaGl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTgwNDEsImV4cCI6MjA3NzQzNDA0MX0.WGxrf8LVcSXVfRH1OM2mlnNJfxwWKP-PewgSeq_rHeM',
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1dXFtbGRoeGpobm1xaGdlZWF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzNDY0ODUsImV4cCI6MjA3NDkyMjQ4NX0.bqK3up9bAW2Q1N8l29Xqnx6nqg5HDT5ZusyEYihNO1Q',
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({ user_id: signUpData.user.id })
