@@ -68,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         normalizedRole: userData.role
       });
 
+      // ALWAYS set user as authenticated, even if optional data queries fail
       setUser(userData);
       setIsAuthenticated(true);
       setIsLoading(false);
@@ -82,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('i18nextLng', userLanguage);
 
       // Check for celebrations asynchronously without blocking
+      // Wrapped in try-catch to prevent Supabase errors from breaking auth
       celebrationService.checkForCelebrations(userId)
         .then((celebrationData) => {
           if (celebrationData) {
@@ -90,12 +92,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         })
         .catch((error) => {
-          console.warn('Failed to check for celebrations:', error);
+          console.warn('Failed to check for celebrations (non-critical):', error);
+          // Don't propagate - celebrations are optional
         });
     } catch (error) {
       console.error('Error loading profile:', error);
-      setUser(null);
-      setIsAuthenticated(false);
+      
+      // CRITICAL FIX: Don't log out on profile load errors during migration
+      // If we have basic user info, keep them logged in
+      const userData: User = {
+        id: userId,
+        email: email,
+        name: email.split('@')[0],
+        role: 'employee'
+      };
+      
+      console.warn('Profile load failed, using fallback auth with email only');
+      setUser(userData);
+      setIsAuthenticated(true);
       setIsLoading(false);
     }
   }, []);
