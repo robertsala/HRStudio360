@@ -55,9 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: userId,
         email: email,
         name: profile
-          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || email.split('@')[0]
+          ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || email.split('@')[0]
           : email.split('@')[0],
-        profilePicture: profile?.profile_picture || undefined,
+        profilePicture: profile?.profilePicture || undefined,
         role: normalizedRole
       };
 
@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // CRITICAL: Set language from database preference FIRST, with fallback to 'en'
       // This ensures database preference ALWAYS overrides browser/localStorage detection
-      const userLanguage = profile?.preferred_language || 'en';
+      const userLanguage = profile?.languagePreference || 'en';
       console.log('Setting user language from database:', userLanguage);
 
       // Force change language and update localStorage to match database
@@ -290,7 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfilePicture = async (pictureUrl: string) => {
     if (user) {
       try {
-        await apiClient.updateProfile(user.id, { profile_picture: pictureUrl });
+        await apiClient.updateProfile(user.id, { profilePicture: pictureUrl });
         setUser({ ...user, profilePicture: pictureUrl });
       } catch (error) {
         console.error('Error updating profile picture:', error);
@@ -328,9 +328,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: targetUserId,
         email: targetEmail,
         name: profile
-          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || targetEmail.split('@')[0]
+          ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || targetEmail.split('@')[0]
           : targetEmail.split('@')[0],
-        profilePicture: profile?.profile_picture || undefined,
+        profilePicture: profile?.profilePicture || undefined,
         role: normalizedRole
       };
 

@@ -7,12 +7,12 @@ import { chatService } from '../../utils/chatService';
 
 interface UserProfile {
   id: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  profile_picture?: string;
+  profilePicture?: string;
   department?: string;
-  job_title?: string;
+  jobTitle?: string;
   location?: string;
 }
 
@@ -79,7 +79,7 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(u => {
-        const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
+        const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
         const email = u.email.toLowerCase();
         const department = u.department?.toLowerCase() || '';
         const emailDomain = email.split('@')[1] || '';
@@ -87,8 +87,8 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
 
         return (
           fullName.includes(query) ||
-          u.first_name.toLowerCase().includes(query) ||
-          u.last_name.toLowerCase().includes(query) ||
+          u.firstName.toLowerCase().includes(query) ||
+          u.lastName.toLowerCase().includes(query) ||
           email.includes(query) ||
           emailDomain.includes(query) ||
           emailUsername.includes(query) ||
@@ -97,8 +97,8 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
       });
 
       filtered.sort((a, b) => {
-        const aFullName = `${a.first_name} ${a.last_name}`.toLowerCase();
-        const bFullName = `${b.first_name} ${b.last_name}`.toLowerCase();
+        const aFullName = `${a.firstName} ${a.lastName}`.toLowerCase();
+        const bFullName = `${b.firstName} ${b.lastName}`.toLowerCase();
         const aEmail = a.email.toLowerCase();
         const bEmail = b.email.toLowerCase();
 
@@ -108,8 +108,8 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
         if (aExactMatch && !bExactMatch) return -1;
         if (!aExactMatch && bExactMatch) return 1;
 
-        const aStartsWith = aFullName.startsWith(query) || a.first_name.toLowerCase().startsWith(query);
-        const bStartsWith = bFullName.startsWith(query) || b.first_name.toLowerCase().startsWith(query);
+        const aStartsWith = aFullName.startsWith(query) || a.firstName.toLowerCase().startsWith(query);
+        const bStartsWith = bFullName.startsWith(query) || b.firstName.toLowerCase().startsWith(query);
 
         if (aStartsWith && !bStartsWith) return -1;
         if (!aStartsWith && bStartsWith) return 1;
@@ -163,12 +163,12 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
 
       const formattedUsers: UserProfile[] = activeUsers.map((profile: any) => ({
         id: profile.id,
-        first_name: profile.first_name || 'Unknown',
-        last_name: profile.last_name || 'User',
+        firstName: profile.first_name || 'Unknown',
+        lastName: profile.last_name || 'User',
         email: profile.email || '',
-        profile_picture: profile.profile_picture,
+        profilePicture: profile.profile_picture,
         department: profile.department || 'General',
-        job_title: profile.job_title || profile.role || 'Employee',
+        jobTitle: profile.job_title || profile.role || 'Employee',
         location: undefined
       }));
 
@@ -237,11 +237,11 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
 
       const newUser = allUsers.find(u => u.id === newProfile.id) || {
         id: newProfile.id,
-        first_name: newProfile.first_name,
-        last_name: newProfile.last_name,
+        firstName: newProfile.first_name,
+        lastName: newProfile.last_name,
         email: newProfile.email,
         department: newProfile.department,
-        profile_picture: newProfile.profile_picture
+        profilePicture: newProfile.profile_picture
       };
 
       const newSelected = new Set(selectedUsers);
@@ -292,7 +292,7 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
       if (channelType === 'direct') {
         const selectedUser = allUsers.find(u => u.id === Array.from(selectedUsers)[0]);
         if (selectedUser) {
-          finalChannelName = `${selectedUser.first_name} ${selectedUser.last_name}`;
+          finalChannelName = `${selectedUser.firstName} ${selectedUser.lastName}`;
         }
       }
 
@@ -315,15 +315,15 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
   };
 
   const getUserAvatar = (user: UserProfile) => {
-    const initials = `${user.first_name[0]}${user.last_name[0]}`.toUpperCase();
+    const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
     const presenceStatus = getPresenceStatus(user.id);
 
     return (
       <div className="relative">
-        {user.profile_picture ? (
+        {user.profilePicture ? (
           <img
-            src={user.profile_picture}
-            alt={`${user.first_name} ${user.last_name}`}
+            src={user.profilePicture}
+            alt={`${user.firstName} ${user.lastName}`}
             className="h-10 w-10 rounded-full object-cover"
           />
         ) : (
@@ -348,7 +348,7 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
     const names = Array.from(selectedUsers)
       .map(id => {
         const user = allUsers.find(u => u.id === id);
-        return user ? `${user.first_name} ${user.last_name}` : '';
+        return user ? `${user.firstName} ${user.lastName}` : '';
       })
       .filter(Boolean);
 
@@ -584,7 +584,7 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
                         <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center space-x-2">
                             <span className="font-medium text-gray-900 dark:text-white">
-                              {profile.first_name} {profile.last_name}
+                              {profile.firstName} {profile.lastName}
                             </span>
                             {profile.department && (
                               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
@@ -593,7 +593,7 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
                             )}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                            {profile.job_title && <span className="font-medium">{profile.job_title} • </span>}
+                            {profile.jobTitle && <span className="font-medium">{profile.jobTitle} • </span>}
                             {profile.email}
                           </div>
                         </div>

@@ -121,10 +121,10 @@ export interface ChannelMember {
   notifications_enabled: boolean;
   user?: {
     id: string;
-    first_name: string;
-    last_name: string;
+    firstName: string;
+    lastName: string;
     email: string;
-    profile_picture?: string;
+    profilePicture?: string;
     department?: string;
   };
 }
@@ -145,10 +145,10 @@ export interface Message {
   created_at: string;
   sender?: {
     id: string;
-    first_name: string;
-    last_name: string;
+    firstName: string;
+    lastName: string;
     email: string;
-    profile_picture?: string;
+    profilePicture?: string;
   };
   read_by?: string[];
 }

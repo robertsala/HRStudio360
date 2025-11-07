@@ -27,8 +27,8 @@ const ChatNotificationBubble: React.FC<ChatNotificationBubbleProps> = ({ onOpenC
         const notification: ChatNotification = {
           id: message.id,
           message,
-          senderName: `${message.sender.first_name} ${message.sender.last_name}`,
-          senderAvatar: message.sender.profile_picture,
+          senderName: `${message.sender.firstName} ${message.sender.lastName}`,
+          senderAvatar: message.sender.profilePicture,
           timestamp: new Date(message.created_at)
         };
 
