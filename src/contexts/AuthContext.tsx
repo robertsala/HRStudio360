@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient } from '../lib/api';
+import { supabase } from '../utils/supabaseClient';
 import i18n from '../i18n';
 import { celebrationService, CelebrationData } from '../utils/celebrationService';
 
@@ -111,7 +112,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log(`[AuthContext] Starting auth initialization (attempt ${retryCount + 1}/${maxRetries + 1})...`);
 
         // Check session with our backend
-        const session = await apiClient.getSession();
+        let session = await apiClient.getSession();
+
+        console.log('[AuthContext] Backend session check:', !!session);
+
+        // If backend returns no session, check Supabase as fallback (during migration)
+        if (!session?.user) {
+          console.log('[AuthContext] Backend returned no session, checking Supabase as fallback...');
+          const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+          if (supabaseSession?.user) {
+            console.log('[AuthContext] Found Supabase session for user:', supabaseSession.user.email);
+            session = {
+              user: {
+                id: supabaseSession.user.id,
+                email: supabaseSession.user.email || ''
+              }
+            };
+          }
+        }
 
         console.log('[AuthContext] Auth check completed - session:', !!session);
 
