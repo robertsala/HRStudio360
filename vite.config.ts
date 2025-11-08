@@ -26,8 +26,7 @@ export default defineConfig({
     strictPort: false,
     cors: true,
     hmr: {
-      overlay: true,
-      clientPort: 5173
+      overlay: true
     },
     headers: {
       'Service-Worker-Allowed': '/',
