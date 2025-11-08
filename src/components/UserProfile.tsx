@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../utils/supabaseClient';
+import { apiClient } from '../lib/api';
 import { useTranslation } from 'react-i18next';
 
 interface UserProfileProps {
@@ -39,23 +39,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
       setLoading(true);
       setError(null);
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
+      const profile = await apiClient.getProfile(user.id);
 
       if (profile) {
+        // Combine firstName and lastName for the name field
+        const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+        
         setFormData({
-          name: profile.full_name || user.name || '',
+          name: fullName || user.name || '',
           email: profile.email || user.email || '',
           phone: profile.phone || '',
-          location: profile.location || '',
+          location: `${profile.city || ''} ${profile.state || ''}`.trim(),
           department: profile.department || '',
           role: profile.role || '',
-          startDate: profile.start_date || ''
+          startDate: profile.hireDate || ''
         });
       }
     } catch (err: any) {
@@ -82,20 +79,32 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
       setSaving(true);
       setError(null);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.name,
+      // Split name into firstName and lastName
+      const nameParts = formData.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Split location into city and state
+      const locationParts = formData.location.trim().split(' ');
+      const city = locationParts[0] || '';
+      const state = locationParts.slice(1).join(' ') || '';
+
+      await fetch(`/api/profiles/${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
           phone: formData.phone,
-          location: formData.location,
+          city,
+          state,
           department: formData.department,
           role: formData.role,
-          start_date: formData.startDate,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+          hireDate: formData.startDate,
+        }),
+      });
 
       setIsEditing(false);
       setSaveSuccess(true);
