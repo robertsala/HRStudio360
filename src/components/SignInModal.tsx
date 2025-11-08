@@ -51,116 +51,21 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
     setIsLoading(true);
     setError('');
 
-    const demoEmail = 'demohrstudio360@gmail.com';
-    const demoPassword = 'DemoPassword123!';
-
-    // Capture the current language preference BEFORE sign-in
-    const selectedLanguage = i18n.language;
-    console.log('User selected language before sign-in:', selectedLanguage);
+    const demoEmail = 'demo@hrstudio360.com';
+    const demoPassword = 'demo';
 
     try {
-      console.log('Attempting demo account sign in with:', demoEmail);
-
-      // Try to sign in first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: demoEmail,
-        password: demoPassword
-      });
-
-      if (signInError) {
-        console.log('Demo sign in failed:', signInError.message);
-
-        // If it's an invalid credentials error, try to create the account
-        if (signInError.message.includes('Invalid') || signInError.message.includes('credentials')) {
-          console.log('Attempting to create demo account...');
-
-          // Create demo account with language preference
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email: demoEmail,
-            password: demoPassword,
-            options: {
-              data: {
-                first_name: 'Demo',
-                last_name: 'User'
-              }
-            }
-          });
-
-          if (signUpError) {
-            console.error('Demo account creation error:', signUpError);
-            throw new Error(`Failed to create demo account: ${signUpError.message}`);
-          }
-
-          if (!signUpData.user) {
-            throw new Error('No user data returned from signup');
-          }
-
-          console.log('Demo account created:', signUpData.user.id);
-
-          // Manually confirm the email in the database
-          try {
-            const confirmResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://cgqoazepziswoziybhiz.supabase.co'}/rest/v1/rpc/confirm_demo_user`, {
-              method: 'POST',
-              headers: {
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNncW9hemVwemlzd296aXliaGl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTgwNDEsImV4cCI6MjA3NzQzNDA0MX0.WGxrf8LVcSXVfRH1OM2mlnNJfxwWKP-PewgSeq_rHeM',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ user_id: signUpData.user.id })
-            });
-            console.log('Email confirmation attempted');
-          } catch (e) {
-            console.log('Could not auto-confirm email, user may need to confirm manually');
-          }
-
-          // Wait for session to establish
-          await new Promise(resolve => setTimeout(resolve, 1500));
-
-          // Create profile with language preference
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: signUpData.user.id,
-              email: demoEmail,
-              first_name: 'Demo',
-              last_name: 'User',
-              role: 'admin',
-              preferred_language: selectedLanguage
-            }, {
-              onConflict: 'id'
-            });
-
-          if (profileError) {
-            console.error('Profile error:', profileError);
-          }
-
-          console.log('Demo account ready!');
-          resetForm();
-          onClose();
-        } else {
-          throw signInError;
-        }
-      } else if (signInData.user) {
-        console.log('Demo sign in successful!');
-
-        // Update the profile with the selected language preference
-        console.log('Updating demo account language preference to:', selectedLanguage);
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ preferred_language: selectedLanguage })
-          .eq('id', signInData.user.id);
-
-        if (updateError) {
-          console.error('Error updating language preference:', updateError);
-        } else {
-          console.log('Language preference updated successfully');
-        }
-
-        resetForm();
-        onClose();
-      }
+      console.log('Demo button: Signing in with demo account...');
+      
+      // Use the backend API via the onSignIn prop
+      await onSignIn(demoEmail, demoPassword);
+      
+      console.log('Demo account sign-in successful!');
+      resetForm();
+      onClose();
     } catch (error: any) {
-      console.error('Demo account error:', error);
-      setError(`Demo account unavailable: ${error.message}. Please create your own account.`);
+      console.error('Demo account sign-in error:', error);
+      setError(`Unable to sign in to demo account. Please try again or create your own account.`);
     } finally {
       setIsLoading(false);
     }
@@ -394,8 +299,8 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
 
           <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">{t('auth.demoCredentials')}</p>
-            <p className="text-xs text-gray-700 dark:text-gray-300">Email: demohrstudio360@gmail.com</p>
-            <p className="text-xs text-gray-700 dark:text-gray-300">Password: DemoPassword123!</p>
+            <p className="text-xs text-gray-700 dark:text-gray-300">Email: demo@hrstudio360.com</p>
+            <p className="text-xs text-gray-700 dark:text-gray-300">Password: demo</p>
           </div>
         </div>
 
