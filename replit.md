@@ -22,11 +22,13 @@ The backend consists of an Express.js server running on port 5000, integrated wi
 
 ### Data Storage
 
-The project uses a PostgreSQL database (Neon-backed), with its schema defined using Drizzle ORM. Key tables include `profiles`, `employees`, `leave_requests`, `pay_stubs`, `celebration_badges`, `channels`, and `performance_reviews`. Drizzle Kit manages database migrations. The backend provides a complete RESTful API for all tables, with frontend components gradually migrating from direct Supabase client access to this new API.
+The project uses a PostgreSQL database (Neon-backed), with its schema defined using Drizzle ORM. Key tables include `profiles`, `employees`, `leave_requests`, `pay_stubs`, `celebration_badges`, `channels`, and `performance_reviews`. The `profiles` table includes location fields (locationLat, locationLon, locationCity, locationState, locationZipCode, locationManualOverride) for weather widget functionality. Drizzle Kit manages database migrations. The backend provides a complete RESTful API for all tables, with frontend components gradually migrating from direct Supabase client access to this new API.
 
 ### Authentication & Authorization
 
 Authentication has been fully migrated from Supabase Auth to the backend Express API. `AuthContext` manages authentication state using backend endpoints for session validation and refresh, including retry logic and expiry warnings. An impersonation feature allows administrators to view the application as other users.
+
+**Session Management** (November 2025): Implemented server-side session management using `express-session` to persist user authentication across requests. Sessions store user ID and regenerate on login to prevent fixation attacks. Cookie settings include httpOnly, sameSite protection, and 7-day expiration. Weather widget location updates and profile modifications no longer invalidate sessions.
 
 ### Real-time Features
 

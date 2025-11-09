@@ -1,11 +1,34 @@
 import express, { type Request, Response, NextFunction } from 'express';
+import session from 'express-session';
 import { registerRoutes } from './routes';
 import { setupVite } from './vite';
 import { createServer } from 'http';
 
 const app = express();
+
+// Trust proxy for secure cookies behind TLS
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Validate SESSION_SECRET in production
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  console.warn('WARNING: SESSION_SECRET not set. Using insecure default.');
+}
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production-' + Math.random(),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    sameSite: 'lax'
+  }
+}));
 
 // Logging middleware
 app.use((req, res, next) => {

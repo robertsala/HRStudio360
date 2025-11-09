@@ -640,7 +640,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Stub authentication endpoint
+  // Authentication endpoints with session management
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { email } = req.body;
@@ -662,19 +662,60 @@ export function registerRoutes(app: Express) {
         });
       }
       
-      res.json({ user: profile });
+      // Regenerate session to prevent fixation attacks
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error('Session regeneration error:', err);
+          return res.status(500).json({ error: 'Login failed' });
+        }
+        
+        // Store user ID in new session
+        (req.session as any).userId = profile.id;
+        
+        // Save session before responding
+        req.session.save((err) => {
+          if (err) {
+            console.error('Session save error:', err);
+            return res.status(500).json({ error: 'Login failed' });
+          }
+          res.json({ user: profile });
+        });
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
   app.post('/api/auth/logout', (req, res) => {
-    res.json({ success: true });
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destruction error:', err);
+        return res.status(500).json({ error: 'Failed to logout' });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ success: true });
+    });
   });
 
-  app.get('/api/auth/session', (req, res) => {
-    // For now, return a mock session
-    res.json({ user: null });
+  app.get('/api/auth/session', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      
+      if (!userId) {
+        return res.json({ user: null });
+      }
+      
+      const profile = await storage.getProfileById(userId);
+      
+      if (!profile) {
+        return res.json({ user: null });
+      }
+      
+      res.json({ user: profile });
+    } catch (error: any) {
+      console.error('Session check error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Onboarding email endpoint (migrated from Supabase Edge Function)
