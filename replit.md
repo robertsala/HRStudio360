@@ -58,11 +58,26 @@ Preferred communication style: Simple, everyday language.
 - Integrated with Vite development middleware for seamless SPA serving
 - All tests passing, server boots cleanly
 
+**Demo Account & Sign In** ✅
+- SignInModal completely migrated from Supabase Auth to backend API
+- Demo account feature working with credentials: demo@hrstudio360.com / demo
+- Simplified authentication flow, reduced from 117 to 22 lines of code
+
+**Hiring Pipeline (HiringModal)** ✅
+- Complete migration from Supabase to backend API (architect-reviewed)
+- loadCandidates() uses apiClient.getCandidates()
+- loadAvailableEmployees() uses apiClient.getProfiles()
+- handleAddCandidate() uses apiClient.createCandidate()
+- handleConvertToNewHire() uses apiClient.updateCandidate()
+- Added 8 sample candidates across different hiring stages (New Candidate, Phone Screen, Interview, Offer Sent, Offer Accepted)
+- Collaborator/comment features stubbed with local state pending backend endpoints
+- Disqualification data properly preserved from backend
+
 ### Remaining Work
 
-**Frontend Component Migration** (60+ modals)
+**Frontend Component Migration** (~58 modals remaining)
 - Migrate celebrationService to use new API client instead of Supabase
-- Update all modal components to use API client instead of direct Supabase queries
+- Update remaining modal components to use API client instead of direct Supabase queries
 - Migrate utility services (chatService, changeLogService, etc.)
 - Update real-time subscriptions from Supabase Realtime to WebSocket/polling strategy
 - Migrate file storage from Supabase Storage to new solution
@@ -72,7 +87,7 @@ Preferred communication style: Simple, everyday language.
 - Validate celebration flows (earning, viewing, dismissing badges)
 - Ensure all frontend payload shapes match Insert* schemas
 
-**Status**: Foundation complete and architect-validated. Ready for systematic component migration.
+**Status**: Foundation complete. SignInModal and HiringModal successfully migrated and architect-validated. ~58 modal components remaining for systematic migration.
 
 ## System Architecture
 
