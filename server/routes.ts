@@ -5,6 +5,7 @@ import {
   insertCandidateSchema, insertExpenseCategorySchema, insertExpenseSchema, 
   insertChatChannelSchema, insertChannelMemberSchema, insertChatMessageSchema,
   insertMessageReactionSchema, insertTypingIndicatorSchema, insertUserPresenceSchema,
+  insertUserNotificationSchema, insertCollaboratorInvitationSchema,
   insertChangeLogSchema, insertHistoricalChangeSchema, insertChangeNotificationSchema,
   insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema,
   insertReviewCycleSchema
@@ -965,6 +966,172 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Review cycle not found' });
       }
       res.json(cycle);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // User Notification routes
+  app.get('/api/user-notifications', async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      const unreadOnly = req.query.unreadOnly === 'true';
+      
+      if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+      }
+      
+      const notifications = await storage.getUserNotifications(userId, unreadOnly);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/user-notifications', async (req, res) => {
+    try {
+      const validated = insertUserNotificationSchema.parse(req.body);
+      const notification = await storage.createUserNotification(validated);
+      res.status(201).json(notification);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/user-notifications/:id/read', async (req, res) => {
+    try {
+      await storage.markNotificationAsRead(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/user-notifications/read-all', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: 'userId is required' });
+      }
+      await storage.markAllNotificationsAsRead(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Collaborator Invitation routes
+  app.get('/api/collaborator-invitations', async (req, res) => {
+    try {
+      const filters = {
+        senderId: req.query.senderId as string | undefined,
+        recipientId: req.query.recipientId as string | undefined,
+        status: req.query.status as string | undefined
+      };
+      
+      const invitations = await storage.getCollaboratorInvitations(filters);
+      res.json(invitations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/collaborator-invitations/:id', async (req, res) => {
+    try {
+      const invitation = await storage.getCollaboratorInvitationById(req.params.id);
+      if (!invitation) {
+        return res.status(404).json({ error: 'Invitation not found' });
+      }
+      res.json(invitation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/collaborator-invitations', async (req, res) => {
+    try {
+      const validated = insertCollaboratorInvitationSchema.parse(req.body);
+      const invitation = await storage.createCollaboratorInvitation(validated);
+      
+      await storage.createUserNotification({
+        userId: validated.recipientId,
+        type: 'collaborator_invite',
+        title: 'New Collaboration Invite',
+        message: `You have received a collaboration invite`,
+        triggeredBy: validated.senderId,
+        relatedId: invitation.id,
+        isRead: false
+      });
+      
+      res.status(201).json(invitation);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/collaborator-invitations/:id/accept', async (req, res) => {
+    try {
+      const invitation = await storage.getCollaboratorInvitationById(req.params.id);
+      if (!invitation) {
+        return res.status(404).json({ error: 'Invitation not found' });
+      }
+      
+      if (invitation.status !== 'pending') {
+        return res.status(409).json({ 
+          error: 'Invitation cannot be accepted',
+          reason: `Current status is "${invitation.status}". Only pending invitations can be accepted.`
+        });
+      }
+      
+      const updated = await storage.updateCollaboratorInvitation(req.params.id, {
+        status: 'accepted',
+        respondedAt: new Date()
+      });
+      
+      if (!updated) {
+        return res.status(500).json({ error: 'Failed to update invitation' });
+      }
+      
+      await storage.createUserNotification({
+        userId: invitation.senderId,
+        type: 'collaborator_accepted',
+        title: 'Collaboration Invite Accepted',
+        message: `Your collaboration invite has been accepted`,
+        triggeredBy: invitation.recipientId,
+        relatedId: invitation.id,
+        isRead: false
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/collaborator-invitations/:id/decline', async (req, res) => {
+    try {
+      const invitation = await storage.getCollaboratorInvitationById(req.params.id);
+      if (!invitation) {
+        return res.status(404).json({ error: 'Invitation not found' });
+      }
+      
+      if (invitation.status !== 'pending') {
+        return res.status(409).json({ 
+          error: 'Invitation cannot be declined',
+          reason: `Current status is "${invitation.status}". Only pending invitations can be declined.`
+        });
+      }
+      
+      const updated = await storage.updateCollaboratorInvitation(req.params.id, {
+        status: 'declined',
+        respondedAt: new Date()
+      });
+      
+      if (!updated) {
+        return res.status(500).json({ error: 'Failed to update invitation' });
+      }
+      
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

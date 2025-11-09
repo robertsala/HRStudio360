@@ -471,16 +471,16 @@ export class DbStorage implements IStorage {
 
   // User Notifications
   async getUserNotifications(userId: string, unreadOnly: boolean = false): Promise<UserNotification[]> {
-    let query = db.select().from(userNotifications).where(eq(userNotifications.userId, userId));
+    const conditions = [eq(userNotifications.userId, userId)];
     
     if (unreadOnly) {
-      query = query.where(and(
-        eq(userNotifications.userId, userId),
-        eq(userNotifications.isRead, false)
-      ));
+      conditions.push(eq(userNotifications.isRead, false));
     }
     
-    return query.orderBy(desc(userNotifications.createdAt));
+    return db.select()
+      .from(userNotifications)
+      .where(and(...conditions))
+      .orderBy(desc(userNotifications.createdAt));
   }
 
   async createUserNotification(notification: InsertUserNotification): Promise<UserNotification> {
