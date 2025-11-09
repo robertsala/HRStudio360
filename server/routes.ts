@@ -718,6 +718,32 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Weather API proxy endpoint
+  app.get('/api/weather/:lat/:lon', async (req, res) => {
+    try {
+      const { lat, lon } = req.params;
+      const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'HR-Studio-Weather-Widget/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('met.no API error:', response.status, errorText);
+        return res.status(response.status).json({ error: 'Weather API error' });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Weather proxy error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Onboarding email endpoint (migrated from Supabase Edge Function)
   app.post('/api/onboarding/send-email', async (req, res) => {
     try {

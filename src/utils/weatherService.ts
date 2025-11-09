@@ -163,20 +163,22 @@ class WeatherService {
     state?: string
   ): Promise<WeatherData | null> {
     try {
-      const url = `${METNO_API_BASE}/compact?lat=${lat}&lon=${lon}`;
+      // Use backend proxy to avoid CORS issues
+      const url = `/api/weather/${lat}/${lon}`;
+      console.log('[WeatherService] Fetching weather from backend proxy:', url);
 
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': USER_AGENT,
-        },
-      });
+      const response = await fetch(url);
+
+      console.log('[WeatherService] API Response status:', response.status, response.statusText);
 
       if (!response.ok) {
-        console.error('met.no API error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Weather API error:', response.status, response.statusText, errorText);
         return null;
       }
 
       const data = await response.json();
+      console.log('[WeatherService] Successfully received weather data');
 
       if (!data.properties || !data.properties.timeseries) {
         console.error('Invalid met.no response format');
