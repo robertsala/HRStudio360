@@ -3,6 +3,7 @@ import type {
   Profile, InsertProfile, 
   Employee, InsertEmployee, EmployeeWithProfile,
   LeaveRequest, InsertLeaveRequest,
+  LeaveBalance, InsertLeaveBalance,
   Candidate, InsertCandidate,
   ExpenseCategory, InsertExpenseCategory,
   Expense, InsertExpense,
@@ -21,7 +22,7 @@ import type {
   CelebrationNotification, InsertCelebrationNotification
 } from '../shared/schema.js';
 import { 
-  profiles, employees, leaveRequests,
+  profiles, employees, leaveRequests, leaveBalances,
   candidates, expenseCategories, expenses,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   changeLog, historicalChanges, changeNotifications,
@@ -49,6 +50,12 @@ export interface IStorage {
   getLeaveRequestById(id: string): Promise<LeaveRequest | undefined>;
   createLeaveRequest(request: InsertLeaveRequest): Promise<LeaveRequest>;
   updateLeaveRequest(id: string, request: Partial<InsertLeaveRequest>): Promise<LeaveRequest | undefined>;
+
+  // Leave Balances
+  getLeaveBalances(): Promise<LeaveBalance[]>;
+  getLeaveBalanceByEmployeeId(employeeId: string): Promise<LeaveBalance | undefined>;
+  createLeaveBalance(balance: InsertLeaveBalance): Promise<LeaveBalance>;
+  updateLeaveBalance(id: string, balance: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined>;
 
   // Candidates
   getCandidates(): Promise<Candidate[]>;
@@ -213,6 +220,26 @@ export class DbStorage implements IStorage {
 
   async updateLeaveRequest(id: string, request: Partial<InsertLeaveRequest>): Promise<LeaveRequest | undefined> {
     const result = await db.update(leaveRequests).set(request).where(eq(leaveRequests.id, id)).returning();
+    return result[0];
+  }
+
+  // Leave Balances
+  async getLeaveBalances(): Promise<LeaveBalance[]> {
+    return db.select().from(leaveBalances);
+  }
+
+  async getLeaveBalanceByEmployeeId(employeeId: string): Promise<LeaveBalance | undefined> {
+    const result = await db.select().from(leaveBalances).where(eq(leaveBalances.employeeId, employeeId));
+    return result[0];
+  }
+
+  async createLeaveBalance(balance: InsertLeaveBalance): Promise<LeaveBalance> {
+    const result = await db.insert(leaveBalances).values(balance).returning();
+    return result[0];
+  }
+
+  async updateLeaveBalance(id: string, balance: Partial<InsertLeaveBalance>): Promise<LeaveBalance | undefined> {
+    const result = await db.update(leaveBalances).set(balance).where(eq(leaveBalances.id, id)).returning();
     return result[0];
   }
 

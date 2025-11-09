@@ -1,7 +1,7 @@
 import type { Express } from 'express';
 import { storage } from './storage.js';
 import { 
-  insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema,
+  insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema, insertLeaveBalanceSchema,
   insertCandidateSchema, insertExpenseCategorySchema, insertExpenseSchema, 
   insertChatChannelSchema, insertChannelMemberSchema, insertChatMessageSchema,
   insertMessageReactionSchema, insertTypingIndicatorSchema, insertUserPresenceSchema,
@@ -123,6 +123,50 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Leave request not found' });
       }
       res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Leave balance routes
+  app.get('/api/leave-balances', async (req, res) => {
+    try {
+      const balances = await storage.getLeaveBalances();
+      res.json(balances);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/leave-balances/employee/:employeeId', async (req, res) => {
+    try {
+      const balance = await storage.getLeaveBalanceByEmployeeId(req.params.employeeId);
+      if (!balance) {
+        return res.status(404).json({ error: 'Leave balance not found' });
+      }
+      res.json(balance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/leave-balances', async (req, res) => {
+    try {
+      const validated = insertLeaveBalanceSchema.parse(req.body);
+      const balance = await storage.createLeaveBalance(validated);
+      res.status(201).json(balance);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/leave-balances/:id', async (req, res) => {
+    try {
+      const balance = await storage.updateLeaveBalance(req.params.id, req.body);
+      if (!balance) {
+        return res.status(404).json({ error: 'Leave balance not found' });
+      }
+      res.json(balance);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
