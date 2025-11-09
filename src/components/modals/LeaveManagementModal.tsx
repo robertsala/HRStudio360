@@ -73,7 +73,7 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
     enabled: true
   });
 
-  const { data: employeeDirectory = [], isLoading: isLoadingEmployees } = useQuery<EmployeeDirectoryEntry[]>({
+  const { data: employeeDirectory = [], isLoading: isLoadingDirectory, isError: isErrorDirectory } = useQuery<EmployeeDirectoryEntry[]>({
     queryKey: ['/api/employees', 'directory'],
     enabled: true
   });
@@ -91,12 +91,16 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
   const leaveRequests = useMemo<LeaveRequestWithEmployee[]>(() => {
     return rawLeaveRequests.map(request => {
       const employee = employeeDirectory.find(emp => emp.id === request.employeeId);
+      const fullName = employee?.profile 
+        ? `${employee.profile.firstName || ''} ${employee.profile.lastName || ''}`.trim()
+        : 'Unknown Employee';
+      
       return {
         ...request,
-        employeeName: employee?.name || 'Unknown Employee',
-        department: employee?.department || undefined,
+        employeeName: fullName || 'Unknown Employee',
+        department: undefined, // Department name not available in directory response
         manager: undefined,
-        employeeEmail: employee?.email || undefined
+        employeeEmail: employee?.profile?.email || undefined
       };
     });
   }, [rawLeaveRequests, employeeDirectory]);
@@ -435,10 +439,38 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
 
         <div className="overflow-y-auto max-h-96">
           <div className="p-6">
+            {/* Loading State */}
+            {(isLoadingRequests || isLoadingDirectory) && (
+              <div className="flex items-center justify-center py-12" data-testid="loading-state">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+                  <p className="mt-4 text-gray-600 dark:text-gray-400">Loading leave data...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Error State */}
+            {(isErrorRequests || isErrorDirectory) && !isLoadingRequests && !isLoadingDirectory && (
+              <div className="flex items-center justify-center py-12" data-testid="error-state">
+                <div className="text-center">
+                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                  <p className="text-red-600 dark:text-red-400 font-medium">Failed to load leave data</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">Please try again later or contact support.</p>
+                </div>
+              </div>
+            )}
+
             {/* Leave Requests Tab */}
-            {activeTab === 'requests' && (
+            {activeTab === 'requests' && !isLoadingRequests && !isLoadingDirectory && !isErrorRequests && !isErrorDirectory && (
               <div className="space-y-4">
-                {filteredRequests.map((request) => (
+                {filteredRequests.length === 0 ? (
+                  <div className="text-center py-12" data-testid="empty-state">
+                    <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 dark:text-gray-400">No leave requests found</p>
+                    <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">Submit a new request to get started</p>
+                  </div>
+                ) : (
+                  filteredRequests.map((request) => (
                   <div key={request.id} className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 dark:border-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-700 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
@@ -486,28 +518,40 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
                           <div className="flex space-x-2">
                             <button
                               onClick={() => handleApproveRequest(request.id)}
-                              className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                              disabled={approveRequestMutation.isPending || denyRequestMutation.isPending}
+                              className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                              data-testid={`button-approve-${request.id}`}
                             >
-                              Approve
+                              {approveRequestMutation.isPending ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                                  Approving...
+                                </>
+                              ) : (
+                                'Approve'
+                              )}
                             </button>
                             <button
                               onClick={() => handleDenyRequest(request.id)}
-                              className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+                              disabled={approveRequestMutation.isPending || denyRequestMutation.isPending}
+                              className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                              data-testid={`button-deny-${request.id}`}
                             >
-                              Deny
+                              {denyRequestMutation.isPending ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                                  Denying...
+                                </>
+                              ) : (
+                                'Deny'
+                              )}
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
-
-                {filteredRequests.length === 0 && (
-                  <div className="text-center py-8">
-                    <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No leave requests found matching your criteria</p>
-                  </div>
+                  ))
                 )}
               </div>
             )}
@@ -940,9 +984,18 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
               </button>
               <button
                 onClick={handleSubmitRequest}
-                className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                disabled={submitRequestMutation.isPending}
+                className="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                data-testid="button-submit-request"
               >
-                Submit Request
+                {submitRequestMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Request'
+                )}
               </button>
             </div>
           </div>
