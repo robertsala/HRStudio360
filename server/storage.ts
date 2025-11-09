@@ -13,6 +13,8 @@ import type {
   MessageReaction, InsertMessageReaction,
   TypingIndicator, InsertTypingIndicator,
   UserPresence, InsertUserPresence,
+  UserNotification, InsertUserNotification,
+  CollaboratorInvitation, InsertCollaboratorInvitation,
   ChangeLog, InsertChangeLog,
   HistoricalChange, InsertHistoricalChange,
   ChangeNotification, InsertChangeNotification,
@@ -26,6 +28,7 @@ import {
   profiles, employees, leaveRequests, leaveBalances,
   candidates, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
+  userNotifications, collaboratorInvitations,
   changeLog, historicalChanges, changeNotifications,
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
   reviewCycles
@@ -108,6 +111,18 @@ export interface IStorage {
   // User Presence
   upsertUserPresence(presence: InsertUserPresence): Promise<UserPresence>;
   getUserPresence(userId: string): Promise<UserPresence | undefined>;
+  
+  // User Notifications
+  getUserNotifications(userId: string, unreadOnly?: boolean): Promise<UserNotification[]>;
+  createUserNotification(notification: InsertUserNotification): Promise<UserNotification>;
+  markNotificationAsRead(id: string): Promise<void>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  
+  // Collaborator Invitations
+  getCollaboratorInvitations(filters: { senderId?: string; recipientId?: string; status?: string }): Promise<CollaboratorInvitation[]>;
+  getCollaboratorInvitationById(id: string): Promise<CollaboratorInvitation | undefined>;
+  createCollaboratorInvitation(invitation: InsertCollaboratorInvitation): Promise<CollaboratorInvitation>;
+  updateCollaboratorInvitation(id: string, invitation: Partial<InsertCollaboratorInvitation>): Promise<CollaboratorInvitation | undefined>;
   
   // Change Log
   getChangeLogs(filters?: { changeType?: string; startDate?: string; endDate?: string }, limit?: number): Promise<ChangeLog[]>;
@@ -451,6 +466,80 @@ export class DbStorage implements IStorage {
 
   async getUserPresence(userId: string): Promise<UserPresence | undefined> {
     const result = await db.select().from(userPresence).where(eq(userPresence.userId, userId));
+    return result[0];
+  }
+
+  // User Notifications
+  async getUserNotifications(userId: string, unreadOnly: boolean = false): Promise<UserNotification[]> {
+    let query = db.select().from(userNotifications).where(eq(userNotifications.userId, userId));
+    
+    if (unreadOnly) {
+      query = query.where(and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.isRead, false)
+      ));
+    }
+    
+    return query.orderBy(desc(userNotifications.createdAt));
+  }
+
+  async createUserNotification(notification: InsertUserNotification): Promise<UserNotification> {
+    const result = await db.insert(userNotifications).values(notification).returning();
+    return result[0];
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await db.update(userNotifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(userNotifications.id, id));
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db.update(userNotifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.isRead, false)
+      ));
+  }
+
+  // Collaborator Invitations
+  async getCollaboratorInvitations(filters: { senderId?: string; recipientId?: string; status?: string }): Promise<CollaboratorInvitation[]> {
+    const conditions = [];
+    
+    if (filters.senderId) {
+      conditions.push(eq(collaboratorInvitations.senderId, filters.senderId));
+    }
+    if (filters.recipientId) {
+      conditions.push(eq(collaboratorInvitations.recipientId, filters.recipientId));
+    }
+    if (filters.status) {
+      conditions.push(eq(collaboratorInvitations.status, filters.status as any));
+    }
+    
+    let query = db.select().from(collaboratorInvitations);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+    
+    return query.orderBy(desc(collaboratorInvitations.createdAt));
+  }
+
+  async getCollaboratorInvitationById(id: string): Promise<CollaboratorInvitation | undefined> {
+    const result = await db.select().from(collaboratorInvitations).where(eq(collaboratorInvitations.id, id));
+    return result[0];
+  }
+
+  async createCollaboratorInvitation(invitation: InsertCollaboratorInvitation): Promise<CollaboratorInvitation> {
+    const result = await db.insert(collaboratorInvitations).values(invitation).returning();
+    return result[0];
+  }
+
+  async updateCollaboratorInvitation(id: string, invitation: Partial<InsertCollaboratorInvitation>): Promise<CollaboratorInvitation | undefined> {
+    const result = await db.update(collaboratorInvitations)
+      .set({ ...invitation, updatedAt: new Date() })
+      .where(eq(collaboratorInvitations.id, id))
+      .returning();
     return result[0];
   }
 
