@@ -705,12 +705,7 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
                    selectedEmployee.email !== user?.email && (
                     <button
                       onClick={() => {
-                        startImpersonation({
-                          id: selectedEmployee.id,
-                          email: selectedEmployee.email,
-                          name: selectedEmployee.name,
-                          role: 'employee'
-                        });
+                        startImpersonation(selectedEmployee.id, selectedEmployee.email);
                         setSelectedEmployee(null);
                         onClose();
                       }}

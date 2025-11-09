@@ -72,6 +72,9 @@ export type EmployeeWithProfile = Employee & {
     firstName: string | null;
     lastName: string | null;
     email: string;
+    department: string | null;
+    role: string | null;
+    phone: string | null;
     avatarUrl: string | null;
   } | null;
 };

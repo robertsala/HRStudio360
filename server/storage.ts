@@ -173,7 +173,10 @@ export class DbStorage implements IStorage {
         firstName: row.profile.firstName,
         lastName: row.profile.lastName,
         email: row.profile.email,
-        avatarUrl: null
+        department: row.profile.department,
+        role: row.profile.role,
+        phone: row.profile.phone,
+        avatarUrl: row.profile.profilePicture
       } : null
     }));
   }
