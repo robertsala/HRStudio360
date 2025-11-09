@@ -296,12 +296,6 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
           >
             {isLoading ? t('auth.signingIn') : t('auth.tryDemoAccount')}
           </button>
-
-          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">{t('auth.demoCredentials')}</p>
-            <p className="text-xs text-gray-700 dark:text-gray-300">Email: demo@hrstudio360.com</p>
-            <p className="text-xs text-gray-700 dark:text-gray-300">Password: demo</p>
-          </div>
         </div>
 
         <div className="mt-6 text-center">
