@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
@@ -408,8 +408,8 @@ export const reviewCycles = pgTable('review_cycles', {
   selfAssessmentDeadline: date('self_assessment_deadline').notNull(),
   managerAssessmentDeadline: date('manager_assessment_deadline').notNull(),
   status: text('status').notNull(), // 'draft' | 'active' | 'completed' | 'archived'
-  employeeSelectionCriteria: text('employee_selection_criteria'),
-  notificationSettings: text('notification_settings'),
+  employeeSelectionCriteria: json('employee_selection_criteria'),
+  notificationSettings: json('notification_settings'),
   approvalThresholdAmount: numeric('approval_threshold_amount', { precision: 10, scale: 2 }),
   approvalThresholdPercentage: numeric('approval_threshold_percentage', { precision: 5, scale: 2 }),
   createdBy: uuid('created_by').references(() => profiles.id),

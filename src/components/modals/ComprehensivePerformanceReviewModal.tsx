@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Calendar, Star, Award, TrendingUp, CheckCircle, Clock, AlertCircle, Eye, Plus, Edit, Save, Send, DollarSign, FileText, Download, Search, Building, UserCheck, ChevronDown } from 'lucide-react';
-import { performanceReviewService, ReviewCycle, PerformanceReview, ReviewQuestion, CompensationApproval } from '../../utils/performanceReviewService';
+import { performanceReviewService } from '../../utils/performanceReviewService';
+import type { ReviewCycle } from '../../../shared/schema';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabaseClient';
 
@@ -26,11 +27,11 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
 
   const [newCycle, setNewCycle] = useState({
     name: '',
-    review_type: 'annual' as 'annual' | 'quarterly' | 'probationary' | 'mid_year',
-    start_date: '',
-    end_date: '',
-    self_assessment_deadline: '',
-    manager_assessment_deadline: '',
+    reviewType: 'annual' as 'annual' | 'quarterly' | 'probationary' | 'mid_year',
+    startDate: '',
+    endDate: '',
+    selfAssessmentDeadline: '',
+    managerAssessmentDeadline: '',
     status: 'draft' as 'draft' | 'active' | 'completed' | 'archived'
   });
 
@@ -192,7 +193,7 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
   };
 
   const handleCreateCycle = async () => {
-    if (!newCycle.name || !newCycle.start_date || !newCycle.end_date) {
+    if (!newCycle.name || !newCycle.startDate || !newCycle.endDate) {
       showNotification('error', 'Please fill in all required fields');
       return;
     }
@@ -217,7 +218,7 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
 
       const createdCycle = await performanceReviewService.createReviewCycle({
         ...newCycle,
-        employee_selection_criteria: employeeSelectionCriteria
+        employeeSelectionCriteria
       });
 
       showNotification('success', `Review cycle created successfully with ${getSelectedEmployeeCount()} employees`);
@@ -226,11 +227,11 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
       // Reset form
       setNewCycle({
         name: '',
-        review_type: 'annual',
-        start_date: '',
-        end_date: '',
-        self_assessment_deadline: '',
-        manager_assessment_deadline: '',
+        reviewType: 'annual',
+        startDate: '',
+        endDate: '',
+        selfAssessmentDeadline: '',
+        managerAssessmentDeadline: '',
         status: 'draft'
       });
       setEmployeeSelectionType('all');
@@ -376,8 +377,8 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-2">Review Type *</label>
                     <select
-                      value={newCycle.review_type}
-                      onChange={(e) => setNewCycle({ ...newCycle, review_type: e.target.value as any })}
+                      value={newCycle.reviewType}
+                      onChange={(e) => setNewCycle({ ...newCycle, reviewType: e.target.value as any })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="annual">Annual</option>
@@ -390,8 +391,8 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-2">Start Date *</label>
                     <input
                       type="date"
-                      value={newCycle.start_date}
-                      onChange={(e) => setNewCycle({ ...newCycle, start_date: e.target.value })}
+                      value={newCycle.startDate}
+                      onChange={(e) => setNewCycle({ ...newCycle, startDate: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
@@ -399,8 +400,8 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-2">End Date *</label>
                     <input
                       type="date"
-                      value={newCycle.end_date}
-                      onChange={(e) => setNewCycle({ ...newCycle, end_date: e.target.value })}
+                      value={newCycle.endDate}
+                      onChange={(e) => setNewCycle({ ...newCycle, endDate: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
@@ -408,8 +409,8 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-2">Self-Assessment Deadline *</label>
                     <input
                       type="date"
-                      value={newCycle.self_assessment_deadline}
-                      onChange={(e) => setNewCycle({ ...newCycle, self_assessment_deadline: e.target.value })}
+                      value={newCycle.selfAssessmentDeadline}
+                      onChange={(e) => setNewCycle({ ...newCycle, selfAssessmentDeadline: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
@@ -417,8 +418,8 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-2">Manager Assessment Deadline *</label>
                     <input
                       type="date"
-                      value={newCycle.manager_assessment_deadline}
-                      onChange={(e) => setNewCycle({ ...newCycle, manager_assessment_deadline: e.target.value })}
+                      value={newCycle.managerAssessmentDeadline}
+                      onChange={(e) => setNewCycle({ ...newCycle, managerAssessmentDeadline: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                   </div>
@@ -604,7 +605,7 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                     <div>
                       <h4 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white">{cycle.name}</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {cycle.review_type.charAt(0).toUpperCase() + cycle.review_type.slice(1)} Review
+                        {cycle.reviewType.charAt(0).toUpperCase() + cycle.reviewType.slice(1)} Review
                       </p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -620,19 +621,19 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                     <div>
                       <span className="font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Period:</span>
-                      <p className="text-gray-600 dark:text-gray-400">{cycle.start_date} to {cycle.end_date}</p>
+                      <p className="text-gray-600 dark:text-gray-400">{cycle.startDate} to {cycle.endDate}</p>
                     </div>
                     <div>
                       <span className="font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Self Deadline:</span>
-                      <p className="text-gray-600 dark:text-gray-400">{cycle.self_assessment_deadline}</p>
+                      <p className="text-gray-600 dark:text-gray-400">{cycle.selfAssessmentDeadline}</p>
                     </div>
                     <div>
                       <span className="font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Manager Deadline:</span>
-                      <p className="text-gray-600 dark:text-gray-400">{cycle.manager_assessment_deadline}</p>
+                      <p className="text-gray-600 dark:text-gray-400">{cycle.managerAssessmentDeadline}</p>
                     </div>
                     <div>
                       <span className="font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Created:</span>
-                      <p className="text-gray-600 dark:text-gray-400">{new Date(cycle.created_at || '').toLocaleDateString()}</p>
+                      <p className="text-gray-600 dark:text-gray-400">{new Date(cycle.createdAt || '').toLocaleDateString()}</p>
                     </div>
                   </div>
 
@@ -682,7 +683,7 @@ const ComprehensivePerformanceReviewModal: React.FC<ComprehensivePerformanceRevi
               <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-5">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-2">{selectedCycle.name}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Review Period: {selectedCycle.start_date} to {selectedCycle.end_date}
+                  Review Period: {selectedCycle.startDate} to {selectedCycle.endDate}
                 </p>
               </div>
             )}
