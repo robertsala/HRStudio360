@@ -23,12 +23,13 @@ import type {
 } from '../shared/schema.js';
 import { 
   profiles, employees, leaveRequests, leaveBalances,
-  candidates, expenseCategories, expenses,
+  candidates, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   changeLog, historicalChanges, changeNotifications,
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, like, sql as drizzleSql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 export interface IStorage {
   // Profiles
@@ -166,13 +167,19 @@ export class DbStorage implements IStorage {
   }
 
   async getEmployeesWithProfiles(): Promise<EmployeeWithProfile[]> {
+    const managerProfiles = alias(profiles, 'managerProfiles');
+    
     const result = await db
       .select({
         employee: employees,
-        profile: profiles
+        profile: profiles,
+        department: departments,
+        managerProfile: managerProfiles
       })
       .from(employees)
-      .leftJoin(profiles, eq(employees.userId, profiles.id));
+      .leftJoin(profiles, eq(employees.userId, profiles.id))
+      .leftJoin(departments, eq(employees.departmentId, departments.id))
+      .leftJoin(managerProfiles, eq(employees.managerId, managerProfiles.id));
 
     return result.map(row => ({
       ...row.employee,
@@ -180,10 +187,13 @@ export class DbStorage implements IStorage {
         firstName: row.profile.firstName,
         lastName: row.profile.lastName,
         email: row.profile.email,
-        department: row.profile.department,
+        department: row.department?.name || null,
         role: row.profile.role,
         phone: row.profile.phone,
-        avatarUrl: row.profile.profilePicture
+        avatarUrl: row.profile.profilePicture,
+        managerName: row.managerProfile 
+          ? `${row.managerProfile.firstName || ''} ${row.managerProfile.lastName || ''}`.trim() || null
+          : null
       } : null
     }));
   }

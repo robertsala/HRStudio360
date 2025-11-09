@@ -42,7 +42,9 @@ interface EmployeeDirectoryEntry {
     firstName: string | null;
     lastName: string | null;
     email: string;
+    department: string | null;
     avatarUrl: string | null;
+    managerName: string | null;
   } | null;
 }
 

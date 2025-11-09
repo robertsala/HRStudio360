@@ -98,8 +98,8 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
       return {
         ...request,
         employeeName: fullName || 'Unknown Employee',
-        department: undefined, // Department name not available in directory response
-        manager: undefined,
+        department: employee?.profile?.department || undefined,
+        manager: employee?.profile?.managerName || undefined,
         employeeEmail: employee?.profile?.email || undefined
       };
     });
