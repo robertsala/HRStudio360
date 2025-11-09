@@ -165,7 +165,7 @@ class ApiClient {
     });
   }
 
-  async updateLeaveRequest(id: number, updates: any) {
+  async updateLeaveRequest(id: string, updates: any) {
     return this.request(`/api/leave-requests/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),

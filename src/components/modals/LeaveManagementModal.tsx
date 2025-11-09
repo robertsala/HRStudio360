@@ -1,25 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Calendar, User, Clock, CheckCircle, AlertCircle, Plus, Filter, Download, Mail, Bell, MapPin, Users, Eye } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient, type EmployeeDirectoryEntry } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
+import type { LeaveRequest as DBLeaveRequest, LeaveBalance } from '../../../shared/schema';
 
-interface LeaveRequest {
+interface LeaveRequestWithEmployee {
   id: string;
-  employeeName: string;
   employeeId: string;
-  department: string;
-  manager: string;
+  employeeName: string;
+  department?: string;
+  manager?: string;
+  employeeEmail?: string;
   type: 'Vacation' | 'Sick' | 'Personal' | 'Bereavement' | 'Maternity' | 'Paternity' | 'FMLA';
   startDate: string;
   endDate: string;
   days: number;
   status: 'Pending' | 'Approved' | 'Denied' | 'Cancelled';
   reason: string;
-  approver?: string;
-  submittedDate: string;
-  approvedDate?: string;
-  notes?: string;
-  coverageArrangements?: string;
-  emergencyContact?: string;
-  medicalCertification?: boolean;
+  approverId?: string | null;
+  coverageArrangements?: string | null;
+  emergencyContact?: string | null;
+  medicalCertification?: boolean | null;
+  notes?: string | null;
+  submittedDate?: string | null;
+  approvedDate?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 interface TeamMember {
@@ -47,17 +54,110 @@ interface LeaveManagementModalProps {
 }
 
 const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, initialFilter }) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('requests');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterType, setFilterType] = useState('All');
   const [teamFilter, setTeamFilter] = useState<'my-team' | 'my-department' | 'my-location' | 'all'>(initialFilter?.type || 'all');
-  const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<LeaveRequestWithEmployee | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [showTeamCalendar, setShowTeamCalendar] = useState(false);
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
+
+  const { data: rawLeaveRequests = [], isLoading: isLoadingRequests, isError: isErrorRequests } = useQuery<DBLeaveRequest[]>({
+    queryKey: ['/api/leave-requests'],
+    enabled: true
+  });
+
+  const { data: employeeDirectory = [], isLoading: isLoadingEmployees } = useQuery<EmployeeDirectoryEntry[]>({
+    queryKey: ['/api/employees', 'directory'],
+    enabled: true
+  });
+
+  const { data: leaveBalances = [], isLoading: isLoadingBalances } = useQuery<LeaveBalance[]>({
+    queryKey: ['/api/leave-balances'],
+    enabled: activeTab === 'balances'
+  });
+
+  const currentEmployee = useMemo(() => 
+    employeeDirectory.find(emp => emp.userId === user?.id),
+    [employeeDirectory, user?.id]
+  );
+
+  const leaveRequests = useMemo<LeaveRequestWithEmployee[]>(() => {
+    return rawLeaveRequests.map(request => {
+      const employee = employeeDirectory.find(emp => emp.id === request.employeeId);
+      return {
+        ...request,
+        employeeName: employee?.name || 'Unknown Employee',
+        department: employee?.department || undefined,
+        manager: undefined,
+        employeeEmail: employee?.email || undefined
+      };
+    });
+  }, [rawLeaveRequests, employeeDirectory]);
+
+  const approveRequestMutation = useMutation({
+    mutationFn: (requestId: string) => apiClient.updateLeaveRequest(requestId, { status: 'Approved' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
+      setNotification({
+        type: 'success',
+        message: 'Leave request approved successfully!'
+      });
+      setTimeout(() => setNotification(null), 4000);
+    },
+    onError: (error: any) => {
+      setNotification({
+        type: 'error',
+        message: error?.message || 'Failed to approve leave request'
+      });
+      setTimeout(() => setNotification(null), 4000);
+    }
+  });
+
+  const denyRequestMutation = useMutation({
+    mutationFn: (requestId: string) => apiClient.updateLeaveRequest(requestId, { status: 'Denied' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
+      setNotification({
+        type: 'info',
+        message: 'Leave request denied.'
+      });
+      setTimeout(() => setNotification(null), 4000);
+    },
+    onError: (error: any) => {
+      setNotification({
+        type: 'error',
+        message: error?.message || 'Failed to deny leave request'
+      });
+      setTimeout(() => setNotification(null), 4000);
+    }
+  });
+
+  const submitRequestMutation = useMutation({
+    mutationFn: (request: any) => apiClient.createLeaveRequest(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
+      setNotification({
+        type: 'success',
+        message: 'Leave request submitted successfully!'
+      });
+      setTimeout(() => setNotification(null), 4000);
+      setShowRequestForm(false);
+    },
+    onError: (error: any) => {
+      setNotification({
+        type: 'error',
+        message: error?.message || 'Failed to submit leave request'
+      });
+      setTimeout(() => setNotification(null), 4000);
+    }
+  });
 
   React.useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -79,71 +179,6 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
       document.removeEventListener('keydown', handleEscKey);
     };
   }, [selectedRequest, showRequestForm, showTeamCalendar, onClose]);
-
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
-    {
-      id: '1',
-      employeeName: 'David Kim',
-      employeeId: 'EMP003',
-      department: 'Engineering',
-      manager: 'Mike Chen',
-      type: 'Vacation',
-      startDate: '2025-02-10',
-      endDate: '2025-02-14',
-      days: 5,
-      status: 'Pending',
-      reason: 'Family vacation to Hawaii',
-      submittedDate: '2025-01-10',
-      coverageArrangements: 'Sarah Johnson will cover critical tasks',
-      emergencyContact: '+1 (555) 999-8888'
-    },
-    {
-      id: '2',
-      employeeName: 'Emma Wilson',
-      employeeId: 'EMP005',
-      department: 'HR',
-      manager: 'Lisa Rodriguez',
-      type: 'Sick',
-      startDate: '2025-01-16',
-      endDate: '2025-01-16',
-      days: 1,
-      status: 'Approved',
-      reason: 'Doctor appointment',
-      approver: 'Lisa Rodriguez',
-      submittedDate: '2025-01-15',
-      approvedDate: '2025-01-15'
-    },
-    {
-      id: '3',
-      employeeName: 'Sarah Johnson',
-      employeeId: 'EMP001',
-      department: 'Engineering',
-      manager: 'Mike Chen',
-      type: 'Personal',
-      startDate: '2025-01-25',
-      endDate: '2025-01-25',
-      days: 1,
-      status: 'Pending',
-      reason: 'Personal appointment',
-      submittedDate: '2025-01-12'
-    },
-    {
-      id: '4',
-      employeeName: 'Alex Thompson',
-      employeeId: 'EMP007',
-      department: 'Marketing',
-      manager: 'John Smith',
-      type: 'FMLA',
-      startDate: '2025-03-01',
-      endDate: '2025-05-01',
-      days: 60,
-      status: 'Pending',
-      reason: 'Family medical leave',
-      submittedDate: '2025-01-08',
-      medicalCertification: true,
-      emergencyContact: '+1 (555) 777-6666'
-    }
-  ]);
 
   const [newRequest, setNewRequest] = useState({
     employeeName: 'Current User',
@@ -199,68 +234,11 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
   ];
 
   const handleApproveRequest = (requestId: string) => {
-    const request = leaveRequests.find(r => r.id === requestId);
-    if (!request) return;
-
-    setLeaveRequests(prev => prev.map(r => 
-      r.id === requestId 
-        ? { 
-            ...r, 
-            status: 'Approved' as const, 
-            approver: 'Current Manager',
-            approvedDate: new Date().toISOString()
-          }
-        : r
-    ));
-
-    // Send notifications
-    console.log('Sending approval notifications:', {
-      employee: {
-        to: `${request.employeeName.toLowerCase().replace(' ', '.')}@company.com`,
-        subject: 'Leave Request Approved',
-        message: `Your ${request.type.toLowerCase()} request for ${request.days} day(s) from ${new Date(request.startDate).toLocaleDateString()} to ${new Date(request.endDate).toLocaleDateString()} has been approved.`
-      },
-      hr: {
-        to: 'hr@company.com',
-        subject: 'Leave Request Approved - Calendar Update Required',
-        message: `${request.employeeName} (${request.department}) has been approved for ${request.type.toLowerCase()} leave. Please update company calendar and coverage arrangements.`
-      }
-    });
-
-    setNotification({
-      type: 'success',
-      message: `Leave request approved for ${request.employeeName}. Employee and HR have been notified.`
-    });
-    setTimeout(() => setNotification(null), 4000);
+    approveRequestMutation.mutate(requestId);
   };
 
   const handleDenyRequest = (requestId: string) => {
-    const request = leaveRequests.find(r => r.id === requestId);
-    if (!request) return;
-
-    setLeaveRequests(prev => prev.map(r => 
-      r.id === requestId 
-        ? { 
-            ...r, 
-            status: 'Denied' as const, 
-            approver: 'Current Manager',
-            approvedDate: new Date().toISOString()
-          }
-        : r
-    ));
-
-    // Send notification to employee
-    console.log('Sending denial notification:', {
-      to: `${request.employeeName.toLowerCase().replace(' ', '.')}@company.com`,
-      subject: 'Leave Request Denied',
-      message: `Your ${request.type.toLowerCase()} request has been denied. Please contact your manager for more information.`
-    });
-
-    setNotification({
-      type: 'info',
-      message: `Leave request denied for ${request.employeeName}. Employee has been notified.`
-    });
-    setTimeout(() => setNotification(null), 4000);
+    denyRequestMutation.mutate(requestId);
   };
 
   const handleSubmitRequest = () => {
@@ -273,45 +251,33 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
       return;
     }
 
-    // Calculate days
+    if (!currentEmployee?.id) {
+      setNotification({
+        type: 'error',
+        message: 'Unable to find your employee record. Please contact HR.'
+      });
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
     const start = new Date(newRequest.startDate);
     const end = new Date(newRequest.endDate);
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-    const request: LeaveRequest = {
-      id: Date.now().toString(),
-      employeeName: newRequest.employeeName,
-      employeeId: 'EMP999',
-      department: 'Current Department',
-      manager: 'Current Manager',
-      type: newRequest.type as LeaveRequest['type'],
+    const requestData = {
+      employeeId: currentEmployee.id,
+      type: newRequest.type,
       startDate: newRequest.startDate,
       endDate: newRequest.endDate,
       days,
-      status: 'Pending',
       reason: newRequest.reason,
-      submittedDate: new Date().toISOString(),
-      coverageArrangements: newRequest.coverageArrangements,
-      emergencyContact: newRequest.emergencyContact
+      status: 'Pending',
+      coverageArrangements: newRequest.coverageArrangements || undefined,
+      emergencyContact: newRequest.emergencyContact || undefined
     };
 
-    setLeaveRequests(prev => [...prev, request]);
-
-    // Send notification to manager
-    console.log('Sending leave request to manager:', {
-      to: 'manager@company.com',
-      cc: 'hr@company.com',
-      subject: 'New Leave Request Requires Approval',
-      message: `${request.employeeName} has submitted a ${request.type.toLowerCase()} leave request for ${days} day(s) from ${new Date(request.startDate).toLocaleDateString()} to ${new Date(request.endDate).toLocaleDateString()}.`
-    });
-
-    setNotification({
-      type: 'success',
-      message: 'Leave request submitted successfully! Your manager has been notified.'
-    });
-    setTimeout(() => setNotification(null), 4000);
-
-    setShowRequestForm(false);
+    submitRequestMutation.mutate(requestData);
+    
     setNewRequest({
       employeeName: 'Current User',
       type: 'Vacation',
