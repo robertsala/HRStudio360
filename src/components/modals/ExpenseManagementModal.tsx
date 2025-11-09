@@ -141,7 +141,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
   const handleSubmitExpense = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.categoryId || !formData.amount || !formData.merchant || !formData.description) {
+    if (!formData.categoryId || !formData.amount || !formData.description) {
       showNotification('error', 'Please fill in all required fields');
       return;
     }
@@ -160,13 +160,18 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
         throw new Error('Employee profile not found');
       }
 
+      // Build description with optional merchant prefix
+      const description = formData.merchant 
+        ? `${formData.merchant} - ${formData.description}`
+        : formData.description;
+
       await apiClient.createExpense({
         employeeId: employeeRecord.id,
         categoryId: formData.categoryId,
-        amount: formData.amount,
+        amount: parseFloat(formData.amount),
         currency: 'USD',
         date: formData.date,
-        description: `${formData.merchant} - ${formData.description}`,
+        description,
         receiptUrl: formData.receiptUrl || null,
         status: 'pending'
       });
@@ -233,9 +238,9 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
     return true;
   });
 
-  const totalPending = expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + e.amount, 0);
-  const totalApproved = expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + e.amount, 0);
-  const totalReimbursed = expenses.filter(e => e.status === 'reimbursed').reduce((sum, e) => sum + e.amount, 0);
+  const totalPending = expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
+  const totalApproved = expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
+  const totalReimbursed = expenses.filter(e => e.status === 'reimbursed').reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
 
   if (!isOpen) return null;
 
@@ -455,7 +460,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-2">
-                    Merchant/Vendor *
+                    Merchant/Vendor (Optional)
                   </label>
                   <input
                     type="text"
@@ -463,8 +468,8 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, merchant: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., Starbucks, Delta Airlines"
-                    required
                   />
+                  <p className="text-xs text-gray-500 mt-1">If provided, will be added to the description</p>
                 </div>
 
                 <div>

@@ -55,18 +55,19 @@ export function registerRoutes(app: Express) {
   });
 
   // Employee routes
-  app.get('/api/employees', async (req, res) => {
+  // Note: Specific routes must come before parametric routes
+  app.get('/api/employees/directory', async (req, res) => {
     try {
-      const employees = await storage.getEmployees();
+      const employees = await storage.getEmployeesWithProfiles();
       res.json(employees);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/employees/directory', async (req, res) => {
+  app.get('/api/employees', async (req, res) => {
     try {
-      const employees = await storage.getEmployeesWithProfiles();
+      const employees = await storage.getEmployees();
       res.json(employees);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
