@@ -1,22 +1,5 @@
 import { supabase } from './supabaseClient';
-
-export interface ReviewCycle {
-  id: string;
-  name: string;
-  review_type: 'annual' | 'quarterly' | 'probationary' | 'mid_year';
-  start_date: string;
-  end_date: string;
-  self_assessment_deadline: string;
-  manager_assessment_deadline: string;
-  status: 'draft' | 'active' | 'completed' | 'archived';
-  employee_selection_criteria?: any;
-  notification_settings?: any;
-  approval_threshold_amount?: number;
-  approval_threshold_percentage?: number;
-  created_by?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+import type { ReviewCycle } from '../../shared/schema';
 
 export interface PerformanceReview {
   id: string;
@@ -101,48 +84,38 @@ export interface CompensationHistory {
 
 export const performanceReviewService = {
   async createReviewCycle(cycleData: Partial<ReviewCycle>) {
-    const { data, error } = await supabase
-      .from('review_cycles')
-      .insert([cycleData])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    const response = await fetch('/api/performance/review-cycles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cycleData)
+    });
+    if (!response.ok) throw new Error('Failed to create review cycle');
+    return response.json();
   },
 
   async getActiveReviewCycles() {
-    const { data, error } = await supabase
-      .from('review_cycles')
-      .select('*')
-      .in('status', ['draft', 'active', 'completed'])
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    const response = await fetch('/api/performance/review-cycles');
+    if (!response.ok) throw new Error('Failed to fetch review cycles');
+    return response.json();
   },
 
   async getReviewCycleById(id: string) {
-    const { data, error } = await supabase
-      .from('review_cycles')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    const response = await fetch(`/api/performance/review-cycles/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error('Failed to fetch review cycle');
+    }
+    return response.json();
   },
 
   async updateReviewCycle(id: string, updates: Partial<ReviewCycle>) {
-    const { data, error } = await supabase
-      .from('review_cycles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    const response = await fetch(`/api/performance/review-cycles/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) throw new Error('Failed to update review cycle');
+    return response.json();
   },
 
   async getStandardQuestions() {

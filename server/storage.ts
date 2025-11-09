@@ -19,14 +19,16 @@ import type {
   CelebrationBadge, InsertCelebrationBadge,
   EarnedBadge, InsertEarnedBadge,
   CelebrationHistory, InsertCelebrationHistory,
-  CelebrationNotification, InsertCelebrationNotification
+  CelebrationNotification, InsertCelebrationNotification,
+  ReviewCycle, InsertReviewCycle
 } from '../shared/schema.js';
 import { 
   profiles, employees, leaveRequests, leaveBalances,
   candidates, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   changeLog, historicalChanges, changeNotifications,
-  celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications
+  celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
+  reviewCycles
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, like, sql as drizzleSql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -132,6 +134,12 @@ export interface IStorage {
   markCelebrationDismissed(userId: string, type: string, date: string): Promise<void>;
   getCelebrationNotifications(userId: string): Promise<CelebrationNotification[]>;
   createCelebrationNotification(notification: InsertCelebrationNotification): Promise<CelebrationNotification>;
+
+  // Performance Review Cycles
+  getActiveReviewCycles(): Promise<ReviewCycle[]>;
+  getReviewCycleById(id: string): Promise<ReviewCycle | undefined>;
+  createReviewCycle(cycle: InsertReviewCycle): Promise<ReviewCycle>;
+  updateReviewCycle(id: string, cycle: Partial<InsertReviewCycle>): Promise<ReviewCycle | undefined>;
 }
 
 // Database storage implementation
@@ -569,6 +577,38 @@ export class DbStorage implements IStorage {
 
   async createCelebrationNotification(notification: InsertCelebrationNotification): Promise<CelebrationNotification> {
     const result = await db.insert(celebrationNotifications).values(notification).returning();
+    return result[0];
+  }
+
+  // Performance Review Cycles
+  async getActiveReviewCycles(): Promise<ReviewCycle[]> {
+    return db.select()
+      .from(reviewCycles)
+      .where(or(
+        eq(reviewCycles.status, 'draft'),
+        eq(reviewCycles.status, 'active'),
+        eq(reviewCycles.status, 'completed')
+      ))
+      .orderBy(desc(reviewCycles.createdAt));
+  }
+
+  async getReviewCycleById(id: string): Promise<ReviewCycle | undefined> {
+    const result = await db.select()
+      .from(reviewCycles)
+      .where(eq(reviewCycles.id, id));
+    return result[0];
+  }
+
+  async createReviewCycle(cycle: InsertReviewCycle): Promise<ReviewCycle> {
+    const result = await db.insert(reviewCycles).values(cycle).returning();
+    return result[0];
+  }
+
+  async updateReviewCycle(id: string, cycle: Partial<InsertReviewCycle>): Promise<ReviewCycle | undefined> {
+    const result = await db.update(reviewCycles)
+      .set({ ...cycle, updatedAt: new Date() })
+      .where(eq(reviewCycles.id, id))
+      .returning();
     return result[0];
   }
 }

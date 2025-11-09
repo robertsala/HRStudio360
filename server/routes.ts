@@ -6,7 +6,8 @@ import {
   insertChatChannelSchema, insertChannelMemberSchema, insertChatMessageSchema,
   insertMessageReactionSchema, insertTypingIndicatorSchema, insertUserPresenceSchema,
   insertChangeLogSchema, insertHistoricalChangeSchema, insertChangeNotificationSchema,
-  insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema
+  insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema,
+  insertReviewCycleSchema
 } from '../shared/schema.js';
 
 export function registerRoutes(app: Express) {
@@ -855,6 +856,50 @@ export function registerRoutes(app: Express) {
       res.status(201).json(notification);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Performance Review Cycle routes
+  app.get('/api/performance/review-cycles', async (req, res) => {
+    try {
+      const cycles = await storage.getActiveReviewCycles();
+      res.json(cycles);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/performance/review-cycles/:id', async (req, res) => {
+    try {
+      const cycle = await storage.getReviewCycleById(req.params.id);
+      if (!cycle) {
+        return res.status(404).json({ error: 'Review cycle not found' });
+      }
+      res.json(cycle);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/performance/review-cycles', async (req, res) => {
+    try {
+      const validated = insertReviewCycleSchema.parse(req.body);
+      const cycle = await storage.createReviewCycle(validated);
+      res.status(201).json(cycle);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/performance/review-cycles/:id', async (req, res) => {
+    try {
+      const cycle = await storage.updateReviewCycle(req.params.id, req.body);
+      if (!cycle) {
+        return res.status(404).json({ error: 'Review cycle not found' });
+      }
+      res.json(cycle);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 }
