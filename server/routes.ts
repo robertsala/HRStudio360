@@ -2,7 +2,7 @@ import type { Express } from 'express';
 import { storage } from './storage.js';
 import { 
   insertProfileSchema, insertEmployeeSchema, insertLeaveRequestSchema,
-  insertCandidateSchema, insertExpenseSchema, 
+  insertCandidateSchema, insertExpenseCategorySchema, insertExpenseSchema, 
   insertChatChannelSchema, insertChannelMemberSchema, insertChatMessageSchema,
   insertMessageReactionSchema, insertTypingIndicatorSchema, insertUserPresenceSchema,
   insertChangeLogSchema, insertHistoricalChangeSchema, insertChangeNotificationSchema,
@@ -157,6 +157,28 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Candidate not found' });
       }
       res.json(candidate);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Expense Category routes
+  app.get('/api/expense-categories', async (req, res) => {
+    try {
+      const categories = await storage.getExpenseCategories();
+      res.json(categories);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/expense-categories/:id', async (req, res) => {
+    try {
+      const category = await storage.getExpenseCategoryById(req.params.id);
+      if (!category) {
+        return res.status(404).json({ error: 'Expense category not found' });
+      }
+      res.json(category);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

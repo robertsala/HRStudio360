@@ -194,6 +194,15 @@ class ApiClient {
     });
   }
 
+  // Expense Category endpoints
+  async getExpenseCategories() {
+    return this.request('/api/expense-categories');
+  }
+
+  async getExpenseCategory(id: string) {
+    return this.request(`/api/expense-categories/${id}`);
+  }
+
   // Expense endpoints
   async getExpenses() {
     return this.request('/api/expenses');

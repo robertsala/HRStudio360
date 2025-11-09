@@ -4,6 +4,7 @@ import type {
   Employee, InsertEmployee, 
   LeaveRequest, InsertLeaveRequest,
   Candidate, InsertCandidate,
+  ExpenseCategory, InsertExpenseCategory,
   Expense, InsertExpense,
   ChatChannel, InsertChatChannel,
   ChannelMember, InsertChannelMember,
@@ -21,7 +22,7 @@ import type {
 } from '../shared/schema.js';
 import { 
   profiles, employees, leaveRequests,
-  candidates, expenses,
+  candidates, expenseCategories, expenses,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   changeLog, historicalChanges, changeNotifications,
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications
@@ -54,6 +55,10 @@ export interface IStorage {
   createCandidate(candidate: InsertCandidate): Promise<Candidate>;
   updateCandidate(id: string, candidate: Partial<InsertCandidate>): Promise<Candidate | undefined>;
 
+  // Expense Categories
+  getExpenseCategories(): Promise<ExpenseCategory[]>;
+  getExpenseCategoryById(id: string): Promise<ExpenseCategory | undefined>;
+  
   // Expenses
   getExpenses(): Promise<Expense[]>;
   getExpenseById(id: string): Promise<Expense | undefined>;
@@ -204,6 +209,16 @@ export class DbStorage implements IStorage {
 
   async updateCandidate(id: string, candidate: Partial<InsertCandidate>): Promise<Candidate | undefined> {
     const result = await db.update(candidates).set(candidate).where(eq(candidates.id, id)).returning();
+    return result[0];
+  }
+
+  // Expense Categories
+  async getExpenseCategories(): Promise<ExpenseCategory[]> {
+    return db.select().from(expenseCategories);
+  }
+
+  async getExpenseCategoryById(id: string): Promise<ExpenseCategory | undefined> {
+    const result = await db.select().from(expenseCategories).where(eq(expenseCategories.id, id));
     return result[0];
   }
 
