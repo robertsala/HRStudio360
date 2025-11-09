@@ -395,6 +395,169 @@ export const celebrationNotifications = pgTable('celebration_notifications', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Performance Review System Tables
+
+// Review cycles
+export const reviewCycles = pgTable('review_cycles', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  reviewType: text('review_type').notNull(), // 'annual' | 'quarterly' | 'probationary' | 'mid_year'
+  templateId: uuid('template_id').references(() => reviewQuestionTemplates.id),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  selfAssessmentDeadline: date('self_assessment_deadline').notNull(),
+  managerAssessmentDeadline: date('manager_assessment_deadline').notNull(),
+  status: text('status').notNull(), // 'draft' | 'active' | 'completed' | 'archived'
+  employeeSelectionCriteria: text('employee_selection_criteria'),
+  notificationSettings: text('notification_settings'),
+  approvalThresholdAmount: numeric('approval_threshold_amount', { precision: 10, scale: 2 }),
+  approvalThresholdPercentage: numeric('approval_threshold_percentage', { precision: 5, scale: 2 }),
+  createdBy: uuid('created_by').references(() => profiles.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Performance reviews
+export const performanceReviews = pgTable('performance_reviews', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  reviewCycleId: uuid('review_cycle_id').references(() => reviewCycles.id).notNull(),
+  employeeId: uuid('employee_id').references(() => employees.id).notNull(),
+  managerId: uuid('manager_id').references(() => employees.id).notNull(),
+  selfAssessmentStatus: text('self_assessment_status').notNull(), // 'not_started' | 'in_progress' | 'submitted'
+  managerAssessmentStatus: text('manager_assessment_status').notNull(), // 'not_started' | 'in_progress' | 'submitted'
+  selfAssessmentSubmittedAt: timestamp('self_assessment_submitted_at'),
+  managerAssessmentSubmittedAt: timestamp('manager_assessment_submitted_at'),
+  hrReviewStatus: text('hr_review_status').notNull(), // 'pending' | 'reviewed' | 'approved'
+  overallStatus: text('overall_status').notNull(), // 'pending_self' | 'pending_manager' | 'pending_hr' | 'completed'
+  selfOverallRating: numeric('self_overall_rating', { precision: 3, scale: 2 }),
+  managerOverallRating: numeric('manager_overall_rating', { precision: 3, scale: 2 }),
+  finalRating: numeric('final_rating', { precision: 3, scale: 2 }),
+  compensationChange: numeric('compensation_change', { precision: 10, scale: 2 }),
+  compensationChangeApproved: boolean('compensation_change_approved').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Review questions library
+export const reviewQuestionsLibrary = pgTable('review_questions_library', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  questionText: text('question_text').notNull(),
+  category: text('category').notNull(),
+  weight: numeric('weight', { precision: 3, scale: 2 }).notNull(),
+  sortOrder: integer('sort_order').notNull(),
+  questionType: text('question_type')
+});
+
+// Review question templates
+export const reviewQuestionTemplates = pgTable('review_question_templates', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  templateName: text('template_name').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Review question assignments
+export const reviewQuestionAssignments = pgTable('review_question_assignments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  templateId: uuid('template_id').references(() => reviewQuestionTemplates.id).notNull(),
+  questionId: uuid('question_id').references(() => reviewQuestionsLibrary.id).notNull(),
+  sortOrder: integer('sort_order').notNull(),
+  isRequired: boolean('is_required').default(true)
+});
+
+// Review responses
+export const reviewResponses = pgTable('review_responses', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  performanceReviewId: uuid('performance_review_id').references(() => performanceReviews.id).notNull(),
+  questionId: uuid('question_id').references(() => reviewQuestionsLibrary.id).notNull(),
+  responseType: text('response_type').notNull(), // 'self_assessment' | 'manager_assessment'
+  rating: numeric('rating', { precision: 3, scale: 2 }),
+  textResponse: text('text_response'),
+  comments: text('comments'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Review goals and comments
+export const reviewGoalsComments = pgTable('review_goals_comments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  performanceReviewId: uuid('performance_review_id').references(() => performanceReviews.id).notNull(),
+  commentType: text('comment_type').notNull(), // 'self_assessment' | 'manager_assessment'
+  achievements: text('achievements'),
+  developmentAreas: text('development_areas'),
+  goalsNextPeriod: text('goals_next_period'),
+  additionalComments: text('additional_comments'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Compensation approvals
+export const compensationApprovals = pgTable('compensation_approvals', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  performanceReviewId: uuid('performance_review_id').references(() => performanceReviews.id).notNull(),
+  employeeId: uuid('employee_id').references(() => employees.id).notNull(),
+  currentSalary: numeric('current_salary', { precision: 10, scale: 2 }).notNull(),
+  recommendedSalary: numeric('recommended_salary', { precision: 10, scale: 2 }).notNull(),
+  recommendedIncreaseAmount: numeric('recommended_increase_amount', { precision: 10, scale: 2 }).notNull(),
+  recommendedIncreasePercentage: numeric('recommended_increase_percentage', { precision: 5, scale: 2 }).notNull(),
+  managerId: uuid('manager_id').references(() => employees.id).notNull(),
+  managerJustification: text('manager_justification').notNull(),
+  hrApprovalStatus: text('hr_approval_status').default('pending'),
+  hrApprovedBy: uuid('hr_approved_by').references(() => profiles.id),
+  hrApprovedAt: timestamp('hr_approved_at'),
+  hrComments: text('hr_comments'),
+  hrModifiedAmount: numeric('hr_modified_amount', { precision: 10, scale: 2 }),
+  executiveApprovalStatus: text('executive_approval_status').default('pending'),
+  executiveApprovedBy: uuid('executive_approved_by').references(() => profiles.id),
+  executiveApprovedAt: timestamp('executive_approved_at'),
+  executiveComments: text('executive_comments'),
+  executiveModifiedAmount: numeric('executive_modified_amount', { precision: 10, scale: 2 }),
+  requiresExecutiveApproval: boolean('requires_executive_approval').default(false),
+  finalApprovalStatus: text('final_approval_status').default('pending'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Compensation history
+export const compensationHistory = pgTable('compensation_history', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => employees.id).notNull(),
+  reviewId: uuid('review_id').references(() => performanceReviews.id),
+  oldSalary: numeric('old_salary', { precision: 10, scale: 2 }).notNull(),
+  newSalary: numeric('new_salary', { precision: 10, scale: 2 }).notNull(),
+  changeAmount: numeric('change_amount', { precision: 10, scale: 2 }).notNull(),
+  changePercentage: numeric('change_percentage', { precision: 5, scale: 2 }).notNull(),
+  effectiveDate: date('effective_date').notNull(),
+  reason: text('reason').notNull(),
+  notes: text('notes'),
+  approvedByManager: uuid('approved_by_manager').references(() => profiles.id),
+  approvedByHr: uuid('approved_by_hr').references(() => profiles.id),
+  approvedByExecutive: uuid('approved_by_executive').references(() => profiles.id),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Performance review history
+export const performanceReviewHistory = pgTable('performance_review_history', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => employees.id).notNull(),
+  reviewDate: date('review_date').notNull(),
+  reviewType: text('review_type').notNull(),
+  rating: numeric('rating', { precision: 3, scale: 2 }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Review audit log
+export const reviewAuditLog = pgTable('review_audit_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  actionType: text('action_type').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: uuid('entity_id').notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  description: text('description').notNull(),
+  oldValue: text('old_value'),
+  newValue: text('new_value'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
@@ -419,6 +582,17 @@ export const insertCelebrationBadgeSchema = createInsertSchema(celebrationBadges
 export const insertEarnedBadgeSchema = createInsertSchema(earnedBadges).omit({ id: true, earnedAt: true });
 export const insertCelebrationHistorySchema = createInsertSchema(celebrationHistory).omit({ id: true, shownAt: true });
 export const insertCelebrationNotificationSchema = createInsertSchema(celebrationNotifications).omit({ id: true, createdAt: true });
+export const insertReviewCycleSchema = createInsertSchema(reviewCycles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPerformanceReviewSchema = createInsertSchema(performanceReviews).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertReviewQuestionLibrarySchema = createInsertSchema(reviewQuestionsLibrary).omit({ id: true });
+export const insertReviewQuestionTemplateSchema = createInsertSchema(reviewQuestionTemplates).omit({ id: true, createdAt: true });
+export const insertReviewQuestionAssignmentSchema = createInsertSchema(reviewQuestionAssignments).omit({ id: true });
+export const insertReviewResponseSchema = createInsertSchema(reviewResponses).omit({ id: true, createdAt: true });
+export const insertReviewGoalsCommentsSchema = createInsertSchema(reviewGoalsComments).omit({ id: true, createdAt: true });
+export const insertCompensationApprovalSchema = createInsertSchema(compensationApprovals).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCompensationHistorySchema = createInsertSchema(compensationHistory).omit({ id: true, createdAt: true });
+export const insertPerformanceReviewHistorySchema = createInsertSchema(performanceReviewHistory).omit({ id: true, createdAt: true });
+export const insertReviewAuditLogSchema = createInsertSchema(reviewAuditLog).omit({ id: true, createdAt: true });
 
 // Types
 export type Profile = typeof profiles.$inferSelect;
@@ -467,3 +641,25 @@ export type CelebrationNotification = typeof celebrationNotifications.$inferSele
 export type InsertCelebrationNotification = z.infer<typeof insertCelebrationNotificationSchema>;
 export type LeaveBalance = typeof leaveBalances.$inferSelect;
 export type InsertLeaveBalance = z.infer<typeof insertLeaveBalanceSchema>;
+export type ReviewCycle = typeof reviewCycles.$inferSelect;
+export type InsertReviewCycle = z.infer<typeof insertReviewCycleSchema>;
+export type PerformanceReview = typeof performanceReviews.$inferSelect;
+export type InsertPerformanceReview = z.infer<typeof insertPerformanceReviewSchema>;
+export type ReviewQuestionLibrary = typeof reviewQuestionsLibrary.$inferSelect;
+export type InsertReviewQuestionLibrary = z.infer<typeof insertReviewQuestionLibrarySchema>;
+export type ReviewQuestionTemplate = typeof reviewQuestionTemplates.$inferSelect;
+export type InsertReviewQuestionTemplate = z.infer<typeof insertReviewQuestionTemplateSchema>;
+export type ReviewQuestionAssignment = typeof reviewQuestionAssignments.$inferSelect;
+export type InsertReviewQuestionAssignment = z.infer<typeof insertReviewQuestionAssignmentSchema>;
+export type ReviewResponse = typeof reviewResponses.$inferSelect;
+export type InsertReviewResponse = z.infer<typeof insertReviewResponseSchema>;
+export type ReviewGoalsComments = typeof reviewGoalsComments.$inferSelect;
+export type InsertReviewGoalsComments = z.infer<typeof insertReviewGoalsCommentsSchema>;
+export type CompensationApproval = typeof compensationApprovals.$inferSelect;
+export type InsertCompensationApproval = z.infer<typeof insertCompensationApprovalSchema>;
+export type CompensationHistory = typeof compensationHistory.$inferSelect;
+export type InsertCompensationHistory = z.infer<typeof insertCompensationHistorySchema>;
+export type PerformanceReviewHistory = typeof performanceReviewHistory.$inferSelect;
+export type InsertPerformanceReviewHistory = z.infer<typeof insertPerformanceReviewHistorySchema>;
+export type ReviewAuditLog = typeof reviewAuditLog.$inferSelect;
+export type InsertReviewAuditLog = z.infer<typeof insertReviewAuditLogSchema>;
