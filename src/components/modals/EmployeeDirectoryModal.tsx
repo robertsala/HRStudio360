@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Filter, Mail, Phone, MapPin, User, Building, Briefcase, Calendar, Users, Sparkles, Trophy, Award, Star, Medal, Shield, Eye } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
-import { useAuth } from '../../hooks/useAuth';
+import { X, Filter, Mail, Phone, MapPin, Building, Briefcase, Calendar, Users, Sparkles, Trophy, Award, Star, Medal, Shield, Eye } from 'lucide-react';
+import { apiClient } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useUserPresence } from '../../hooks/useUserPresence';
 import ComprehensiveEmployeeProfileModal from './ComprehensiveEmployeeProfileModal';
 
@@ -46,48 +46,35 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
   const fetchEmployees = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select(`
-          id,
-          employee_id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          job_title,
-          location,
-          start_date,
-          status,
-          salary,
-          hourly_rate,
-          employment_type,
-          profile_picture_url,
-          departments (name)
-        `)
-        .eq('status', 'Active')
-        .order('first_name');
-
-      if (error) throw error;
+      const data = await apiClient.getEmployees();
 
       const formattedEmployees: Employee[] = (data || []).map((emp: any) => {
-        const fullName = `${emp.first_name} ${emp.last_name}`;
+        const fullName = `${emp.firstName} ${emp.lastName}`;
+        
+        // Normalize status (case-insensitive mapping)
+        const normalizedStatus = emp.status?.toLowerCase() === 'active' 
+          ? 'Active' 
+          : emp.status?.toLowerCase() === 'remote'
+          ? 'Remote'
+          : 'On Leave';
+        
         return {
-          id: emp.id,
+          id: emp.id.toString(),
           name: fullName,
-          email: emp.email || `${emp.first_name?.toLowerCase()}.${emp.last_name?.toLowerCase()}@company.com`,
+          email: emp.email || `${emp.firstName?.toLowerCase()}.${emp.lastName?.toLowerCase()}@company.com`,
           phone: emp.phone || '(555) 000-0000',
-          department: emp.departments?.name || 'General',
-          role: emp.job_title || 'Employee',
+          department: emp.department || 'General',
+          role: emp.jobTitle || 'Employee',
           location: emp.location || 'Remote',
-          startDate: emp.start_date || new Date().toISOString().split('T')[0],
-          status: (emp.status === 'Active' ? 'Active' : 'On Leave') as 'Active' | 'Remote' | 'On Leave',
-          profileImage: emp.profile_picture_url,
-          salary: emp.salary || emp.hourly_rate,
-          employmentType: emp.employment_type === 'Hourly' ? 'Hourly' : 'Salaried'
+          startDate: emp.startDate || new Date().toISOString().split('T')[0],
+          status: normalizedStatus as 'Active' | 'Remote' | 'On Leave',
+          profileImage: emp.profilePictureUrl,
+          salary: emp.salary || emp.hourlyRate,
+          employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried'
         };
       });
 
+      // Keep all employees - filtering can be done by user via filter controls
       setEmployees(formattedEmployees);
     } catch (error) {
       console.error('Error fetching employees:', error);
