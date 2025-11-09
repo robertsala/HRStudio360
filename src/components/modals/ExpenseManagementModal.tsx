@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Upload, DollarSign, Calendar, Tag, FileText, CheckCircle, XCircle, Clock, Search, Filter, Download, Eye } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
+import { X, Plus, Upload, DollarSign, Calendar, Tag, FileText, CheckCircle, XCircle, Clock, Search, Eye } from 'lucide-react';
+import { apiClient } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ExpenseManagementModalProps {
   isOpen: boolean;
@@ -11,17 +12,17 @@ interface ExpenseManagementModalProps {
 
 interface Expense {
   id: string;
-  employee_id: string;
-  category_id: string;
+  employeeId: string;
+  categoryId: string;
   amount: number;
   currency: string;
-  expense_date: string;
+  expenseDate: string;
   merchant: string;
   description: string;
-  receipt_url: string | null;
+  receiptUrl: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'reimbursed';
-  submitted_at: string;
-  rejection_reason: string | null;
+  submittedAt: string;
+  rejectionReason: string | null;
   employee?: {
     name: string;
     department: string;
@@ -34,9 +35,10 @@ interface Expense {
 interface ExpenseCategory {
   id: string;
   name: string;
-  description: string;
-  requires_receipt: boolean;
-  max_amount_without_approval: number;
+  icon?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+  createdAt?: string;
 }
 
 const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
@@ -45,6 +47,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
   employeeId,
   isHRView = false
 }) => {
+  const { user } = useAuth();
   const [view, setView] = useState<'list' | 'submit'>('list');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -53,12 +56,12 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
 
   const [formData, setFormData] = useState({
-    category_id: '',
+    categoryId: '',
     amount: '',
-    expense_date: new Date().toISOString().split('T')[0],
+    expenseDate: new Date().toISOString().split('T')[0],
     merchant: '',
     description: '',
-    receipt_url: ''
+    receiptUrl: ''
   });
 
   const [notification, setNotification] = useState<{
@@ -76,27 +79,44 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
   const loadExpenses = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('expenses')
-        .select(`
-          *,
-          employee:employees(name, department),
-          category:expense_categories(name)
-        `)
-        .order('submitted_at', { ascending: false });
+      const [expensesData, employeesData, categoriesData] = await Promise.all([
+        apiClient.getExpenses(),
+        apiClient.getEmployees(),
+        apiClient.getExpenseCategories()
+      ]);
+
+      const employeeMap = new Map(employeesData.map((emp: any) => [emp.id, emp]));
+      const categoryMap = new Map(categoriesData.map((cat: any) => [cat.id, cat]));
+
+      let filteredExpenses = expensesData;
 
       if (!isHRView && employeeId) {
-        query = query.eq('employee_id', employeeId);
+        filteredExpenses = filteredExpenses.filter((exp: any) => exp.employeeId === employeeId);
       }
 
       if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
+        filteredExpenses = filteredExpenses.filter((exp: any) => exp.status === filterStatus);
       }
 
-      const { data, error } = await query;
+      const enrichedExpenses = filteredExpenses.map((expense: any) => {
+        const employee = employeeMap.get(expense.employeeId) as any;
+        const category = categoryMap.get(expense.categoryId) as any;
+        
+        return {
+          ...expense,
+          employee: employee ? {
+            name: `${employee.firstName} ${employee.lastName}`,
+            department: employee.department || ''
+          } : undefined,
+          category: category ? {
+            name: category.name
+          } : undefined
+        };
+      }).sort((a: any, b: any) => 
+        new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
 
-      if (error) throw error;
-      setExpenses(data || []);
+      setExpenses(enrichedExpenses);
     } catch (error) {
       console.error('Error loading expenses:', error);
       showNotification('error', 'Failed to load expenses');
@@ -107,14 +127,9 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('expense_categories')
-        .select('*')
-        .eq('active', true)
-        .order('name');
-
-      if (error) throw error;
-      setCategories(data || []);
+      const data = await apiClient.getExpenseCategories();
+      const activeCategories = data.filter((cat: any) => cat.isActive);
+      setCategories(activeCategories || []);
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -123,39 +138,37 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
   const handleSubmitExpense = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.category_id || !formData.amount || !formData.merchant || !formData.description) {
+    if (!formData.categoryId || !formData.amount || !formData.merchant || !formData.description) {
       showNotification('error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (!user) {
+      showNotification('error', 'Not authenticated');
       return;
     }
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      const employees = await apiClient.getEmployees();
+      const employeeRecord = employees.find((emp: any) => emp.userId === user.id);
 
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', userData.user.id)
-        .single();
+      if (!employeeRecord) {
+        throw new Error('Employee profile not found');
+      }
 
-      if (!employeeData) throw new Error('Employee profile not found');
-
-      const { error } = await supabase
-        .from('expenses')
-        .insert([{
-          employee_id: employeeData.id,
-          category_id: formData.category_id,
-          amount: parseFloat(formData.amount),
-          expense_date: formData.expense_date,
-          merchant: formData.merchant,
-          description: formData.description,
-          receipt_url: formData.receipt_url || null,
-          submitted_by: userData.user.id,
-          status: 'pending'
-        }]);
-
-      if (error) throw error;
+      await apiClient.createExpense({
+        employeeId: employeeRecord.id,
+        categoryId: formData.categoryId,
+        amount: parseFloat(formData.amount),
+        currency: 'USD',
+        expenseDate: formData.expenseDate,
+        merchant: formData.merchant,
+        description: formData.description,
+        receiptUrl: formData.receiptUrl || null,
+        status: 'pending',
+        submittedAt: new Date().toISOString()
+      });
 
       showNotification('success', 'Expense submitted successfully');
       setView('list');
@@ -171,12 +184,12 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
 
   const resetForm = () => {
     setFormData({
-      category_id: '',
+      categoryId: '',
       amount: '',
-      expense_date: new Date().toISOString().split('T')[0],
+      expenseDate: new Date().toISOString().split('T')[0],
       merchant: '',
       description: '',
-      receipt_url: ''
+      receiptUrl: ''
     });
   };
 
@@ -359,7 +372,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                             </span>
                             <span className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
-                              {new Date(expense.expense_date).toLocaleDateString()}
+                              {new Date(expense.expenseDate).toLocaleDateString()}
                             </span>
                             {isHRView && expense.employee && (
                               <span className="flex items-center gap-1">
@@ -372,7 +385,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                           <p className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">
                             ${expense.amount.toFixed(2)}
                           </p>
-                          {expense.receipt_url && (
+                          {expense.receiptUrl && (
                             <button className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1 mt-2">
                               <Eye className="h-4 w-4" />
                               View Receipt
@@ -380,9 +393,9 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                           )}
                         </div>
                       </div>
-                      {expense.rejection_reason && (
+                      {expense.rejectionReason && (
                         <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded text-sm text-red-800">
-                          <strong>Rejection Reason:</strong> {expense.rejection_reason}
+                          <strong>Rejection Reason:</strong> {expense.rejectionReason}
                         </div>
                       )}
                     </div>
@@ -398,8 +411,8 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                     Expense Category *
                   </label>
                   <select
-                    value={formData.category_id}
-                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                     required
                   >
@@ -437,8 +450,8 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                     </label>
                     <input
                       type="date"
-                      value={formData.expense_date}
-                      onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
+                      value={formData.expenseDate}
+                      onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                       required
                     />
