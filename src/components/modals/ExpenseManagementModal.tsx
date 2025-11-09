@@ -16,13 +16,11 @@ interface Expense {
   categoryId: string;
   amount: number;
   currency: string;
-  expenseDate: string;
-  merchant: string;
+  date: string;
   description: string;
   receiptUrl: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'reimbursed';
   submittedAt: string;
-  rejectionReason: string | null;
   employee?: {
     name: string;
     department: string;
@@ -58,7 +56,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
   const [formData, setFormData] = useState({
     categoryId: '',
     amount: '',
-    expenseDate: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split('T')[0],
     merchant: '',
     description: '',
     receiptUrl: ''
@@ -160,14 +158,12 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
       await apiClient.createExpense({
         employeeId: employeeRecord.id,
         categoryId: formData.categoryId,
-        amount: parseFloat(formData.amount),
+        amount: formData.amount,
         currency: 'USD',
-        expenseDate: formData.expenseDate,
-        merchant: formData.merchant,
-        description: formData.description,
+        date: formData.date,
+        description: `${formData.merchant} - ${formData.description}`,
         receiptUrl: formData.receiptUrl || null,
-        status: 'pending',
-        submittedAt: new Date().toISOString()
+        status: 'pending'
       });
 
       showNotification('success', 'Expense submitted successfully');
@@ -186,7 +182,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
     setFormData({
       categoryId: '',
       amount: '',
-      expenseDate: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split('T')[0],
       merchant: '',
       description: '',
       receiptUrl: ''
@@ -372,7 +368,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                             </span>
                             <span className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
-                              {new Date(expense.expenseDate).toLocaleDateString()}
+                              {new Date(expense.date).toLocaleDateString()}
                             </span>
                             {isHRView && expense.employee && (
                               <span className="flex items-center gap-1">
@@ -450,8 +446,8 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                     </label>
                     <input
                       type="date"
-                      value={formData.expenseDate}
-                      onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                       required
                     />
