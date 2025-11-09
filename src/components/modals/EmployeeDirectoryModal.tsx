@@ -46,10 +46,14 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
   const fetchEmployees = async () => {
     setIsLoading(true);
     try {
-      const data = await apiClient.getEmployees();
+      // Use directory endpoint which includes profile data via JOIN
+      const data = await apiClient.getEmployeesWithProfiles();
 
       const formattedEmployees: Employee[] = (data || []).map((emp: any) => {
-        const fullName = `${emp.firstName} ${emp.lastName}`;
+        // Profile data comes from the joined profile object
+        const firstName = emp.profile?.firstName ?? '';
+        const lastName = emp.profile?.lastName ?? '';
+        const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Employee';
         
         // Normalize status (case-insensitive mapping)
         const normalizedStatus = emp.status?.toLowerCase() === 'active' 
@@ -59,17 +63,17 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
           : 'On Leave';
         
         return {
-          id: emp.id.toString(),
+          id: emp.userId || emp.id.toString(),
           name: fullName,
-          email: emp.email || `${emp.firstName?.toLowerCase()}.${emp.lastName?.toLowerCase()}@company.com`,
-          phone: emp.phone || '(555) 000-0000',
-          department: emp.department || 'General',
-          role: emp.jobTitle || 'Employee',
-          location: emp.location || 'Remote',
+          email: emp.profile?.email || `${firstName?.toLowerCase()}.${lastName?.toLowerCase()}@company.com`,
+          phone: emp.profile?.phone || '(555) 000-0000',
+          department: emp.profile?.department || 'General',
+          role: emp.profile?.role || 'Employee',
+          location: 'Remote', // Default for now, can be added to schema later
           startDate: emp.startDate || new Date().toISOString().split('T')[0],
           status: normalizedStatus as 'Active' | 'Remote' | 'On Leave',
-          profileImage: emp.profilePictureUrl,
-          salary: emp.salary || emp.hourlyRate,
+          profileImage: emp.profile?.avatarUrl,
+          salary: parseFloat(emp.salary?.toString() || '0'),
           employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried'
         };
       });
