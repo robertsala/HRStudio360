@@ -172,6 +172,29 @@ class ApiClient {
     });
   }
 
+  // Leave balance endpoints
+  async getLeaveBalances() {
+    return this.request('/api/leave-balances');
+  }
+
+  async getLeaveBalanceByEmployeeId(employeeId: string) {
+    return this.request(`/api/leave-balances/employee/${employeeId}`);
+  }
+
+  async createLeaveBalance(balance: any) {
+    return this.request('/api/leave-balances', {
+      method: 'POST',
+      body: JSON.stringify(balance),
+    });
+  }
+
+  async updateLeaveBalance(id: string, balance: any) {
+    return this.request(`/api/leave-balances/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(balance),
+    });
+  }
+
   // AI Assistant endpoint
   async chatWithAssistant(message: string, userId: string) {
     return this.request('/api/ai-assistant/chat', {
