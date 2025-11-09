@@ -312,6 +312,57 @@ export const userPresence = pgTable('user_presence', {
   lastSeenAt: timestamp('last_seen_at').defaultNow()
 });
 
+// Notification types enum
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'mention',
+  'reply',
+  'reaction',
+  'direct_message',
+  'channel_invite',
+  'collaborator_invite',
+  'collaborator_accepted',
+  'leave_request',
+  'expense_approval',
+  'review_reminder',
+  'system'
+]);
+
+// User notifications
+export const userNotifications = pgTable('user_notifications', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  type: notificationTypeEnum('type').notNull(),
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  actionUrl: text('action_url'),
+  triggeredBy: uuid('triggered_by').references(() => profiles.id),
+  relatedId: uuid('related_id'),
+  isRead: boolean('is_read').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+  readAt: timestamp('read_at')
+});
+
+// Collaborator invitation status enum
+export const collaboratorInvitationStatusEnum = pgEnum('collaborator_invitation_status', [
+  'pending',
+  'accepted',
+  'declined',
+  'cancelled'
+]);
+
+// Collaborator invitations
+export const collaboratorInvitations = pgTable('collaborator_invitations', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  senderId: uuid('sender_id').references(() => profiles.id).notNull(),
+  recipientId: uuid('recipient_id').references(() => profiles.id).notNull(),
+  recipientEmail: text('recipient_email').notNull(),
+  message: text('message'),
+  status: collaboratorInvitationStatusEnum('status').default('pending'),
+  createdAt: timestamp('created_at').defaultNow(),
+  respondedAt: timestamp('responded_at'),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
 // Change log
 export const changeLog = pgTable('change_log', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -584,6 +635,8 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ i
 export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({ id: true, createdAt: true });
 export const insertTypingIndicatorSchema = createInsertSchema(typingIndicators).omit({ id: true, startedTypingAt: true });
 export const insertUserPresenceSchema = createInsertSchema(userPresence).omit({ lastSeenAt: true });
+export const insertUserNotificationSchema = createInsertSchema(userNotifications).omit({ id: true, createdAt: true });
+export const insertCollaboratorInvitationSchema = createInsertSchema(collaboratorInvitations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChangeLogSchema = createInsertSchema(changeLog).omit({ id: true, createdAt: true });
 export const insertHistoricalChangeSchema = createInsertSchema(historicalChanges).omit({ id: true, createdAt: true });
 export const insertChangeNotificationSchema = createInsertSchema(changeNotifications).omit({ id: true, deliveredAt: true });
@@ -634,6 +687,10 @@ export type TypingIndicator = typeof typingIndicators.$inferSelect;
 export type InsertTypingIndicator = z.infer<typeof insertTypingIndicatorSchema>;
 export type UserPresence = typeof userPresence.$inferSelect;
 export type InsertUserPresence = z.infer<typeof insertUserPresenceSchema>;
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
+export type CollaboratorInvitation = typeof collaboratorInvitations.$inferSelect;
+export type InsertCollaboratorInvitation = z.infer<typeof insertCollaboratorInvitationSchema>;
 export type ChangeLog = typeof changeLog.$inferSelect;
 export type InsertChangeLog = z.infer<typeof insertChangeLogSchema>;
 export type HistoricalChange = typeof historicalChanges.$inferSelect;
