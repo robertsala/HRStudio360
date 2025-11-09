@@ -67,6 +67,15 @@ export const employees = pgTable('employees', {
   updatedAt: timestamp('updated_at').defaultNow()
 });
 
+export type EmployeeWithProfile = Employee & {
+  profile?: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    avatarUrl: string | null;
+  } | null;
+};
+
 // Leave requests table
 export const leaveRequests = pgTable('leave_requests', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),

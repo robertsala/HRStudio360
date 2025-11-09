@@ -25,6 +25,27 @@ interface Profile {
   themePreference: string | null;
 }
 
+interface EmployeeDirectoryEntry {
+  id: string;
+  userId: string | null;
+  employeeId: string;
+  departmentId: string | null;
+  jobTitleId: string | null;
+  managerId: string | null;
+  startDate: string;
+  employmentType: string;
+  salary: string | null;
+  status: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  profile?: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    avatarUrl: string | null;
+  } | null;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -111,6 +132,10 @@ class ApiClient {
   // Employee endpoints
   async getEmployees() {
     return this.request('/api/employees');
+  }
+
+  async getEmployeesWithProfiles(): Promise<EmployeeDirectoryEntry[]> {
+    return this.request('/api/employees/directory');
   }
 
   async getEmployee(id: number) {

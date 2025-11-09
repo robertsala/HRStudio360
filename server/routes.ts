@@ -64,6 +64,15 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get('/api/employees/directory', async (req, res) => {
+    try {
+      const employees = await storage.getEmployeesWithProfiles();
+      res.json(employees);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/employees/:id', async (req, res) => {
     try {
       const employee = await storage.getEmployeeById(req.params.id);

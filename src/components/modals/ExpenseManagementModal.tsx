@@ -79,7 +79,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
     try {
       const [expensesData, employeesData, categoriesData] = await Promise.all([
         apiClient.getExpenses(),
-        apiClient.getEmployees(),
+        apiClient.getEmployeesWithProfiles(),
         apiClient.getExpenseCategories()
       ]);
 
@@ -100,10 +100,15 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
         const employee = employeeMap.get(expense.employeeId) as any;
         const category = categoryMap.get(expense.categoryId) as any;
         
+        // Safely construct employee name from profile data
+        const firstName = employee?.profile?.firstName ?? '';
+        const lastName = employee?.profile?.lastName ?? '';
+        const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Employee';
+        
         return {
           ...expense,
           employee: employee ? {
-            name: `${employee.firstName} ${employee.lastName}`,
+            name: fullName,
             department: employee.department || ''
           } : undefined,
           category: category ? {
@@ -221,9 +226,8 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return (
-        expense.merchant.toLowerCase().includes(search) ||
-        expense.description.toLowerCase().includes(search) ||
-        expense.category?.name.toLowerCase().includes(search)
+        expense.description?.toLowerCase().includes(search) ||
+        expense.category?.name?.toLowerCase().includes(search)
       );
     }
     return true;
@@ -354,7 +358,7 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-lg">{expense.merchant}</h3>
+                            <h3 className="font-semibold text-lg">{expense.category?.name || 'Expense'}</h3>
                             <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusBadge(expense.status)}`}>
                               {getStatusIcon(expense.status)}
                               {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
@@ -389,11 +393,6 @@ const ExpenseManagementModal: React.FC<ExpenseManagementModalProps> = ({
                           )}
                         </div>
                       </div>
-                      {expense.rejectionReason && (
-                        <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded text-sm text-red-800">
-                          <strong>Rejection Reason:</strong> {expense.rejectionReason}
-                        </div>
-                      )}
                     </div>
                   ))
                 )}

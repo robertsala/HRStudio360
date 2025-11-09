@@ -1,7 +1,7 @@
 import { db } from './db.js';
 import type { 
   Profile, InsertProfile, 
-  Employee, InsertEmployee, 
+  Employee, InsertEmployee, EmployeeWithProfile,
   LeaveRequest, InsertLeaveRequest,
   Candidate, InsertCandidate,
   ExpenseCategory, InsertExpenseCategory,
@@ -39,6 +39,7 @@ export interface IStorage {
   
   // Employees
   getEmployees(): Promise<Employee[]>;
+  getEmployeesWithProfiles(): Promise<EmployeeWithProfile[]>;
   getEmployeeById(id: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
@@ -155,6 +156,26 @@ export class DbStorage implements IStorage {
   // Employees
   async getEmployees(): Promise<Employee[]> {
     return db.select().from(employees);
+  }
+
+  async getEmployeesWithProfiles(): Promise<EmployeeWithProfile[]> {
+    const result = await db
+      .select({
+        employee: employees,
+        profile: profiles
+      })
+      .from(employees)
+      .leftJoin(profiles, eq(employees.userId, profiles.id));
+
+    return result.map(row => ({
+      ...row.employee,
+      profile: row.profile ? {
+        firstName: row.profile.firstName,
+        lastName: row.profile.lastName,
+        email: row.profile.email,
+        avatarUrl: null
+      } : null
+    }));
   }
 
   async getEmployeeById(id: string): Promise<Employee | undefined> {
