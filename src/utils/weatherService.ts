@@ -130,30 +130,20 @@ class WeatherService {
 
   private async getUserLocation(userId: string): Promise<UserLocation | null> {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('location_lat, location_lon, location_city, location_state, location_zip_code')
-        .eq('id', userId)
-        .maybeSingle();
+      const profile = await apiClient.getProfile(userId);
 
-      if (error) {
-        console.error('[WeatherService] Error fetching user location:', error);
-        // Don't throw, just return null - weather is not critical
-        return null;
-      }
-
-      if (!data) {
+      if (!profile) {
         console.log('[WeatherService] No profile data found for user');
         return null;
       }
 
-      if (data.location_lat && data.location_lon) {
+      if (profile.locationLat && profile.locationLon) {
         return {
-          lat: data.location_lat,
-          lon: data.location_lon,
-          city: data.location_city,
-          state: data.location_state,
-          zipCode: data.location_zip_code,
+          lat: parseFloat(profile.locationLat),
+          lon: parseFloat(profile.locationLon),
+          city: profile.locationCity || undefined,
+          state: profile.locationState || undefined,
+          zipCode: profile.locationZipCode || undefined,
         };
       }
 
