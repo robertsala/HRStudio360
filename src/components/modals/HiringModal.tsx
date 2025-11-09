@@ -4,7 +4,8 @@ import OfferManagementModal from './OfferManagementModal';
 import WorkerClassificationModal from './WorkerClassificationModal';
 import ConfettiAnimation from '../ConfettiAnimation';
 import ResizableModal from '../ResizableModal';
-import { supabase } from '../../utils/supabaseClient';
+import { apiClient } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 
@@ -63,6 +64,7 @@ interface HiringModalProps {
 
 const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClose }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   useEscapeKey(() => onClose?.(), !!onClose);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -92,12 +94,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
 
   const loadAvailableEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role, department')
-        .order('full_name');
-
-      if (error) throw error;
+      const data = await apiClient.getProfiles();
       setAvailableEmployees(data || []);
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -106,122 +103,27 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
 
   const loadCollaborators = async (candidateId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('candidate_collaborators')
-        .select(`
-          id,
-          role,
-          status,
-          invited_at,
-          responded_at,
-          user:user_id (
-            id,
-            full_name,
-            email,
-            role,
-            avatar_url
-          ),
-          inviter:invited_by (
-            full_name
-          )
-        `)
-        .eq('candidate_id', candidateId)
-        .order('invited_at', { ascending: false });
-
-      if (error) throw error;
-      setCollaborators(data || []);
+      // TODO: Add backend endpoint for collaborators
+      setCollaborators([]);
     } catch (error) {
       console.error('Error loading collaborators:', error);
     }
   };
 
   const handleInviteCollaborator = async () => {
-    if (!selectedCandidate || !selectedCollaboratorId) return;
+    if (!selectedCandidate || !selectedCollaboratorId || !user) return;
 
     setIsAddingCollaborator(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const collaboratorProfile = availableEmployees.find(e => e.id === selectedCollaboratorId);
-      if (!collaboratorProfile) throw new Error('Collaborator not found');
-
-      const { data: collaboration, error: collabError } = await supabase
-        .from('candidate_collaborators')
-        .insert({
-          candidate_id: selectedCandidate.id,
-          user_id: selectedCollaboratorId,
-          invited_by: user.id,
-          role: selectedCollaboratorRole,
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (collabError) {
-        if (collabError.code === '23505') {
-          setNotification({
-            type: 'error',
-            message: 'This user is already a collaborator on this candidate.'
-          });
-        } else {
-          throw collabError;
-        }
-        setTimeout(() => setNotification(null), 3000);
-        setIsAddingCollaborator(false);
-        return;
-      }
-
-      try {
-        const inviteResponse = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-collaboration-invite`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              to: collaboratorProfile.email,
-              inviterName: profile?.full_name || 'HR Team',
-              candidateName: selectedCandidate.name,
-              candidatePosition: selectedCandidate.position,
-              role: selectedCollaboratorRole,
-              collaborationId: collaboration.id
-            }),
-          }
-        );
-
-        if (!inviteResponse.ok) {
-          console.error('Failed to send invitation email');
-        }
-      } catch (emailError) {
-        console.error('Error sending email:', emailError);
-      }
-
-      await loadCollaborators(selectedCandidate.id);
-      setSelectedCollaboratorId('');
-      setSelectedCollaboratorRole('commenter');
-      setShowCollaborationModal(false);
-
+      // TODO: Add backend endpoint for inviting collaborators
       setNotification({
-        type: 'success',
-        message: `Invitation sent to ${collaboratorProfile.full_name}`
+        type: 'info',
+        message: 'Collaborator feature coming soon!'
       });
       setTimeout(() => setNotification(null), 3000);
+      setShowCollaborationModal(false);
     } catch (error) {
       console.error('Error inviting collaborator:', error);
-      setNotification({
-        type: 'error',
-        message: 'Failed to invite collaborator. Please try again.'
-      });
-      setTimeout(() => setNotification(null), 3000);
     } finally {
       setIsAddingCollaborator(false);
     }
@@ -231,39 +133,21 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     if (!selectedCandidate) return;
 
     try {
-      const { error } = await supabase
-        .from('candidate_collaborators')
-        .update({ status: 'revoked' })
-        .eq('id', collaboratorId);
-
-      if (error) throw error;
-
-      await loadCollaborators(selectedCandidate.id);
-
+      // TODO: Add backend endpoint for removing collaborators
       setNotification({
-        type: 'success',
-        message: 'Collaborator access revoked'
+        type: 'info',
+        message: 'Collaborator feature coming soon!'
       });
       setTimeout(() => setNotification(null), 3000);
     } catch (error) {
       console.error('Error removing collaborator:', error);
-      setNotification({
-        type: 'error',
-        message: 'Failed to remove collaborator. Please try again.'
-      });
-      setTimeout(() => setNotification(null), 3000);
     }
   };
 
   const loadCandidates = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .order('applied_date', { ascending: false });
-
-      if (error) throw error;
+      const data = await apiClient.getCandidates();
 
       if (data) {
         const formattedCandidates: Candidate[] = data.map((c: any) => ({
@@ -275,22 +159,22 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
           department: c.department,
           experience: c.experience || '',
           location: c.location || '',
-          salaryExpectation: Number(c.salary_expectation) || 0,
-          appliedDate: c.applied_date,
+          salaryExpectation: Number(c.salaryExpectation) || 0,
+          appliedDate: c.appliedDate,
           status: c.status,
           skills: c.skills || [],
           education: c.education || '',
-          previousCompany: c.previous_company || '',
-          profilePicture: c.profile_picture || '',
+          previousCompany: c.previousCompany || '',
+          profilePicture: c.profilePicture || '',
           likes: c.likes || 0,
           views: c.views || 0,
-          commentsCount: c.comments_count || 0,
-          aiMatchScore: c.ai_match_score || 0,
+          commentsCount: c.commentsCount || 0,
+          aiMatchScore: c.aiMatchScore || 0,
           rating: c.rating || 0,
           notes: c.notes || '',
-          disqualifiedReason: c.disqualified_reason || '',
-          disqualifiedDate: c.disqualified_date || '',
-          previousStatus: c.previous_status || '',
+          disqualifiedReason: c.disqualifiedReason || '',
+          disqualifiedDate: c.disqualifiedDate || '',
+          previousStatus: c.previousStatus || '',
           isLikedByUser: false,
           comments: []
         }));
@@ -603,38 +487,17 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim() || !selectedCandidate) return;
+    if (!newComment.trim() || !selectedCandidate || !user) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      const { data: comment, error } = await supabase
-        .from('candidate_comments')
-        .insert({
-          candidate_id: selectedCandidate.id,
-          user_id: user.id,
-          comment_text: newComment.trim(),
-          is_private: isPrivateComment
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      // TODO: Add backend endpoint for candidate comments
       const newCommentObj: CandidateComment = {
-        id: comment.id,
-        author: profile?.full_name || 'Current User',
-        authorRole: profile?.role || 'HR Manager',
-        message: comment.comment_text,
-        timestamp: comment.created_at,
-        isPrivate: comment.is_private
+        id: crypto.randomUUID(),
+        author: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'Current User',
+        authorRole: user.role || 'HR Manager',
+        message: newComment.trim(),
+        timestamp: new Date().toISOString(),
+        isPrivate: isPrivateComment
       };
 
       setCandidates(prev => prev.map(candidate =>
@@ -674,23 +537,14 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
   };
 
   const handleRateCandidate = async (candidateId: string, rating: number) => {
+    if (!user) return;
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { error } = await supabase
-        .from('candidate_ratings')
-        .upsert({
-          candidate_id: candidateId,
-          user_id: user.id,
-          rating: rating
-        }, {
-          onConflict: 'candidate_id,user_id'
-        });
-
-      if (error) throw error;
-
-      await loadCandidates();
+      // TODO: Add backend endpoint for candidate ratings
+      // Update local state for now
+      setCandidates(prev => prev.map(c =>
+        c.id === candidateId ? { ...c, rating } : c
+      ));
 
       const candidate = candidates.find(c => c.id === candidateId);
       setNotification({
@@ -716,44 +570,14 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
         : c
     ));
 
-    // Load comments for this candidate
-    try {
-      const { data: commentsData, error: commentsError } = await supabase
-        .from('candidate_comments')
-        .select(`
-          id,
-          comment_text,
-          is_private,
-          created_at,
-          profiles:user_id (
-            full_name,
-            role
-          )
-        `)
-        .eq('candidate_id', candidate.id)
-        .order('created_at', { ascending: false });
+    // TODO: Add backend endpoint for candidate comments
+    // For now, just show candidate without loading comments from backend
+    setSelectedCandidate({
+      ...candidate,
+      comments: candidate.comments || []
+    });
 
-      if (commentsError) throw commentsError;
-
-      const formattedComments: CandidateComment[] = (commentsData || []).map((c: any) => ({
-        id: c.id,
-        author: c.profiles?.full_name || 'Unknown User',
-        authorRole: c.profiles?.role || 'User',
-        message: c.comment_text,
-        timestamp: c.created_at,
-        isPrivate: c.is_private
-      }));
-
-      setSelectedCandidate({
-        ...candidate,
-        comments: formattedComments
-      });
-
-      await loadCollaborators(candidate.id);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-      setSelectedCandidate(candidate);
-    }
+    await loadCollaborators(candidate.id);
   };
 
   const handleCreateOffer = (candidate: Candidate) => {
@@ -782,54 +606,9 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
 
     setIsConverting(true);
     try {
-      const { data: existingHire } = await supabase
-        .from('new_hires')
-        .select('id')
-        .eq('email', newHireForm.email)
-        .maybeSingle();
-
-      if (existingHire) {
-        setNotification({
-          type: 'error',
-          message: 'This candidate has already been converted to a new hire.'
-        });
-        setTimeout(() => {
-          setNotification(null);
-          setShowConvertModal(false);
-          setSelectedCandidate(null);
-        }, 3000);
-        setIsConverting(false);
-        return;
-      }
-
-      let candidateUuid = selectedCandidate.id;
-      if (!selectedCandidate.id.includes('-')) {
-        const { data: uuidData } = await supabase.rpc('gen_random_uuid');
-        candidateUuid = uuidData || crypto.randomUUID();
-      }
-
-      const { data, error } = await supabase.rpc('convert_candidate_to_new_hire', {
-        p_candidate_id: candidateUuid,
-        p_first_name: newHireForm.first_name,
-        p_last_name: newHireForm.last_name,
-        p_email: newHireForm.email,
-        p_phone: newHireForm.phone || '',
-        p_role: newHireForm.role,
-        p_department: newHireForm.department,
-        p_manager_id: newHireForm.manager_id ? newHireForm.manager_id : null,
-        p_start_date: newHireForm.start_date,
-        p_salary: parseFloat(newHireForm.salary),
-        p_employment_type: newHireForm.employment_type
-      });
-
-      if (error) throw error;
-
-      const { error: updateError } = await supabase
-        .from('candidates')
-        .update({ status: 'Hired' })
-        .eq('id', selectedCandidate.id);
-
-      if (updateError) throw updateError;
+      // TODO: Add backend endpoint for converting candidates to new hires
+      // For now, just update status locally
+      await apiClient.updateCandidate(selectedCandidate.id, { status: 'Hired' });
 
       setCandidates(candidates.map(c =>
         c.id === selectedCandidate.id
@@ -837,42 +616,10 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
           : c
       ));
 
-      // Send onboarding email
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-onboarding-email`;
-
-        const emailResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: newHireForm.email,
-            firstName: newHireForm.first_name,
-            lastName: newHireForm.last_name,
-            position: newHireForm.role,
-            department: newHireForm.department,
-            startDate: newHireForm.start_date,
-          }),
-        });
-
-        const emailResult = await emailResponse.json();
-
-        if (emailResult.success) {
-          console.log('Onboarding email sent successfully:', emailResult.message);
-        } else {
-          console.warn('Failed to send onboarding email:', emailResult.error);
-        }
-      } catch (emailError) {
-        console.error('Error sending onboarding email:', emailError);
-      }
-
       setShowConfetti(true);
       setNotification({
         type: 'success',
-        message: `${newHireForm.first_name} ${newHireForm.last_name} successfully hired! Onboarding email sent to ${newHireForm.email}.`
+        message: `${newHireForm.first_name} ${newHireForm.last_name} successfully hired!`
       });
 
       setTimeout(() => {
@@ -882,13 +629,9 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
       }, 3000);
     } catch (error: any) {
       console.error('Error converting to new hire:', error);
-      const errorMessage = error?.message?.includes('duplicate') || error?.message?.includes('unique')
-        ? 'This candidate has already been converted to a new hire.'
-        : 'Failed to convert candidate to new hire. Please try again.';
-
       setNotification({
         type: 'error',
-        message: errorMessage
+        message: 'Failed to convert candidate to new hire. Please try again.'
       });
       setTimeout(() => setNotification(null), 3000);
     } finally {
@@ -924,33 +667,22 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
 
       const aiScore = Math.floor(Math.random() * 30) + 70;
 
-      const { data, error } = await supabase
-        .from('candidates')
-        .insert([{
-          name: newCandidateForm.name,
-          email: newCandidateForm.email,
-          phone: newCandidateForm.phone || '',
-          position: newCandidateForm.position,
-          department: newCandidateForm.department,
-          location: newCandidateForm.location || '',
-          salary_expectation: parseFloat(newCandidateForm.salary_expectation) || 0,
-          skills: skillsArray,
-          status: 'New Candidate',
-          applied_date: new Date().toISOString().split('T')[0],
-          profile_picture: randomProfilePic,
-          ai_match_score: aiScore,
-          experience: '',
-          education: '',
-          previous_company: '',
-          likes: 0,
-          views: 0,
-          comments_count: 0,
-          rating: 0,
-          notes: ''
-        }])
-        .select();
-
-      if (error) throw error;
+      await apiClient.createCandidate({
+        name: newCandidateForm.name,
+        email: newCandidateForm.email,
+        phone: newCandidateForm.phone || '',
+        position: newCandidateForm.position,
+        department: newCandidateForm.department,
+        location: newCandidateForm.location || '',
+        salaryExpectation: newCandidateForm.salary_expectation,
+        skills: skillsArray,
+        status: 'New Candidate',
+        profilePicture: randomProfilePic,
+        aiMatchScore: aiScore,
+        experience: '',
+        education: '',
+        previousCompany: ''
+      });
 
       await loadCandidates();
 
