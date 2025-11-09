@@ -3,7 +3,7 @@ import ReactAnimatedWeather from 'react-animated-weather';
 import { MapPin, RefreshCw, CreditCard as Edit2, Wind, Droplets, Loader } from 'lucide-react';
 import { weatherService, WeatherData } from '../utils/weatherService';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../utils/supabaseClient';
+import { apiClient } from '../lib/api';
 import { useTranslation } from 'react-i18next';
 
 interface WeatherWidgetProps {
@@ -116,18 +116,8 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ onLocationChange }) => {
     if (!user) return false;
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('location_lat, location_lon')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error checking user location:', error);
-        return false;
-      }
-
-      return !!(data?.location_lat && data?.location_lon);
+      const profile = await apiClient.getProfile(user.id);
+      return !!(profile.locationLat && profile.locationLon);
     } catch (error) {
       console.error('Exception checking user location:', error);
       return false;

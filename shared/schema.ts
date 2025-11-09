@@ -29,6 +29,12 @@ export const profiles = pgTable('profiles', {
   lastAnniversaryShown: date('last_anniversary_shown'),
   languagePreference: text('language_preference').default('en'),
   themePreference: text('theme_preference').default('light'),
+  locationLat: numeric('location_lat', { precision: 10, scale: 7 }),
+  locationLon: numeric('location_lon', { precision: 10, scale: 7 }),
+  locationCity: text('location_city'),
+  locationState: text('location_state'),
+  locationZipCode: text('location_zip_code'),
+  locationManualOverride: boolean('location_manual_override').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });

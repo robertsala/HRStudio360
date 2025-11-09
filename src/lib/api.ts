@@ -23,6 +23,12 @@ interface Profile {
   lastAnniversaryShown: string | null;
   languagePreference: string | null;
   themePreference: string | null;
+  locationLat: string | null;
+  locationLon: string | null;
+  locationCity: string | null;
+  locationState: string | null;
+  locationZipCode: string | null;
+  locationManualOverride: boolean | null;
 }
 
 interface EmployeeDirectoryEntry {

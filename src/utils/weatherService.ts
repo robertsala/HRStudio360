@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { geocodingService } from './geocodingService';
 import { getWeatherDescription, getAnimatedIconType } from './metnoWeatherMapping';
+import { apiClient } from '../lib/api';
 
 const METNO_API_BASE = 'https://api.met.no/weatherapi/locationforecast/2.0';
 const USER_AGENT = 'HR-Studio-Weather-Widget/1.0';
@@ -447,22 +448,14 @@ class WeatherService {
     manualOverride: boolean = false
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          location_lat: location.lat,
-          location_lon: location.lon,
-          location_city: location.city,
-          location_state: location.state,
-          location_zip_code: location.zipCode,
-          location_manual_override: manualOverride,
-        })
-        .eq('id', userId);
-
-      if (error) {
-        console.error('Error updating user location:', error);
-        return false;
-      }
+      await apiClient.updateProfile(userId, {
+        locationLat: location.lat.toString(),
+        locationLon: location.lon.toString(),
+        locationCity: location.city,
+        locationState: location.state,
+        locationZipCode: location.zipCode,
+        locationManualOverride: manualOverride,
+      });
 
       await this.invalidateWeatherCache(userId);
 
