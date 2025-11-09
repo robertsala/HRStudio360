@@ -14,6 +14,8 @@ Preferred communication style: Simple, everyday language.
 
 The frontend is a React 18 single-page application (SPA) built with TypeScript and Vite. State management relies on React Context for authentication and theming, with component-level state managed via hooks. Wouter handles client-side routing, with authentication guards for protected routes. The UI is modular, featuring over 60 modal components managed by `Dashboard.tsx` for visibility and communication. Styling uses Tailwind CSS with dark mode support, and custom CSS animations for celebrations. Internationalization is implemented via i18next, supporting English and Spanish.
 
+**TanStack Query Configuration**: The app uses TanStack Query v5 for data fetching with a default query function configured in `src/lib/queryClient.ts` that automatically fetches from backend API endpoints. The `apiRequest` helper function is exported for mutations.
+
 ### Backend Architecture
 
 The backend consists of an Express.js server running on port 5000, integrated with Vite. It provides a RESTful API for all HR functionalities across 29 database tables. The API interacts with the database through an `IStorage` interface, implemented by `DbStorage` using Drizzle ORM for type-safe queries. Authentication has been fully migrated to the Express backend, handling login, logout, and session management.
