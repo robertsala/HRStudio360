@@ -389,12 +389,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     }
 
     try {
-      const { error } = await supabase
-        .from('candidates')
-        .update({ status: nextStage })
-        .eq('id', candidate.id);
-
-      if (error) throw error;
+      await apiClient.updateCandidate(candidate.id, { status: nextStage });
 
       setCandidates(prev => prev.map(c =>
         c.id === candidate.id
@@ -436,12 +431,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     const newStatus = getStatusFromStageId(stageId);
 
     try {
-      const { error } = await supabase
-        .from('candidates')
-        .update({ status: newStatus })
-        .eq('id', draggedCandidate.id);
-
-      if (error) throw error;
+      await apiClient.updateCandidate(draggedCandidate.id, { status: newStatus });
 
       setCandidates(prev => prev.map(candidate =>
         candidate.id === draggedCandidate.id
@@ -740,17 +730,12 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     const restoreToStatus = selectedCandidate.previousStatus || 'New Candidate';
 
     try {
-      const { error } = await supabase
-        .from('candidates')
-        .update({
-          status: restoreToStatus,
-          disqualified_reason: null,
-          disqualified_date: null,
-          previous_status: null
-        })
-        .eq('id', selectedCandidate.id);
-
-      if (error) throw error;
+      await apiClient.updateCandidate(selectedCandidate.id, {
+        status: restoreToStatus,
+        disqualifiedReason: null,
+        disqualifiedDate: null,
+        previousStatus: null
+      });
 
       setCandidates(candidates.map(c =>
         c.id === selectedCandidate.id
@@ -800,17 +785,12 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     }
 
     try {
-      const { error } = await supabase
-        .from('candidates')
-        .update({
-          status: 'Disqualified',
-          disqualified_reason: finalReason,
-          disqualified_date: new Date().toISOString(),
-          previous_status: selectedCandidate.status
-        })
-        .eq('id', selectedCandidate.id);
-
-      if (error) throw error;
+      await apiClient.updateCandidate(selectedCandidate.id, {
+        status: 'Disqualified',
+        disqualifiedReason: finalReason,
+        disqualifiedDate: new Date().toISOString(),
+        previousStatus: selectedCandidate.status
+      });
 
       setCandidates(candidates.map(c =>
         c.id === selectedCandidate.id
