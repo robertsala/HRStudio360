@@ -35,8 +35,27 @@ export const profiles = pgTable('profiles', {
   locationState: text('location_state'),
   locationZipCode: text('location_zip_code'),
   locationManualOverride: boolean('location_manual_override').default(false),
+  canAccessOrgChart: boolean('can_access_org_chart').default(false),
+  managerId: uuid('manager_id').references((): any => profiles.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Announcements table
+export const announcements = pgTable('announcements', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  priority: text('priority'),
+  targetAudienceType: text('target_audience_type'),
+  specificEmployeeIds: uuid('specific_employee_ids').array(),
+  departments: text('departments').array(),
+  locations: text('locations').array(),
+  published: boolean('published').default(false),
+  publicationDate: timestamp('publication_date'),
+  expirationDate: timestamp('expiration_date'),
+  creatorUserId: uuid('creator_user_id').references(() => profiles.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Departments table
@@ -620,6 +639,7 @@ export const reviewAuditLog = pgTable('review_audit_log', {
 
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true, updatedAt: true });
@@ -659,6 +679,8 @@ export const insertReviewAuditLogSchema = createInsertSchema(reviewAuditLog).omi
 // Types
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Department = typeof departments.$inferSelect;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type Employee = typeof employees.$inferSelect;
@@ -758,4 +780,12 @@ export interface DashboardStats {
       type: string;
     };
   };
+}
+
+// User Permissions type
+export interface UserPermissions {
+  department: string | null;
+  role: string | null;
+  canAccessOrgChart: boolean;
+  managerId: string | null;
 }

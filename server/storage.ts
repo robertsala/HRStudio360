@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import type { 
   Profile, InsertProfile, 
+  Announcement, InsertAnnouncement,
   Employee, InsertEmployee, EmployeeWithProfile,
   LeaveRequest, InsertLeaveRequest,
   LeaveBalance, InsertLeaveBalance,
@@ -25,7 +26,7 @@ import type {
   ReviewCycle, InsertReviewCycle
 } from '../shared/schema.js';
 import { 
-  profiles, employees, leaveRequests, leaveBalances,
+  profiles, announcements, employees, leaveRequests, leaveBalances,
   candidates, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   userNotifications, collaboratorInvitations,
@@ -33,7 +34,7 @@ import {
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
   reviewCycles
 } from '../shared/schema.js';
-import { eq, gte, and, desc, or, like, sql as drizzleSql } from 'drizzle-orm';
+import { eq, gte, and, desc, or, like, sql as drizzleSql, isNull, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 export interface IStorage {
@@ -158,6 +159,12 @@ export interface IStorage {
   
   // Dashboard Stats
   getDashboardStats(userId: string): Promise<import('../shared/schema.js').DashboardStats>;
+  
+  // Announcements
+  getPublishedAnnouncements(limit?: number): Promise<import('../shared/schema.js').Announcement[]>;
+  
+  // User Permissions
+  getUserPermissions(userId: string): Promise<import('../shared/schema.js').UserPermissions>;
 }
 
 // Database storage implementation
@@ -831,6 +838,52 @@ export class DbStorage implements IStorage {
         year: 'numeric' 
       });
     }
+  }
+
+  async getPublishedAnnouncements(limit: number = 10): Promise<import('../shared/schema.js').Announcement[]> {
+    const now = new Date();
+    
+    const result = await db.select()
+      .from(announcements)
+      .where(
+        and(
+          eq(announcements.published, true),
+          or(
+            isNull(announcements.publicationDate),
+            lte(announcements.publicationDate, now)
+          ),
+          or(
+            isNull(announcements.expirationDate),
+            gte(announcements.expirationDate, now)
+          )
+        )
+      )
+      .orderBy(desc(announcements.createdAt))
+      .limit(limit);
+    
+    return result;
+  }
+
+  async getUserPermissions(userId: string): Promise<import('../shared/schema.js').UserPermissions> {
+    const result = await db.select({
+      department: profiles.department,
+      role: profiles.role,
+      canAccessOrgChart: profiles.canAccessOrgChart,
+      managerId: profiles.managerId
+    })
+    .from(profiles)
+    .where(eq(profiles.id, userId));
+    
+    if (!result || result.length === 0) {
+      return {
+        department: null,
+        role: null,
+        canAccessOrgChart: false,
+        managerId: null
+      };
+    }
+    
+    return result[0];
   }
 }
 

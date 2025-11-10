@@ -1186,4 +1186,33 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Announcements endpoint
+  app.get('/api/announcements', async (req, res) => {
+    try {
+      let limit = 10; // Default
+      if (req.query.limit) {
+        const parsed = parseInt(req.query.limit as string);
+        if (isNaN(parsed) || parsed < 1 || parsed > 100) {
+          return res.status(400).json({ error: 'Invalid limit parameter. Must be a number between 1 and 100.' });
+        }
+        limit = parsed;
+      }
+      const announcements = await storage.getPublishedAnnouncements(limit);
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // User permissions endpoint
+  app.get('/api/profiles/:id/permissions', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const permissions = await storage.getUserPermissions(id);
+      res.json(permissions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 }

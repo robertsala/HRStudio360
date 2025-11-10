@@ -69,11 +69,10 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   // Employee state management
   const [employees, setEmployees] = React.useState(mockEmployees.slice(0, 247));
 
-  // Announcements state
+  // Announcements state (deprecated - for backwards compatibility only)
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
-  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = React.useState(true);
 
-  // User permissions and profile data
+  // User permissions and profile data (deprecated - moved to TanStack Query)
   const [canAccessOrgChart, setCanAccessOrgChart] = React.useState(false);
   const [userProfile, setUserProfile] = React.useState<any>(null);
 
@@ -113,6 +112,53 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     refetchOnWindowFocus: false
   });
+
+  // Fetch announcements from API
+  const { data: apiAnnouncements, isLoading: isAnnouncementsLoading } = useQuery<any[]>({
+    queryKey: ['/api/announcements'],
+    queryFn: async () => {
+      const response = await fetch('/api/announcements?limit=3');
+      if (!response.ok) {
+        throw new Error('Failed to fetch announcements');
+      }
+      return response.json();
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5 // Cache for 5 minutes
+  });
+
+  // Fetch user permissions from API
+  const { data: userPermissions } = useQuery<import('../../shared/schema').UserPermissions>({
+    queryKey: ['/api/profiles', user?.id, 'permissions'],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User ID is required');
+      const response = await fetch(`/api/profiles/${user.id}/permissions`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user permissions');
+      }
+      return response.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 10 // Cache for 10 minutes
+  });
+
+  // Update legacy state when API data loads
+  React.useEffect(() => {
+    if (apiAnnouncements) {
+      setAnnouncements(apiAnnouncements);
+    }
+  }, [apiAnnouncements]);
+
+  React.useEffect(() => {
+    if (userPermissions) {
+      setUserProfile(userPermissions);
+      const hasOrgChartAccess =
+        userPermissions.department === 'HR' ||
+        userPermissions.role === 'Product Owner' ||
+        userPermissions.canAccessOrgChart === true;
+      setCanAccessOrgChart(hasOrgChartAccess);
+    }
+  }, [userPermissions]);
 
   // Time-based greeting utility
   const getTimeBasedGreeting = () => {
@@ -174,56 +220,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   console.log('Dashboard - User DB Role:', user?.role);
   console.log('Dashboard - Display Role:', userRole);
 
-  // Load announcements and user permissions from database
-  React.useEffect(() => {
-    loadAnnouncements();
-    loadUserPermissions();
-  }, [user]);
-
-  const loadAnnouncements = async () => {
-    try {
-      setIsLoadingAnnouncements(true);
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('published', true)
-        .order('created_at', { ascending: false})
-        .limit(3);
-
-      if (error) throw error;
-
-      setAnnouncements(data || []);
-    } catch (error) {
-      console.error('Error loading announcements:', error);
-    } finally {
-      setIsLoadingAnnouncements(false);
-    }
-  };
-
-  const loadUserPermissions = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('department, role, can_access_org_chart, manager_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      setUserProfile(data);
-
-      const hasOrgChartAccess =
-        data?.department === 'HR' ||
-        data?.role === 'Product Owner' ||
-        data?.can_access_org_chart === true;
-
-      setCanAccessOrgChart(hasOrgChartAccess);
-    } catch (error) {
-      console.error('Error loading user permissions:', error);
-    }
-  };
+  // Legacy loading functions removed - now using TanStack Query
+  // See useQuery hooks for apiAnnouncements and userPermissions above
 
   const openModal = (modalName: string) => {
     console.log(`Opening modal: ${modalName}`);
@@ -981,7 +979,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                     {t('dashboard.companyAnnouncements')}
                   </h3>
                   <div className="space-y-4">
-                    {isLoadingAnnouncements ? (
+                    {isAnnouncementsLoading ? (
                       Array.from({ length: 3 }).map((_, index) => (
                         <div key={index} className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-2" data-testid={`skeleton-announcement-${index}`}>
                           <div className="flex items-start justify-between">
@@ -1024,7 +1022,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                       </div>
                     )}
                   </div>
-                  {!isLoadingAnnouncements && (
+                  {!isAnnouncementsLoading && (
                     <button
                       onClick={() => openModal('announcements')}
                       className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium hover:underline"
