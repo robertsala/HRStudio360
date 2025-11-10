@@ -3,17 +3,12 @@ import session from 'express-session';
 import { registerRoutes } from './routes';
 import { setupVite } from './vite';
 import { createServer } from 'http';
-import { initSentry, requestHandler, tracingHandler, errorHandler } from './lib/sentry';
+import { initSentry, setupExpressErrorHandler } from './lib/sentry';
 
 // Initialize Sentry for backend error tracking
 initSentry();
 
 const app = express();
-
-// Sentry request handler must be the first middleware
-app.use(requestHandler());
-// Sentry tracing handler for performance monitoring  
-app.use(tracingHandler());
 
 // Trust proxy for secure cookies behind TLS
 app.set('trust proxy', 1);
@@ -79,10 +74,10 @@ setupVite(app, server).then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
+  
+  // Setup Sentry error handler AFTER all routes (v10+ API)
+  setupExpressErrorHandler(app);
 });
-
-// Sentry error handler must be before other error handlers
-app.use(errorHandler());
 
 // General error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

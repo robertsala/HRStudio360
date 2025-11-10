@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node';
-import type { Request, Response, NextFunction } from 'express';
+import type { Express } from 'express';
 
 let isSentryEnabled = false;
 
@@ -44,6 +44,13 @@ export function initSentry() {
   console.info('✅ Sentry initialized for backend error tracking');
 }
 
+// Setup Express error handler (v10+ API)
+export function setupExpressErrorHandler(app: Express) {
+  if (isSentryEnabled) {
+    Sentry.setupExpressErrorHandler(app);
+  }
+}
+
 // Helper to manually capture errors
 export function captureError(error: Error, context?: Record<string, any>) {
   if (isSentryEnabled) {
@@ -71,15 +78,3 @@ export function clearSentryUser() {
   }
 }
 
-// Export Sentry handlers with fallbacks for when Sentry is not configured
-export const requestHandler = () => isSentryEnabled 
-  ? Sentry.requestHandler() 
-  : (req: Request, res: Response, next: NextFunction) => next();
-
-export const tracingHandler = () => isSentryEnabled 
-  ? Sentry.tracingHandler() 
-  : (req: Request, res: Response, next: NextFunction) => next();
-
-export const errorHandler = () => isSentryEnabled 
-  ? Sentry.errorHandler() 
-  : (err: any, req: Request, res: Response, next: NextFunction) => next(err);
