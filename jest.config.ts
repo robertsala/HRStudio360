@@ -11,7 +11,9 @@ const config: Config = {
   },
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js)',
-    '<rootDir>/src/**/?(*.)(spec|test).(ts|tsx|js)'
+    '<rootDir>/src/**/?(*.)(spec|test).(ts|tsx|js)',
+    '<rootDir>/server/**/__tests__/**/*.(ts|tsx|js)',
+    '<rootDir>/server/**/?(*.)(spec|test).(ts|tsx|js)'
   ],
   collectCoverageFrom: [
     'src/**/*.(ts|tsx)',
