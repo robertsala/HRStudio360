@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabaseClient';
+import { useQuery } from '@tanstack/react-query';
+import type { DashboardStats } from '../../shared/schema';
 import Calendar from './Calendar';
 import { mockEmployees } from './modals/EmployeeListModal';
 import EmployeeListModal from './modals/EmployeeListModal';
@@ -94,6 +96,22 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
 
   // Chat-specific state
   const [initialChatChannelId, setInitialChatChannelId] = React.useState<string | undefined>(undefined);
+
+  // Fetch dashboard stats from API
+  const { data: dashboardStats, isLoading: isStatsLoading, error: statsError } = useQuery<DashboardStats>({
+    queryKey: ['/api/dashboard/stats', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User ID is required');
+      const response = await fetch(`/api/dashboard/stats?userId=${user.id}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dashboard stats: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    refetchOnWindowFocus: false
+  });
 
   // Time-based greeting utility
   const getTimeBasedGreeting = () => {
@@ -462,31 +480,49 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   const stats = [
     {
       label: t('dashboard.ptoBalance'),
-      value: `${personalizedData.ptoBalance} ${t('dashboard.days')}`,
+      value: isStatsLoading 
+        ? '...' 
+        : dashboardStats?.ptoBalance 
+          ? `${Math.round(dashboardStats.ptoBalance.total)} ${t('dashboard.days')}`
+          : t('dashboard.notAvailable'),
       icon: CalendarIcon,
       color: 'bg-blue-500',
       action: () => openModal('leaveManagement')
     },
     {
       label: t('dashboard.nextPayday'),
-      value: personalizedData.nextPayday.split(',')[0],
+      value: isStatsLoading
+        ? '...'
+        : dashboardStats?.nextPayday 
+          ? dashboardStats.nextPayday.split(',')[0]
+          : t('dashboard.notAvailable'),
       icon: DollarSign,
       color: 'bg-emerald-500',
       action: () => openModal('benefitsPay')
     },
     {
       label: t('dashboard.pendingTasks'),
-      value: personalizedData.pendingTasks.length.toString(),
+      value: isStatsLoading
+        ? '...'
+        : (dashboardStats?.pendingTasks?.count || 0).toString(),
       icon: Clock,
       color: 'bg-purple-500',
       action: () => openModal('inbox')
     },
     {
-      label: userRole === 'Manager' ? t('dashboard.teamSize') : t('dashboard.companyEvents'),
-      value: userRole === 'Manager' ? personalizedData.teamStats?.teamSize.toString() || '0' : personalizedData.upcomingEvents.length.toString(),
-      icon: userRole === 'Manager' ? Users : CalendarIcon,
+      label: userRole === 'Manager' || userRole === 'HR' 
+        ? t('dashboard.teamSize') 
+        : t('dashboard.companyEvents'),
+      value: isStatsLoading
+        ? '...'
+        : (userRole === 'Manager' || userRole === 'HR')
+          ? (dashboardStats?.team?.size || 0).toString()
+          : (dashboardStats?.events?.upcomingCount || 0).toString(),
+      icon: (userRole === 'Manager' || userRole === 'HR') ? Users : CalendarIcon,
       color: 'bg-yellow-500',
-      action: () => userRole === 'Manager' ? openModal('employees') : openModal('events')
+      action: () => (userRole === 'Manager' || userRole === 'HR') 
+        ? openModal('employees') 
+        : openModal('events')
     }
   ];
 

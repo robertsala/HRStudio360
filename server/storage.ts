@@ -155,6 +155,9 @@ export interface IStorage {
   getReviewCycleById(id: string): Promise<ReviewCycle | undefined>;
   createReviewCycle(cycle: InsertReviewCycle): Promise<ReviewCycle>;
   updateReviewCycle(id: string, cycle: Partial<InsertReviewCycle>): Promise<ReviewCycle | undefined>;
+  
+  // Dashboard Stats
+  getDashboardStats(userId: string): Promise<import('../shared/schema.js').DashboardStats>;
 }
 
 // Database storage implementation
@@ -699,6 +702,135 @@ export class DbStorage implements IStorage {
       .where(eq(reviewCycles.id, id))
       .returning();
     return result[0];
+  }
+
+  // Dashboard Stats
+  async getDashboardStats(userId: string): Promise<import('../shared/schema.js').DashboardStats> {
+    // Find the employee record for this user
+    const employeeResult = await db.select()
+      .from(employees)
+      .where(eq(employees.userId, userId));
+    
+    if (!employeeResult || employeeResult.length === 0) {
+      // Return default stats if no employee record exists
+      return {
+        ptoBalance: null,
+        nextPayday: null,
+        pendingTasks: { count: 0 },
+        events: { upcomingCount: 4 } // Static for now
+      };
+    }
+
+    const employee = employeeResult[0];
+    const currentYear = new Date().getFullYear();
+
+    // Get leave balance (latest year)
+    const balanceResult = await db.select()
+      .from(leaveBalances)
+      .where(and(
+        eq(leaveBalances.employeeId, employee.id),
+        eq(leaveBalances.year, currentYear)
+      ));
+
+    const leaveBalance = balanceResult[0];
+    
+    // Count pending leave requests for this employee
+    const pendingRequestsResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.employeeId, employee.id),
+        eq(leaveRequests.status, 'Pending')
+      ));
+    
+    const pendingCount = pendingRequestsResult[0]?.count || 0;
+
+    // Count team size for managers
+    const teamResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(employees)
+      .where(eq(employees.managerId, employee.id));
+    
+    const teamSize = teamResult[0]?.count || 0;
+
+    // Count pending approvals (leave requests awaiting this user's approval)
+    const awaitingApprovalResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.approverId, employee.id),
+        eq(leaveRequests.status, 'Pending')
+      ));
+    
+    const awaitingApprovalCount = awaitingApprovalResult[0]?.count || 0;
+
+    // Calculate next payday (bi-weekly schedule from start date)
+    const nextPayday = this.calculateNextPayday(employee.startDate);
+
+    // Build PTO balance
+    const ptoBalance = leaveBalance ? {
+      total: parseFloat(leaveBalance.vacationDays || '0') + 
+             parseFloat(leaveBalance.sickDays || '0') + 
+             parseFloat(leaveBalance.personalDays || '0'),
+      breakdown: {
+        vacation: parseFloat(leaveBalance.vacationDays || '0'),
+        sick: parseFloat(leaveBalance.sickDays || '0'),
+        personal: parseFloat(leaveBalance.personalDays || '0')
+      }
+    } : null;
+
+    return {
+      ptoBalance,
+      nextPayday,
+      pendingTasks: {
+        count: pendingCount,
+        ...(awaitingApprovalCount > 0 && { awaitingApprovalFor: awaitingApprovalCount })
+      },
+      ...(teamSize > 0 && { team: { size: teamSize } }),
+      events: {
+        upcomingCount: 4 // Static for now - could query from events table
+      }
+    };
+  }
+
+  // Helper function to calculate next payday (bi-weekly schedule)
+  private calculateNextPayday(startDate: string): string | null {
+    try {
+      const start = new Date(startDate);
+      const today = new Date();
+      
+      // Calculate days since start date
+      const daysSinceStart = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Bi-weekly pay period (14 days)
+      const payPeriodDays = 14;
+      
+      // Calculate next payday
+      const daysSinceLastPay = daysSinceStart % payPeriodDays;
+      const daysUntilNextPay = payPeriodDays - daysSinceLastPay;
+      
+      const nextPay = new Date(today);
+      nextPay.setDate(today.getDate() + daysUntilNextPay);
+      
+      // Format as "Month Day, Year"
+      return nextPay.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    } catch (error) {
+      // Fallback: return 15th of current month or next month
+      const today = new Date();
+      const fifteenth = new Date(today.getFullYear(), today.getMonth(), 15);
+      
+      if (today.getDate() > 15) {
+        // Return 15th of next month
+        fifteenth.setMonth(fifteenth.getMonth() + 1);
+      }
+      
+      return fifteenth.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    }
   }
 }
 

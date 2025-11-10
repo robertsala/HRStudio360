@@ -729,3 +729,33 @@ export type PerformanceReviewHistory = typeof performanceReviewHistory.$inferSel
 export type InsertPerformanceReviewHistory = z.infer<typeof insertPerformanceReviewHistorySchema>;
 export type ReviewAuditLog = typeof reviewAuditLog.$inferSelect;
 export type InsertReviewAuditLog = z.infer<typeof insertReviewAuditLogSchema>;
+
+// Dashboard Stats type
+export interface DashboardStats {
+  ptoBalance: {
+    total: number;
+    breakdown: {
+      vacation: number;
+      sick: number;
+      personal: number;
+    };
+  } | null;
+  nextPayday: string | null;
+  pendingTasks: {
+    count: number;
+    awaitingApprovalFor?: number; // For managers: tasks awaiting their approval
+  };
+  team?: {
+    size: number;
+    memberIds?: string[];
+  };
+  events: {
+    upcomingCount: number;
+    nextEvent?: {
+      id: string;
+      title: string;
+      date: string;
+      type: string;
+    };
+  };
+}

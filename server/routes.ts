@@ -1171,4 +1171,19 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Dashboard stats endpoint
+  app.get('/api/dashboard/stats', async (req, res) => {
+    try {
+      const { userId } = req.query;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'userId parameter is required' });
+      }
+
+      const stats = await storage.getDashboardStats(userId);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 }
