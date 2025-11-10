@@ -71,6 +71,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
 
   // Announcements state
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = React.useState(true);
 
   // User permissions and profile data
   const [canAccessOrgChart, setCanAccessOrgChart] = React.useState(false);
@@ -181,11 +182,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
 
   const loadAnnouncements = async () => {
     try {
+      setIsLoadingAnnouncements(true);
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
         .eq('published', true)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false})
         .limit(3);
 
       if (error) throw error;
@@ -193,6 +195,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
+    } finally {
+      setIsLoadingAnnouncements(false);
     }
   };
 
@@ -713,30 +717,54 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
 
             {/* Personalized Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => {
-                const Icon = stat.icon;
-                
-                return (
-                  <button
+              {isStatsLoading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div
                     key={index}
-                    className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
-                    onClick={stat.action}
+                    className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700"
+                    data-testid={`skeleton-stat-${index}`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className={`p-3 rounded-xl ${stat.color} shadow-md`}>
-                          <Icon className="h-6 w-6 text-white" />
+                        <div className="p-3 rounded-xl bg-gray-200 dark:bg-gray-700 shadow-md animate-pulse">
+                          <div className="h-6 w-6" />
                         </div>
-                        <div className="ml-4">
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">{stat.value}</p>
-                          <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm">{stat.label}</p>
+                        <div className="ml-4 space-y-2">
+                          <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                      <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                     </div>
-                  </button>
-                );
-              })}
+                  </div>
+                ))
+              ) : (
+                stats.map((stat, index) => {
+                  const Icon = stat.icon;
+                  
+                  return (
+                    <button
+                      key={index}
+                      className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
+                      onClick={stat.action}
+                      data-testid={`stat-card-${index}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className={`p-3 rounded-xl ${stat.color} shadow-md`}>
+                            <Icon className="h-6 w-6 text-white" />
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">{stat.value}</p>
+                            <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm">{stat.label}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
 
             {/* Manager/HR Specific Stats */}
@@ -953,33 +981,58 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                     {t('dashboard.companyAnnouncements')}
                   </h3>
                   <div className="space-y-4">
-                    {personalizedData.companyAnnouncements.map((announcement) => (
-                      <div key={announcement.id} className="border-l-4 border-blue-500 pl-4 py-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white mb-1">{announcement.title}</h4>
-                            <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm mb-2">{announcement.excerpt}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{announcement.date}</p>
+                    {isLoadingAnnouncements ? (
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-2" data-testid={`skeleton-announcement-${index}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-2">
+                              <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                              <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                              <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                              <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                            </div>
+                            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ml-4" />
                           </div>
-                          <button
-                            onClick={() => {
-                              setSelectedAnnouncementId(announcement.id);
-                              openModal('announcements');
-                            }}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium ml-4 hover:underline"
-                          >
-                            {t('dashboard.readMore')}
-                          </button>
                         </div>
+                      ))
+                    ) : personalizedData.companyAnnouncements.length > 0 ? (
+                      personalizedData.companyAnnouncements.map((announcement) => (
+                        <div key={announcement.id} className="border-l-4 border-blue-500 pl-4 py-2" data-testid={`announcement-${announcement.id}`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white mb-1">{announcement.title}</h4>
+                              <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm mb-2">{announcement.excerpt}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{announcement.date}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedAnnouncementId(announcement.id);
+                                openModal('announcements');
+                              }}
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium ml-4 hover:underline"
+                              data-testid={`button-read-announcement-${announcement.id}`}
+                            >
+                              {t('dashboard.readMore')}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <Globe className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                        <p>{t('dashboard.noAnnouncements') || 'No announcements at this time'}</p>
                       </div>
-                    ))}
+                    )}
                   </div>
-                  <button
-                    onClick={() => openModal('announcements')}
-                    className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium hover:underline"
-                  >
-                    {t('dashboard.viewAllAnnouncements')} →
-                  </button>
+                  {!isLoadingAnnouncements && (
+                    <button
+                      onClick={() => openModal('announcements')}
+                      className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium hover:underline"
+                      data-testid="button-view-all-announcements"
+                    >
+                      {t('dashboard.viewAllAnnouncements')} →
+                    </button>
+                  )}
                 </div>
 
                 {/* Upcoming Events & Calendar Integration */}
