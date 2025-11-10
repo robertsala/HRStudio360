@@ -1,7 +1,7 @@
-import * as Sentry from '@sentry/react';
+import * as Sentry from '@sentry/node';
 
 export function initSentry() {
-  const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+  const sentryDsn = process.env.SENTRY_DSN;
   
   if (!sentryDsn) {
     console.info('Sentry DSN not configured - error tracking disabled');
@@ -10,49 +10,39 @@ export function initSentry() {
 
   Sentry.init({
     dsn: sentryDsn,
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({
-        maskAllText: true,
-        blockAllMedia: true,
-      }),
-    ],
     
     // Performance Monitoring
-    tracesSampleRate: 0.1, // Capture 10% of transactions for performance monitoring
-    
-    // Session Replay
-    replaysSessionSampleRate: 0.1, // Sample 10% of sessions
-    replaysOnErrorSampleRate: 1.0, // Sample 100% of sessions with errors
+    tracesSampleRate: 0.1, // Capture 10% of transactions
     
     // Environment
-    environment: import.meta.env.MODE,
+    environment: process.env.NODE_ENV || 'development',
     
     // Release tracking
-    release: `hrstudio360@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
+    release: `hrstudio360@${process.env.APP_VERSION || '1.0.0'}`,
     
     // Privacy settings
     beforeSend(event, hint) {
       // Don't send events in development unless explicitly enabled
-      if (import.meta.env.MODE === 'development' && !import.meta.env.VITE_SENTRY_DEBUG) {
+      if (process.env.NODE_ENV === 'development' && !process.env.SENTRY_DEBUG) {
         return null;
       }
       
       // Filter out sensitive data
       if (event.request) {
         delete event.request.cookies;
+        delete event.request.headers;
       }
       
       return event;
     },
   });
   
-  console.info('Sentry initialized for error tracking and performance monitoring');
+  console.info('✅ Sentry initialized for backend error tracking');
 }
 
 // Helper to manually capture errors
 export function captureError(error: Error, context?: Record<string, any>) {
-  if (import.meta.env.VITE_SENTRY_DSN) {
+  if (process.env.SENTRY_DSN) {
     Sentry.captureException(error, {
       extra: context,
     });
@@ -61,7 +51,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
 
 // Helper to set user context
 export function setSentryUser(user: { id: number; email?: string; username?: string }) {
-  if (import.meta.env.VITE_SENTRY_DSN) {
+  if (process.env.SENTRY_DSN) {
     Sentry.setUser({
       id: user.id.toString(),
       email: user.email,
@@ -70,9 +60,12 @@ export function setSentryUser(user: { id: number; email?: string; username?: str
   }
 }
 
-// Helper to clear user context on logout
+// Helper to clear user context
 export function clearSentryUser() {
-  if (import.meta.env.VITE_SENTRY_DSN) {
+  if (process.env.SENTRY_DSN) {
     Sentry.setUser(null);
   }
 }
+
+// Export Sentry handlers for Express
+export const { requestHandler, tracingHandler, errorHandler } = Sentry;

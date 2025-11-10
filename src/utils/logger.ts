@@ -1,7 +1,8 @@
 /**
  * Centralized logger utility for error tracking and monitoring
- * Future integration point for Sentry, LogRocket, or other monitoring services
+ * Integrated with Sentry for production error tracking
  */
+import { captureError } from '../lib/sentry';
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
@@ -31,8 +32,10 @@ class Logger {
       }
     }
 
-    // Future: Send to monitoring service
-    // Example: Sentry.captureException(error, { tags: context });
+    // Send to Sentry if available
+    if (error instanceof Error) {
+      captureError(error, { message, ...context });
+    }
   }
 
   warn(message: string, context?: LogContext) {
@@ -67,8 +70,12 @@ class Logger {
       {
         component,
         componentStack: errorInfo.componentStack,
+        type: 'react_error',
       }
     );
+    
+    // Note: Sentry is already called in ErrorBoundary.componentDidCatch
+    // to avoid duplicate error reports
   }
 
   // Specific method for API errors

@@ -1,6 +1,7 @@
 import React, { Component, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { logger } from '../utils/logger';
+import { captureError } from '../lib/sentry';
 
 interface Props {
   children: ReactNode;
@@ -26,6 +27,13 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     logger.componentError(error, errorInfo, this.props.componentName);
+    
+    // Send error to Sentry with React-specific context
+    captureError(error, {
+      componentName: this.props.componentName,
+      componentStack: errorInfo.componentStack,
+    });
+    
     this.props.onError?.(error, errorInfo);
   }
 

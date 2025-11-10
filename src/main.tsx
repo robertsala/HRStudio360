@@ -9,6 +9,10 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { initializeAppIcons } from './utils/iconGenerator';
 import ErrorBoundary from './components/ErrorBoundary';
 import { queryClient } from './lib/queryClient';
+import { initSentry } from './lib/sentry';
+
+// Initialize Sentry for error tracking and performance monitoring
+initSentry();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
