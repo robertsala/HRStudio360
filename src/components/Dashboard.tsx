@@ -486,7 +486,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         ? '...' 
         : dashboardStats?.ptoBalance 
           ? `${Math.round(dashboardStats.ptoBalance.total)} ${t('dashboard.days')}`
-          : t('dashboard.notAvailable'),
+          : 'N/A',
       icon: CalendarIcon,
       color: 'bg-blue-500',
       action: () => openModal('leaveManagement')
@@ -497,7 +497,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         ? '...'
         : dashboardStats?.nextPayday 
           ? dashboardStats.nextPayday.split(',')[0]
-          : t('dashboard.notAvailable'),
+          : 'N/A',
       icon: DollarSign,
       color: 'bg-emerald-500',
       action: () => openModal('benefitsPay')
