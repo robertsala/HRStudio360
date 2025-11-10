@@ -78,6 +78,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         return <Mail className="w-5 h-5 text-purple-500" />;
       case 'channel_invite':
         return <UserPlus className="w-5 h-5 text-orange-500" />;
+      case 'collaborator_invite':
+        return <UserPlus className="w-5 h-5 text-blue-600" />;
+      case 'collaborator_accepted':
+        return <CheckCheck className="w-5 h-5 text-green-600" />;
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
@@ -95,6 +99,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         return 'sent you a direct message';
       case 'channel_invite':
         return 'invited you to a channel';
+      case 'collaborator_invite':
+        return 'invited you to collaborate';
+      case 'collaborator_accepted':
+        return 'accepted your collaboration invite';
       default:
         return 'sent you a notification';
     }

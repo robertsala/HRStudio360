@@ -53,6 +53,7 @@ import ChatNotificationBubble from './ChatNotificationBubble';
 import DigitalClock from './DigitalClock';
 import KnowledgeBaseWidget from './KnowledgeBaseWidget';
 import KnowledgeBaseModal from './modals/KnowledgeBaseModal';
+import CollaboratorModal from './modals/CollaboratorModal';
 
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((props, ref) => {
   const { t } = useTranslation();
@@ -87,7 +88,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     directDeposit: false,
     locationOverride: false,
     enterpriseChat: false,
-    knowledgeBase: false
+    knowledgeBase: false,
+    collaborator: false
   });
 
   // Chat-specific state
@@ -1184,6 +1186,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
           <KnowledgeBaseModal
             isOpen={modals.knowledgeBase}
             onClose={() => closeModal('knowledgeBase')}
+          />
+        )}
+        {modals.collaborator && (
+          <CollaboratorModal
+            isOpen={modals.collaborator}
+            onClose={() => closeModal('collaborator')}
           />
         )}
 
