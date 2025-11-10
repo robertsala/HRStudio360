@@ -975,9 +975,10 @@ export class DbStorage implements IStorage {
     // Import performance reviews and responses tables
     const { performanceReviews, reviewResponses } = await import('../shared/schema.js');
     const { startDate } = this.getDateRange(timeRange);
+    const startDateObj = new Date(startDate);
     
     // Build time range filter condition using managerAssessmentSubmittedAt
-    const timeFilter = gte(performanceReviews.managerAssessmentSubmittedAt, startDate);
+    const timeFilter = gte(performanceReviews.managerAssessmentSubmittedAt, startDateObj);
     
     // Get average performance score from manager ratings (time-filtered)
     const avgScoreResult = await db.select({
@@ -1011,7 +1012,7 @@ export class DbStorage implements IStorage {
       .where(and(
         gte(reviewResponses.rating, drizzleSql`4.0`),
         isNotNull(performanceReviews.managerAssessmentSubmittedAt),
-        gte(performanceReviews.managerAssessmentSubmittedAt, startDate)
+        gte(performanceReviews.managerAssessmentSubmittedAt, startDateObj)
       ));
     const goalsAchieved = goalsResult[0]?.count || 0;
     
@@ -1065,11 +1066,12 @@ export class DbStorage implements IStorage {
 
   async getLeaveMetrics(timeRange: string): Promise<import('../shared/schema.js').LeaveMetrics> {
     const { startDate } = this.getDateRange(timeRange);
+    const startDateObj = new Date(startDate);
     
     // Get total leave requests in time range
     const totalRequestsResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
       .from(leaveRequests)
-      .where(gte(leaveRequests.submittedDate, new Date(startDate)));
+      .where(gte(leaveRequests.submittedDate, startDateObj));
     const totalRequests = totalRequestsResult[0]?.count || 0;
     
     // Get requests by status
@@ -1077,7 +1079,7 @@ export class DbStorage implements IStorage {
       .from(leaveRequests)
       .where(and(
         eq(leaveRequests.status, 'Pending'),
-        gte(leaveRequests.submittedDate, new Date(startDate))
+        gte(leaveRequests.submittedDate, startDateObj)
       ));
     const pendingRequests = pendingResult[0]?.count || 0;
     
@@ -1085,7 +1087,7 @@ export class DbStorage implements IStorage {
       .from(leaveRequests)
       .where(and(
         eq(leaveRequests.status, 'Approved'),
-        gte(leaveRequests.submittedDate, new Date(startDate))
+        gte(leaveRequests.submittedDate, startDateObj)
       ));
     const approvedRequests = approvedResult[0]?.count || 0;
     
@@ -1093,7 +1095,7 @@ export class DbStorage implements IStorage {
       .from(leaveRequests)
       .where(and(
         eq(leaveRequests.status, 'Denied'),
-        gte(leaveRequests.submittedDate, new Date(startDate))
+        gte(leaveRequests.submittedDate, startDateObj)
       ));
     const deniedRequests = deniedResult[0]?.count || 0;
     
@@ -1104,7 +1106,7 @@ export class DbStorage implements IStorage {
       avgDays: drizzleSql<number>`avg(days)::int`
     })
       .from(leaveRequests)
-      .where(gte(leaveRequests.submittedDate, new Date(startDate)))
+      .where(gte(leaveRequests.submittedDate, startDateObj))
       .groupBy(leaveRequests.type);
     
     return {
