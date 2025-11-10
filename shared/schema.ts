@@ -814,3 +814,64 @@ export interface UserPermissions {
   canAccessOrgChart: boolean;
   managerId: string | null;
 }
+
+// Analytics types
+export interface WorkforceMetrics {
+  totalEmployees: number;
+  newHires: number;
+  departures: number;
+  remoteWorkers: number;
+  departmentBreakdown: Array<{
+    department: string;
+    count: number;
+    satisfaction?: number;
+    performance?: number;
+  }>;
+}
+
+export interface PerformanceMetrics {
+  avgPerformanceScore: number;
+  goalsAchieved: number;
+  reviewsCompleted: number;
+  reviewsTotal: number;
+  skillCertifications: number;
+  ratingDistribution: Array<{
+    rating: string;
+    count: number;
+  }>;
+}
+
+export interface LeaveMetrics {
+  totalRequests: number;
+  pendingRequests: number;
+  approvedRequests: number;
+  deniedRequests: number;
+  avgProcessingDays: number;
+  leaveTypeBreakdown: Array<{
+    type: string;
+    count: number;
+    avgDays: number;
+  }>;
+}
+
+export interface FinancialMetrics {
+  totalPayroll: number;
+  benefitsCost: number;
+  trainingInvestment: number;
+  costPerHire: number;
+  revenuePerEmployee: number;
+  departmentCosts: Array<{
+    department: string;
+    totalCost: number;
+    employeeCount: number;
+  }>;
+}
+
+export interface AnalyticsSummary {
+  workforce: WorkforceMetrics;
+  performance: PerformanceMetrics;
+  leave: LeaveMetrics;
+  financial: FinancialMetrics;
+  timeRange: string;
+  generatedAt: string;
+}

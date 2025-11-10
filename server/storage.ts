@@ -35,7 +35,7 @@ import {
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
   reviewCycles
 } from '../shared/schema.js';
-import { eq, gte, and, desc, or, like, sql as drizzleSql, isNull, lte } from 'drizzle-orm';
+import { eq, gte, and, desc, or, like, sql as drizzleSql, isNull, isNotNull, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 export interface IStorage {
@@ -173,6 +173,13 @@ export interface IStorage {
   createNewHire(newHire: import('../shared/schema.js').InsertNewHire): Promise<import('../shared/schema.js').NewHire>;
   getNewHireByEmail(email: string): Promise<import('../shared/schema.js').NewHire | undefined>;
   updateNewHire(id: string, newHire: Partial<import('../shared/schema.js').InsertNewHire>): Promise<import('../shared/schema.js').NewHire | undefined>;
+  
+  // Analytics
+  getWorkforceMetrics(timeRange: string): Promise<import('../shared/schema.js').WorkforceMetrics>;
+  getPerformanceMetrics(timeRange: string): Promise<import('../shared/schema.js').PerformanceMetrics>;
+  getLeaveMetrics(timeRange: string): Promise<import('../shared/schema.js').LeaveMetrics>;
+  getFinancialMetrics(timeRange: string): Promise<import('../shared/schema.js').FinancialMetrics>;
+  getAnalyticsSummary(timeRange: string): Promise<import('../shared/schema.js').AnalyticsSummary>;
 }
 
 // Database storage implementation
@@ -917,6 +924,255 @@ export class DbStorage implements IStorage {
   async updateNewHire(id: string, newHire: Partial<import('../shared/schema.js').InsertNewHire>): Promise<import('../shared/schema.js').NewHire | undefined> {
     const result = await db.update(newHires).set(newHire).where(eq(newHires.id, id)).returning();
     return result[0];
+  }
+
+  // Analytics Methods
+  async getWorkforceMetrics(timeRange: string): Promise<import('../shared/schema.js').WorkforceMetrics> {
+    const { startDate } = this.getDateRange(timeRange);
+    
+    // Get total active employees
+    const totalEmployeesResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(employees)
+      .where(eq(employees.status, 'Active'));
+    const totalEmployees = totalEmployeesResult[0]?.count || 0;
+    
+    // Get new hires in time range
+    const newHiresResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(employees)
+      .where(and(
+        eq(employees.status, 'Active'),
+        gte(employees.startDate, startDate)
+      ));
+    const newHires = newHiresResult[0]?.count || 0;
+    
+    // Get department breakdown
+    const departmentData = await db.select({
+      department: profiles.department,
+      count: drizzleSql<number>`count(*)::int`
+    })
+      .from(profiles)
+      .leftJoin(employees, eq(profiles.id, employees.userId))
+      .where(eq(employees.status, 'Active'))
+      .groupBy(profiles.department);
+    
+    // Note: departures and remoteWorkers omitted until schema supports them
+    // TODO: Add termination_date to employees table for reliable departures
+    // TODO: Add is_remote to profiles table for remote worker tracking
+    
+    return {
+      totalEmployees,
+      newHires,
+      departures: 0, // Excluded until termination_date field exists
+      remoteWorkers: 0, // Excluded until is_remote field exists
+      departmentBreakdown: departmentData.map(d => ({
+        department: d.department || 'Unknown',
+        count: d.count
+        // satisfaction and performance omitted until real survey/review data available
+      }))
+    };
+  }
+
+  async getPerformanceMetrics(_timeRange: string): Promise<import('../shared/schema.js').PerformanceMetrics> {
+    // Import performance reviews table
+    const { performanceReviews } = await import('../shared/schema.js');
+    
+    // Get average performance score from manager ratings
+    const avgScoreResult = await db.select({
+      avg: drizzleSql<number>`AVG(${performanceReviews.managerOverallRating})::numeric`
+    }).from(performanceReviews);
+    const avgPerformanceScore = Number(avgScoreResult[0]?.avg || 0);
+    
+    // Get total reviews
+    const totalResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(performanceReviews);
+    const reviewsTotal = totalResult[0]?.count || 0;
+    
+    // Get completed reviews (where both self and manager assessments are submitted)
+    const completedResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(performanceReviews)
+      .where(eq(performanceReviews.overallStatus, 'completed'));
+    const reviewsCompleted = completedResult[0]?.count || 0;
+    
+    // Get goals achieved (reviews with rating >= 4.0)
+    const goalsResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(performanceReviews)
+      .where(gte(performanceReviews.managerOverallRating, drizzleSql`4.0`));
+    const goalsAchieved = goalsResult[0]?.count || 0;
+    
+    // Get rating distribution (GROUP BY rounded rating)
+    const ratingDist = await db.select({
+      rating: drizzleSql<string>`CASE 
+        WHEN ${performanceReviews.managerOverallRating} >= 5.0 THEN '5.0'
+        WHEN ${performanceReviews.managerOverallRating} >= 4.0 THEN '4.0-4.9'
+        WHEN ${performanceReviews.managerOverallRating} >= 3.0 THEN '3.0-3.9'
+        WHEN ${performanceReviews.managerOverallRating} >= 2.0 THEN '2.0-2.9'
+        ELSE '1.0-1.9'
+      END`,
+      count: drizzleSql<number>`count(*)::int`
+    })
+      .from(performanceReviews)
+      .where(isNotNull(performanceReviews.managerOverallRating))
+      .groupBy(drizzleSql`CASE 
+        WHEN ${performanceReviews.managerOverallRating} >= 5.0 THEN '5.0'
+        WHEN ${performanceReviews.managerOverallRating} >= 4.0 THEN '4.0-4.9'
+        WHEN ${performanceReviews.managerOverallRating} >= 3.0 THEN '3.0-3.9'
+        WHEN ${performanceReviews.managerOverallRating} >= 2.0 THEN '2.0-2.9'
+        ELSE '1.0-1.9'
+      END`);
+    
+    // Build rating distribution with all categories
+    const ratingDistribution = [
+      { rating: '5.0', count: 0 },
+      { rating: '4.0-4.9', count: 0 },
+      { rating: '3.0-3.9', count: 0 },
+      { rating: '2.0-2.9', count: 0 },
+      { rating: '1.0-1.9', count: 0 }
+    ];
+    ratingDist.forEach(r => {
+      const found = ratingDistribution.find(rd => rd.rating === r.rating);
+      if (found) found.count = r.count;
+    });
+    
+    return {
+      avgPerformanceScore,
+      goalsAchieved,
+      reviewsCompleted,
+      reviewsTotal,
+      skillCertifications: 0, // TODO: Add when skill tracking implemented
+      ratingDistribution
+    };
+  }
+
+  async getLeaveMetrics(timeRange: string): Promise<import('../shared/schema.js').LeaveMetrics> {
+    const { startDate } = this.getDateRange(timeRange);
+    
+    // Get total leave requests in time range
+    const totalRequestsResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(leaveRequests)
+      .where(gte(leaveRequests.submittedDate, new Date(startDate)));
+    const totalRequests = totalRequestsResult[0]?.count || 0;
+    
+    // Get requests by status
+    const pendingResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.status, 'Pending'),
+        gte(leaveRequests.submittedDate, new Date(startDate))
+      ));
+    const pendingRequests = pendingResult[0]?.count || 0;
+    
+    const approvedResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.status, 'Approved'),
+        gte(leaveRequests.submittedDate, new Date(startDate))
+      ));
+    const approvedRequests = approvedResult[0]?.count || 0;
+    
+    const deniedResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
+      .from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.status, 'Denied'),
+        gte(leaveRequests.submittedDate, new Date(startDate))
+      ));
+    const deniedRequests = deniedResult[0]?.count || 0;
+    
+    // Get leave type breakdown
+    const typeBreakdown = await db.select({
+      type: leaveRequests.type,
+      count: drizzleSql<number>`count(*)::int`,
+      avgDays: drizzleSql<number>`avg(days)::int`
+    })
+      .from(leaveRequests)
+      .where(gte(leaveRequests.submittedDate, new Date(startDate)))
+      .groupBy(leaveRequests.type);
+    
+    return {
+      totalRequests,
+      pendingRequests,
+      approvedRequests,
+      deniedRequests,
+      avgProcessingDays: 3,
+      leaveTypeBreakdown: typeBreakdown.map(t => ({
+        type: t.type,
+        count: t.count,
+        avgDays: t.avgDays
+      }))
+    };
+  }
+
+  async getFinancialMetrics(timeRange: string): Promise<import('../shared/schema.js').FinancialMetrics> {
+    // Get department-level salary aggregations
+    const departmentCosts = await db.select({
+      department: profiles.department,
+      totalCost: drizzleSql<number>`sum(${employees.salary})::numeric`,
+      employeeCount: drizzleSql<number>`count(*)::int`
+    })
+      .from(employees)
+      .leftJoin(profiles, eq(employees.userId, profiles.id))
+      .where(eq(employees.status, 'Active'))
+      .groupBy(profiles.department);
+    
+    const totalPayroll = departmentCosts.reduce((sum, d) => sum + Number(d.totalCost || 0), 0);
+    const benefitsCost = totalPayroll * 0.2; // 20% estimate
+    const trainingInvestment = 125000; // Mock value
+    const costPerHire = 3200; // Mock value
+    const revenuePerEmployee = 185000; // Mock value
+    
+    return {
+      totalPayroll,
+      benefitsCost,
+      trainingInvestment,
+      costPerHire,
+      revenuePerEmployee,
+      departmentCosts: departmentCosts.map(d => ({
+        department: d.department || 'Unknown',
+        totalCost: Number(d.totalCost || 0),
+        employeeCount: d.employeeCount
+      }))
+    };
+  }
+
+  async getAnalyticsSummary(timeRange: string): Promise<import('../shared/schema.js').AnalyticsSummary> {
+    const [workforce, performance, leave, financial] = await Promise.all([
+      this.getWorkforceMetrics(timeRange),
+      this.getPerformanceMetrics(timeRange),
+      this.getLeaveMetrics(timeRange),
+      this.getFinancialMetrics(timeRange)
+    ]);
+    
+    return {
+      workforce,
+      performance,
+      leave,
+      financial,
+      timeRange,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
+  private getDateRange(timeRange: string): { startDate: string; endDate: string } {
+    const endDate = new Date().toISOString();
+    const start = new Date();
+    
+    switch (timeRange) {
+      case '1m':
+        start.setMonth(start.getMonth() - 1);
+        break;
+      case '3m':
+        start.setMonth(start.getMonth() - 3);
+        break;
+      case '6m':
+        start.setMonth(start.getMonth() - 6);
+        break;
+      case '1y':
+        start.setFullYear(start.getFullYear() - 1);
+        break;
+      default:
+        start.setMonth(start.getMonth() - 3); // Default to 3 months
+    }
+    
+    return { startDate: start.toISOString(), endDate };
   }
 }
 

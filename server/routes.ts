@@ -1284,4 +1284,79 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Analytics routes
+  const validateTimeRange = (timeRange: string | undefined): string => {
+    const validRanges = ['1m', '3m', '6m', '1y'];
+    const range = timeRange || '3m';
+    if (!validRanges.includes(range)) {
+      throw new Error(`Invalid timeRange. Must be one of: ${validRanges.join(', ')}`);
+    }
+    return range;
+  };
+
+  app.get('/api/analytics/workforce', async (req, res) => {
+    try {
+      const timeRange = validateTimeRange(req.query.timeRange as string | undefined);
+      const metrics = await storage.getWorkforceMetrics(timeRange);
+      res.json(metrics);
+    } catch (error: any) {
+      if (error.message.includes('Invalid timeRange')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/analytics/performance', async (req, res) => {
+    try {
+      const timeRange = validateTimeRange(req.query.timeRange as string | undefined);
+      const metrics = await storage.getPerformanceMetrics(timeRange);
+      res.json(metrics);
+    } catch (error: any) {
+      if (error.message.includes('Invalid timeRange')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/analytics/leave', async (req, res) => {
+    try {
+      const timeRange = validateTimeRange(req.query.timeRange as string | undefined);
+      const metrics = await storage.getLeaveMetrics(timeRange);
+      res.json(metrics);
+    } catch (error: any) {
+      if (error.message.includes('Invalid timeRange')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/analytics/financial', async (req, res) => {
+    try {
+      const timeRange = validateTimeRange(req.query.timeRange as string | undefined);
+      const metrics = await storage.getFinancialMetrics(timeRange);
+      res.json(metrics);
+    } catch (error: any) {
+      if (error.message.includes('Invalid timeRange')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/analytics/summary', async (req, res) => {
+    try {
+      const timeRange = validateTimeRange(req.query.timeRange as string | undefined);
+      const summary = await storage.getAnalyticsSummary(timeRange);
+      res.json(summary);
+    } catch (error: any) {
+      if (error.message.includes('Invalid timeRange')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
 }
