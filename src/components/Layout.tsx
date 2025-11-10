@@ -496,8 +496,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
   // Dashboard layout for authenticated users
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 fixed h-full z-40`}>
+      {/* Sidebar - Hidden on mobile, visible on lg screens and up */}
+      <div className={`hidden lg:flex ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-col transition-all duration-300 fixed h-full z-40`}>
         {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
@@ -554,11 +554,19 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
 
       </div>
 
-      {/* Main Content Area */}
-      <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
+      {/* Main Content Area - No margin on mobile, margin on lg screens */}
+      <div className={`flex-1 flex flex-col ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'} transition-all duration-300`}>
         {/* Top Header with AI Search */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-          <div className="flex items-center justify-between">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            {/* Mobile Menu Button - Only visible on mobile */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all touch-manipulation"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+
             {/* AI-Powered Global Search */}
             <div className="flex-1 max-w-2xl">
               <div className="relative">
@@ -574,7 +582,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                   value={globalSearchTerm}
                   onChange={(e) => setGlobalSearchTerm(e.target.value)}
                   onKeyPress={handleGlobalSearchKeyPress}
-                  className="w-full pl-16 pr-12 py-3 border-2 border-purple-100 dark:border-purple-800 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-300 dark:focus:border-purple-600 bg-purple-50/50 dark:bg-purple-900/20 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white transition-all duration-200"
+                  className="w-full pl-12 sm:pl-16 pr-10 sm:pr-12 py-2 sm:py-3 text-sm sm:text-base border-2 border-purple-100 dark:border-purple-800 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-300 dark:focus:border-purple-600 bg-purple-50/50 dark:bg-purple-900/20 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white transition-all duration-200 touch-manipulation"
                   onClick={(e) => e.stopPropagation()}
                 />
                 {globalSearchTerm && (
@@ -644,44 +652,50 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center space-x-4">
-              {/* Theme Toggle */}
-              <ThemeToggle />
+            <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
+              {/* Theme Toggle - Hidden on very small screens */}
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
 
-              {/* Language Selector */}
-              <LanguageSelector />
+              {/* Language Selector - Hidden on very small screens */}
+              <div className="hidden sm:block">
+                <LanguageSelector />
+              </div>
 
-              {/* Change Log Notifications */}
-              <ChangeLogNotificationBadge onClick={() => {
-                if (onOpenModal) {
-                  onOpenModal('systemSettings:changelog');
-                }
-              }} />
+              {/* Change Log Notifications - Hidden on very small screens */}
+              <div className="hidden md:block">
+                <ChangeLogNotificationBadge onClick={() => {
+                  if (onOpenModal) {
+                    onOpenModal('systemSettings:changelog');
+                  }
+                }} />
+              </div>
 
               {/* Notifications */}
               <button
                 onClick={() => onOpenModal?.('notifications')}
-                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-xl transition-all duration-200"
+                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-xl transition-all duration-200 touch-manipulation"
                 title="Notifications"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
                   3
                 </span>
               </button>
 
-              {/* Inbox */}
+              {/* Inbox - Hidden on very small screens */}
               <button
                 onClick={() => {
                   console.log('[Layout.tsx] Inbox button clicked');
                   console.log('[Layout.tsx] onOpenModal exists?', !!onOpenModal);
                   onOpenModal?.('inbox');
                 }}
-                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-gray-700 rounded-xl transition-all duration-200"
+                className="hidden sm:flex relative p-2 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-gray-700 rounded-xl transition-all duration-200 touch-manipulation"
                 title="HR Inbox"
               >
                 <Inbox className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
                   5
                 </span>
               </button>
@@ -689,16 +703,16 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
               {/* User Profile */}
               <button
                 onClick={() => onNavigate?.('profile')}
-                className="flex items-center space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl p-2 transition-all duration-200"
+                className="flex items-center space-x-2 sm:space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl p-1 sm:p-2 transition-all duration-200 touch-manipulation"
               >
                 {user?.profilePicture ? (
                   <img
                     src={user.profilePicture}
                     alt={user.name}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-gray-200"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
                   />
                 ) : (
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-sm">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-sm">
                     <span className="text-white text-sm font-bold">
                       {user?.name?.charAt(0).toUpperCase()}
                     </span>
