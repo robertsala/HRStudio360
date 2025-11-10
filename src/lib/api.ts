@@ -516,6 +516,60 @@ class ApiClient {
       body: JSON.stringify(notification),
     });
   }
+
+  // User Notifications endpoints
+  async getUserNotifications(userId: string, unreadOnly?: boolean) {
+    const params = new URLSearchParams();
+    if (unreadOnly) params.append('unreadOnly', 'true');
+    const query = params.toString() ? `?${params}` : '';
+    return this.request(`/api/user-notifications/${userId}${query}`);
+  }
+
+  async markNotificationAsRead(notificationId: string) {
+    return this.request(`/api/user-notifications/${notificationId}/read`, {
+      method: 'PATCH',
+    });
+  }
+
+  async markAllNotificationsAsRead(userId: string) {
+    return this.request(`/api/user-notifications/${userId}/read-all`, {
+      method: 'PATCH',
+    });
+  }
+
+  // Collaborator Invitation endpoints
+  async getCollaboratorInvitations(filters?: { senderId?: string; recipientId?: string; status?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.senderId) params.append('senderId', filters.senderId);
+    if (filters?.recipientId) params.append('recipientId', filters.recipientId);
+    if (filters?.status) params.append('status', filters.status);
+    const query = params.toString() ? `?${params}` : '';
+    return this.request(`/api/collaborator-invitations${query}`);
+  }
+
+  async createCollaboratorInvitation(invitation: {
+    senderId: string;
+    recipientId: string;
+    recipientEmail: string;
+    message?: string;
+  }) {
+    return this.request('/api/collaborator-invitations', {
+      method: 'POST',
+      body: JSON.stringify(invitation),
+    });
+  }
+
+  async acceptCollaboratorInvitation(invitationId: string) {
+    return this.request(`/api/collaborator-invitations/${invitationId}/accept`, {
+      method: 'POST',
+    });
+  }
+
+  async declineCollaboratorInvitation(invitationId: string) {
+    return this.request(`/api/collaborator-invitations/${invitationId}/decline`, {
+      method: 'POST',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
