@@ -474,6 +474,25 @@ export const celebrationNotifications = pgTable('celebration_notifications', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Weather cache table
+export const weatherCache = pgTable('weather_cache', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id),
+  locationLat: numeric('location_lat', { precision: 10, scale: 7 }),
+  locationLon: numeric('location_lon', { precision: 10, scale: 7 }),
+  locationName: text('location_name'),
+  temperature: numeric('temperature', { precision: 5, scale: 2 }),
+  temperatureUnit: text('temperature_unit'),
+  weatherCondition: text('weather_condition'),
+  weatherIcon: text('weather_icon'),
+  windSpeed: numeric('wind_speed', { precision: 5, scale: 2 }),
+  humidity: integer('humidity'),
+  feelsLike: numeric('feels_like', { precision: 5, scale: 2 }),
+  forecastData: json('forecast_data'),
+  lastUpdated: timestamp('last_updated').defaultNow(),
+  cacheExpiresAt: timestamp('cache_expires_at')
+});
+
 // Performance Review System Tables
 
 // Review cycles
@@ -676,6 +695,7 @@ export const insertCompensationApprovalSchema = createInsertSchema(compensationA
 export const insertCompensationHistorySchema = createInsertSchema(compensationHistory).omit({ id: true, createdAt: true });
 export const insertPerformanceReviewHistorySchema = createInsertSchema(performanceReviewHistory).omit({ id: true, createdAt: true });
 export const insertReviewAuditLogSchema = createInsertSchema(reviewAuditLog).omit({ id: true, createdAt: true });
+export const insertWeatherCacheSchema = createInsertSchema(weatherCache).omit({ id: true, lastUpdated: true, cacheExpiresAt: true });
 
 // Types
 export type Profile = typeof profiles.$inferSelect;
@@ -754,6 +774,8 @@ export type PerformanceReviewHistory = typeof performanceReviewHistory.$inferSel
 export type InsertPerformanceReviewHistory = z.infer<typeof insertPerformanceReviewHistorySchema>;
 export type ReviewAuditLog = typeof reviewAuditLog.$inferSelect;
 export type InsertReviewAuditLog = z.infer<typeof insertReviewAuditLogSchema>;
+export type WeatherCache = typeof weatherCache.$inferSelect;
+export type InsertWeatherCache = z.infer<typeof insertWeatherCacheSchema>;
 
 // Dashboard Stats type
 export interface DashboardStats {
