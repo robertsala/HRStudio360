@@ -252,7 +252,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
             <div className="flex justify-between items-center h-20">
               <button 
                 onClick={() => onNavigate?.('landing')}
-                className="flex items-center hover:opacity-80 transition-all duration-200 min-h-[44px] touch-action-manipulation group"
+                className="flex items-center hover:opacity-80 transition-all duration-200 min-h-[44px] touch-manipulation group"
               >
                 <div className="bg-gradient-to-br from-blue-600 to-emerald-600 p-2 rounded-xl group-hover:scale-105 transition-transform duration-200">
                   <Users className="h-8 w-8 text-white" />
@@ -293,19 +293,19 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                     </div>
                     <button
                       onClick={() => onNavigate?.('profile')}
-                      className="px-3 py-2 text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 font-medium"
+                      className="px-3 py-3 text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 font-medium min-h-[44px] touch-manipulation"
                     >
                       {t('common.profile')}
                     </button>
                     <button
                       onClick={() => onNavigate?.('dashboard')}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-lg hover:from-blue-700 hover:to-emerald-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105"
+                      className="px-4 py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-lg hover:from-blue-700 hover:to-emerald-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg transform hover:scale-105 min-h-[44px] touch-manipulation"
                     >
                       {t('common.dashboard')}
                     </button>
                     <button
                       onClick={handleSignOut}
-                      className="flex items-center px-3 py-2 text-gray-800 dark:text-gray-200 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 font-medium"
+                      className="flex items-center px-3 py-3 text-gray-800 dark:text-gray-200 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 font-medium min-h-[44px] touch-manipulation"
                     >
                       <LogOut className="h-4 w-4 mr-1" />
                       {t('common.signOut')}
@@ -314,7 +314,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                 ) : (
                   <button
                     onClick={() => setShowSignInModal(true)}
-                    className="px-4 py-2 text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 font-medium"
+                    className="px-4 py-3 text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 font-medium min-h-[44px] touch-manipulation"
                   >
                     {t('common.signIn')}
                   </button>
@@ -324,16 +324,15 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                     // Scroll to contact section
                     document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
                   }}
-                  className="bg-gradient-to-r from-emerald-600 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-emerald-700 hover:to-blue-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg transform hover:scale-105 min-h-[44px] touch-action-manipulation"
+                  className="bg-gradient-to-r from-emerald-600 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-emerald-700 hover:to-blue-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg transform hover:scale-105 min-h-[44px] touch-manipulation"
                 >
                   {t('common.requestDemo')}
                 </button>
               </div>
 
               <button
-                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                style={{ minHeight: '44px', minWidth: '44px', touchAction: 'manipulation' }}
               >
                 {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
@@ -359,8 +358,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                   </div>
                   <button
                     onClick={() => setMobileMenuOpen(false)}
-                    className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                    style={{ minHeight: '44px', minWidth: '44px' }}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
                   >
                     <X className="h-6 w-6" />
                   </button>
