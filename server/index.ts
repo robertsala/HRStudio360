@@ -12,7 +12,7 @@ const app = express();
 
 // Sentry request handler must be the first middleware
 app.use(requestHandler());
-// Sentry tracing handler for performance monitoring
+// Sentry tracing handler for performance monitoring  
 app.use(tracingHandler());
 
 // Trust proxy for secure cookies behind TLS

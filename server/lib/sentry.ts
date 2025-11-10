@@ -1,4 +1,7 @@
 import * as Sentry from '@sentry/node';
+import type { Request, Response, NextFunction } from 'express';
+
+let isSentryEnabled = false;
 
 export function initSentry() {
   const sentryDsn = process.env.SENTRY_DSN;
@@ -37,12 +40,13 @@ export function initSentry() {
     },
   });
   
+  isSentryEnabled = true;
   console.info('✅ Sentry initialized for backend error tracking');
 }
 
 // Helper to manually capture errors
 export function captureError(error: Error, context?: Record<string, any>) {
-  if (process.env.SENTRY_DSN) {
+  if (isSentryEnabled) {
     Sentry.captureException(error, {
       extra: context,
     });
@@ -51,7 +55,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
 
 // Helper to set user context
 export function setSentryUser(user: { id: number; email?: string; username?: string }) {
-  if (process.env.SENTRY_DSN) {
+  if (isSentryEnabled) {
     Sentry.setUser({
       id: user.id.toString(),
       email: user.email,
@@ -62,10 +66,20 @@ export function setSentryUser(user: { id: number; email?: string; username?: str
 
 // Helper to clear user context
 export function clearSentryUser() {
-  if (process.env.SENTRY_DSN) {
+  if (isSentryEnabled) {
     Sentry.setUser(null);
   }
 }
 
-// Export Sentry handlers for Express
-export const { requestHandler, tracingHandler, errorHandler } = Sentry;
+// Export Sentry handlers with fallbacks for when Sentry is not configured
+export const requestHandler = () => isSentryEnabled 
+  ? Sentry.requestHandler() 
+  : (req: Request, res: Response, next: NextFunction) => next();
+
+export const tracingHandler = () => isSentryEnabled 
+  ? Sentry.tracingHandler() 
+  : (req: Request, res: Response, next: NextFunction) => next();
+
+export const errorHandler = () => isSentryEnabled 
+  ? Sentry.errorHandler() 
+  : (err: any, req: Request, res: Response, next: NextFunction) => next(err);
