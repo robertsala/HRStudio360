@@ -1,19 +1,23 @@
 {
   "name": "HR Studio 360",
-  "short_name": "HR Studio",
-  "description": "Complete HR Management Platform - Streamline your workforce management",
+  "short_name": "HRStudio360",
+  "description": "AI-powered HR management platform - Streamline your entire employee lifecycle from recruitment to offboarding",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [
     {
       "src": "/vite.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity", "utilities"],
+  "prefer_related_applications": false,
+  "lang": "en-US",
+  "dir": "ltr"
 }
