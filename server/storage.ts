@@ -168,8 +168,11 @@ export interface IStorage {
   getUserPermissions(userId: string): Promise<import('../shared/schema.js').UserPermissions>;
   
   // New Hires
+  getNewHires(): Promise<import('../shared/schema.js').NewHire[]>;
+  getNewHireById(id: string): Promise<import('../shared/schema.js').NewHire | undefined>;
   createNewHire(newHire: import('../shared/schema.js').InsertNewHire): Promise<import('../shared/schema.js').NewHire>;
   getNewHireByEmail(email: string): Promise<import('../shared/schema.js').NewHire | undefined>;
+  updateNewHire(id: string, newHire: Partial<import('../shared/schema.js').InsertNewHire>): Promise<import('../shared/schema.js').NewHire | undefined>;
 }
 
 // Database storage implementation
@@ -892,6 +895,15 @@ export class DbStorage implements IStorage {
   }
 
   // New Hires
+  async getNewHires(): Promise<import('../shared/schema.js').NewHire[]> {
+    return db.select().from(newHires).orderBy(desc(newHires.startDate));
+  }
+
+  async getNewHireById(id: string): Promise<import('../shared/schema.js').NewHire | undefined> {
+    const result = await db.select().from(newHires).where(eq(newHires.id, id));
+    return result[0];
+  }
+
   async createNewHire(newHire: import('../shared/schema.js').InsertNewHire): Promise<import('../shared/schema.js').NewHire> {
     const result = await db.insert(newHires).values(newHire).returning();
     return result[0];
@@ -899,6 +911,11 @@ export class DbStorage implements IStorage {
 
   async getNewHireByEmail(email: string): Promise<import('../shared/schema.js').NewHire | undefined> {
     const result = await db.select().from(newHires).where(eq(newHires.email, email));
+    return result[0];
+  }
+
+  async updateNewHire(id: string, newHire: Partial<import('../shared/schema.js').InsertNewHire>): Promise<import('../shared/schema.js').NewHire | undefined> {
+    const result = await db.update(newHires).set(newHire).where(eq(newHires.id, id)).returning();
     return result[0];
   }
 }

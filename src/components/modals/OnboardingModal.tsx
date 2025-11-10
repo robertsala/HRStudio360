@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Users, CheckCircle, Calendar, User, Building, Briefcase, Clock, X, Send, Plus, Eye, Mail, Phone, MapPin, FileText, Target, Award, Shield, Globe, UserCheck } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
+import { Users, CheckCircle, Calendar, User, Building, Briefcase, X, Send, Plus, Eye, Shield, Globe, UserCheck } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import type { NewHire as NewHireType } from '../../../shared/schema';
 import { useTranslation } from 'react-i18next';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 
@@ -30,8 +31,6 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => {
   const [selectedHire, setSelectedHire] = useState<NewHire | null>(null);
   const [showModal, setShowModal] = useState<'details' | 'update' | 'add' | null>(null);
   const [updateMessage, setUpdateMessage] = useState('');
-  const [newHires, setNewHires] = useState<NewHire[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [newHireForm, setNewHireForm] = useState({
     name: '',
     email: '',
@@ -41,9 +40,10 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => {
     manager: ''
   });
 
-  React.useEffect(() => {
-    loadNewHires();
-  }, []);
+  const { data: newHiresData, isLoading } = useQuery<NewHireType[]>({
+    queryKey: ['/api/new-hires'],
+    staleTime: 1000 * 60 * 5,
+  });
 
   React.useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -58,78 +58,44 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose }) => {
     };
   }, [showModal]);
 
-  const loadNewHires = async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('new_hires')
-        .select(`
-          *,
-          manager:employees!new_hires_manager_id_fkey(first_name, last_name)
-        `)
-        .order('start_date', { ascending: true });
+  const newHires: NewHire[] = React.useMemo(() => {
+    if (!newHiresData) return [];
 
-      if (error) throw error;
+    return newHiresData.map((h: NewHireType) => {
+      const progress = 0;
 
-      if (data) {
-        const { data: tasksData } = await supabase
-          .from('onboarding_tasks')
-          .select('new_hire_id, status');
+      let status = 'Pre-boarding';
+      const today = new Date();
+      const startDate = new Date(h.startDate);
+      const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-        const tasksByHire = tasksData?.reduce((acc: any, task: any) => {
-          if (!acc[task.new_hire_id]) {
-            acc[task.new_hire_id] = { total: 0, completed: 0 };
-          }
-          acc[task.new_hire_id].total++;
-          if (task.status === 'completed') {
-            acc[task.new_hire_id].completed++;
-          }
-          return acc;
-        }, {}) || {};
-
-        const formattedHires: NewHire[] = data.map((h: any) => {
-          const tasks = tasksByHire[h.id] || { total: 0, completed: 0 };
-          const progress = tasks.total > 0 ? Math.round((tasks.completed / tasks.total) * 100) : 0;
-
-          let status = 'Pre-boarding';
-          const today = new Date();
-          const startDate = new Date(h.start_date);
-          const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-          if (h.status === 'completed') {
-            status = 'Completed';
-          } else if (daysSinceStart >= 30) {
-            status = 'First Month';
-          } else if (daysSinceStart >= 7) {
-            status = 'First Week';
-          } else if (daysSinceStart >= 0) {
-            status = 'First Day';
-          } else {
-            status = 'Pre-boarding';
-          }
-
-          return {
-            id: h.id,
-            name: `${h.first_name} ${h.last_name}`,
-            email: h.email,
-            department: h.department,
-            role: h.role,
-            startDate: h.start_date,
-            manager: h.manager ? `${h.manager.first_name} ${h.manager.last_name}` : 'Unassigned',
-            status,
-            progress,
-            workerClassification: h.worker_classification_code || 'W2_EMPLOYEE',
-            classificationRiskScore: h.classification_risk_score
-          };
-        });
-        setNewHires(formattedHires);
+      if (h.status === 'completed') {
+        status = 'Completed';
+      } else if (daysSinceStart >= 30) {
+        status = 'First Month';
+      } else if (daysSinceStart >= 7) {
+        status = 'First Week';
+      } else if (daysSinceStart >= 0) {
+        status = 'First Day';
+      } else {
+        status = 'Pre-boarding';
       }
-    } catch (error) {
-      console.error('Error loading new hires:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+      return {
+        id: h.id,
+        name: `${h.firstName} ${h.lastName}`,
+        email: h.email,
+        department: h.department || '',
+        role: h.role || '',
+        startDate: h.startDate,
+        manager: 'Unassigned',
+        status,
+        progress,
+        workerClassification: h.workerClassificationCode || 'W2_EMPLOYEE',
+        classificationRiskScore: h.classificationRiskScore || undefined
+      };
+    });
+  }, [newHiresData]);
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase();

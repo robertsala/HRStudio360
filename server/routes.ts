@@ -1216,7 +1216,29 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // New hires endpoint
+  // New hires endpoints
+  app.get('/api/new-hires', async (_req, res) => {
+    try {
+      const newHires = await storage.getNewHires();
+      res.json(newHires);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/new-hires/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const newHire = await storage.getNewHireById(id);
+      if (!newHire) {
+        return res.status(404).json({ error: 'New hire not found' });
+      }
+      res.json(newHire);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post('/api/new-hires', async (req, res) => {
     try {
       const { insertNewHireSchema } = await import('../shared/schema.js');
@@ -1233,6 +1255,28 @@ export function registerRoutes(app: Express) {
       // Create new hire
       const newHire = await storage.createNewHire(validatedData);
       res.status(201).json(newHire);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/new-hires/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { insertNewHireSchema } = await import('../shared/schema.js');
+      
+      // Validate request body (partial update)
+      const validatedData = insertNewHireSchema.partial().parse(req.body);
+      
+      // Update new hire
+      const updatedHire = await storage.updateNewHire(id, validatedData);
+      if (!updatedHire) {
+        return res.status(404).json({ error: 'New hire not found' });
+      }
+      res.json(updatedHire);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: 'Invalid request data', details: error.errors });
