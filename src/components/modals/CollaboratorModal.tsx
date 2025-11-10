@@ -213,28 +213,29 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
     // Invalidate queries
     queryClient.invalidateQueries({ queryKey: ['/api/collaborator-invitations'] });
 
-    // Show notification
+    // Show notification and reset form only on complete success
     if (failures === 0) {
       setNotification({
         type: 'success',
         message: `Successfully sent ${successes} invitation${successes > 1 ? 's' : ''}! Email notifications have been sent.`,
       });
+      // Only clear selection on complete success
+      setSelectedEmployeeIds([]);
+      setMessage('');
+      setTimeout(() => setNotification(null), 5000);
     } else if (successes === 0) {
       setNotification({
         type: 'error',
         message: `Failed to send all ${failures} invitation${failures > 1 ? 's' : ''}. Please try again.`,
       });
+      setTimeout(() => setNotification(null), 5000);
     } else {
       setNotification({
         type: 'info',
-        message: `Sent ${successes} invitation${successes > 1 ? 's' : ''}, but ${failures} failed. Check your network and try again.`,
+        message: `Sent ${successes} invitation${successes > 1 ? 's' : ''}, but ${failures} failed. Selection preserved - please retry the failed invitations.`,
       });
+      setTimeout(() => setNotification(null), 5000);
     }
-
-    // Reset form
-    setSelectedEmployeeIds([]);
-    setMessage('');
-    setTimeout(() => setNotification(null), 5000);
   };
 
   // Toggle employee selection
