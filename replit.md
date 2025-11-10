@@ -42,7 +42,13 @@ The system includes an enterprise chat system with channels, direct messages, an
 - **Email Notifications**: Resend integration sends invitation emails and acceptance confirmations with graceful error handling
 - **In-app Notifications**: Real-time notifications via NotificationCenter for invite sent and accepted events
 - **AI-Powered Search**: Smart employee search utility (`src/utils/employeeSearch.ts`) enables finding team members by name, role, department, or location with contextual matching
-- **CollaboratorModal**: Full-featured React component with sent/received invitation lists, role selection (viewer/commenter/decision_maker), and bidirectional confirmation flow
+- **Enhanced Employee Selection** (November 2025): Multi-select interface with intelligent filters and batch invitation sending:
+  - **Filter Options**: Segmented controls for All Employees, My Team (manager-based with department fallback), and Department filtering
+  - **Interactive Grid**: Checkbox-based multi-select with visual feedback, avatars, and employee details
+  - **Batch Operations**: Send invitations to multiple employees simultaneously with Promise.allSettled for robust error handling
+  - **Smart Persistence**: Selected employees remain selected across filter/search changes and retry on partial failures
+  - **Contextual Empty States**: Clear messaging for each filter scenario (no team members, select department, no search results)
+- **CollaboratorModal**: Full-featured React component with sent/received invitation lists, multi-select employee picker, and bidirectional confirmation flow
 - **React Query Integration**: Optimistic updates and automatic cache invalidation ensure real-time UI consistency
 
 ### AI Integration
