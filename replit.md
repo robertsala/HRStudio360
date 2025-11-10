@@ -71,6 +71,35 @@ File processing includes client-side PDF generation using jspdf and html2canvas 
 
 The system heavily utilizes a modal-based interface for primary interactions. A service layer pattern encapsulates business logic, and optimistic UI updates are employed for perceived performance. Error boundaries are used for graceful error handling.
 
+### Error Handling & Resilience
+
+**Comprehensive Error Handling System** (November 2025): Production-ready error handling infrastructure for improved reliability and user experience:
+
+- **ErrorBoundary Component** (`src/components/ErrorBoundary.tsx`): Reusable React error boundary with fallback UI, retry capabilities, and component name tracking. Integrated with centralized logger for error monitoring. Root boundary in `main.tsx` catches catastrophic errors, with architecture supporting sectional boundaries for high-risk areas.
+
+- **Centralized Logger** (`src/utils/logger.ts`): Unified logging interface with methods for error, warn, info, and debug levels. Specialized methods for component errors (`componentError`) and API errors (`apiError`) with contextual metadata. Ready for future integration with monitoring services (Sentry, LogRocket).
+
+- **API Error Utilities** (`src/utils/apiErrors.ts`):
+  - `parseApiError()`: Standardized parsing of HTTP error responses into structured ApiError objects
+  - `getUserFriendlyErrorMessage()`: Converts technical errors to user-friendly messages
+  - `handleApiError()`: Combined error handling with automatic logging
+  - `retryWithBackoff()`: Exponential backoff utility for retry operations
+  - `isApiError()`: Type guard that distinguishes custom ApiError objects from native Error/TypeError using status/code discriminators
+  - `HttpStatus` helpers: Constants and utilities for HTTP status code handling
+
+- **Enhanced TanStack Query** (`src/lib/queryClient.ts`):
+  - Smart retry logic: Retries server errors (5xx) and network errors, skips client errors (4xx)
+  - Exponential backoff: 1s → 2s → 4s delay between retries, max 30 seconds
+  - Network error handling: TypeError from fetch failures wrapped in friendly "Network error. Please check your connection" message
+  - Comprehensive logging: All API errors logged with endpoint, method, and error details
+  - Proper error discrimination: Uses `isApiError()` type guard to distinguish API errors from network failures
+
+- **Error Flow Architecture**:
+  1. HTTP errors (4xx/5xx): Parsed into ApiError with status → logged → rethrown with original message
+  2. Network failures: TypeError caught → logged as network_error → wrapped in user-friendly message
+  3. React component errors: Caught by ErrorBoundary → logged with component name → fallback UI displayed
+  4. All errors tracked via centralized logger for future monitoring integration
+
 ## External Dependencies
 
 ### Third-Party Services
