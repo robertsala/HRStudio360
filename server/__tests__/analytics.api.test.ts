@@ -4,12 +4,12 @@
 
 import request from 'supertest';
 import express from 'express';
-import { router } from '../routes';
+import { registerRoutes } from '../routes.js';
 
 // Create a test app instance
 const app = express();
 app.use(express.json());
-app.use('/api', router);
+registerRoutes(app);
 
 describe('Analytics API Endpoints', () => {
   describe('GET /api/analytics/workforce', () => {

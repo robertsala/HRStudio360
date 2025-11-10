@@ -71,6 +71,32 @@ File processing includes client-side PDF generation using jspdf and html2canvas 
 
 The system heavily utilizes a modal-based interface for primary interactions. A service layer pattern encapsulates business logic, and optimistic UI updates are employed for perceived performance. Error boundaries are used for graceful error handling.
 
+### Testing Infrastructure
+
+**Comprehensive Testing Suite** (November 2025): Production-ready testing infrastructure with Jest and Testing Library:
+
+- **Unit Tests**: Comprehensive test coverage for error handling utilities:
+  - `src/utils/logger.test.ts`: 11 test cases covering all Logger methods (error, warn, info, debug, componentError, apiError)
+  - `src/utils/apiErrors.test.ts`: 29 test cases covering API error parsing, user-friendly messages, retry logic, and HTTP status helpers
+  - All 40 tests passing with full coverage of edge cases
+
+- **API Endpoint Tests**: Integration tests for backend analytics endpoints:
+  - `server/__tests__/analytics.api.test.ts`: 15 test cases covering all analytics routes
+  - Tests for workforce, performance, leave, financial, and summary endpoints
+  - Time-range validation testing (1m, 3m, 6m, 1y)
+  - Error handling and data type verification
+
+- **Jest Configuration**: Updated `jest.config.ts` to support both frontend and backend testing:
+  - ts-jest preset with jsdom environment
+  - Module name mapping for @ imports and assets
+  - Supports both `src/` and `server/` test directories
+  - Mock setup for import.meta and environment variables
+
+- **Test Scripts**:
+  - `npm test`: Run all tests
+  - `npm test:watch`: Watch mode for development
+  - `npm test:coverage`: Generate coverage reports
+
 ### Error Handling & Resilience
 
 **Comprehensive Error Handling System** (November 2025): Production-ready error handling infrastructure for improved reliability and user experience:
