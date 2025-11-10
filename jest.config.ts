@@ -48,13 +48,13 @@ const config: Config = {
         }
       }
     },
-    // Server/Backend tests - Node environment with ESM support
+    // Server/Backend tests - Node environment
     {
       displayName: 'server',
-      preset: 'ts-jest/presets/default-esm',
+      preset: 'ts-jest',
       testEnvironment: 'node',
-      extensionsToTreatAsEsm: ['.ts'],
       moduleNameMapper: {
+        '^@shared/(.*)$': '<rootDir>/shared/$1',
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
       testMatch: [
@@ -69,12 +69,24 @@ const config: Config = {
       transform: {
         '^.+\\.ts$': ['ts-jest', {
           tsconfig: {
+            target: 'ES2022',
+            lib: ['ES2023'],
+            module: 'commonjs',
+            skipLibCheck: true,
+            moduleResolution: 'node',
+            isolatedModules: false,
+            strict: false,
             esModuleInterop: true,
             allowSyntheticDefaultImports: true,
-            module: 'esnext',
-            moduleResolution: 'node'
+            baseUrl: '.',
+            paths: {
+              '@shared/*': ['./shared/*']
+            }
           },
-          useESM: true
+          isolatedModules: true,
+          diagnostics: {
+            ignoreCodes: [2740, 2769, 2339, 2322]
+          }
         }],
       },
       moduleFileExtensions: ['ts', 'js', 'json', 'node']

@@ -86,11 +86,12 @@ The system heavily utilizes a modal-based interface for primary interactions. A 
   - Time-range validation testing (1m, 3m, 6m, 1y)
   - Error handling and data type verification
 
-- **Jest Configuration**: Updated `jest.config.ts` to support both frontend and backend testing:
-  - ts-jest preset with jsdom environment
-  - Module name mapping for @ imports and assets
-  - Supports both `src/` and `server/` test directories
-  - Mock setup for import.meta and environment variables
+- **Jest Configuration**: Dual Jest project configuration supporting both frontend and backend testing:
+  - **Client project**: ts-jest with jsdom environment for React component tests
+  - **Server project**: ts-jest with Node environment for API endpoint tests
+  - Module name mapping for @ imports, assets, and @shared paths
+  - `.js` extension mapper to resolve ES module imports in CommonJS test environment
+  - TypeScript diagnostic relaxation for pre-existing storage layer type issues
 
 - **Test Scripts**:
   - `npm test`: Run all tests

@@ -847,7 +847,7 @@ export interface LeaveMetrics {
   approvedRequests: number;
   deniedRequests: number;
   avgProcessingDays: number;
-  leaveTypeBreakdown: Array<{
+  leaveByType: Array<{
     type: string;
     count: number;
     avgDays: number;
@@ -856,14 +856,17 @@ export interface LeaveMetrics {
 
 export interface FinancialMetrics {
   totalPayroll: number;
+  avgSalary: number;
+  totalExpenses: number;
   benefitsCost: number;
   trainingInvestment: number;
   costPerHire: number;
   revenuePerEmployee: number;
-  departmentCosts: Array<{
+  payrollByDepartment: Array<{
     department: string;
     totalCost: number;
     employeeCount: number;
+    avgSalary: number;
   }>;
 }
 

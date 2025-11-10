@@ -3,11 +3,11 @@
  */
 
 import request from 'supertest';
-import express from 'express';
-import { registerRoutes } from '../routes.js';
+import express, { type Express } from 'express';
+import { registerRoutes } from '../routes';
 
 // Create a test app instance
-const app = express();
+const app: Express = express();
 app.use(express.json());
 registerRoutes(app);
 

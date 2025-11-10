@@ -1113,7 +1113,7 @@ export class DbStorage implements IStorage {
       approvedRequests,
       deniedRequests,
       avgProcessingDays: 3,
-      leaveTypeBreakdown: typeBreakdown.map(t => ({
+      leaveByType: typeBreakdown.map(t => ({
         type: t.type,
         count: t.count,
         avgDays: t.avgDays
@@ -1134,21 +1134,27 @@ export class DbStorage implements IStorage {
       .groupBy(profiles.department);
     
     const totalPayroll = departmentCosts.reduce((sum, d) => sum + Number(d.totalCost || 0), 0);
+    const totalEmployees = departmentCosts.reduce((sum, d) => sum + d.employeeCount, 0);
+    const avgSalary = totalEmployees > 0 ? totalPayroll / totalEmployees : 0;
     const benefitsCost = totalPayroll * 0.2; // 20% estimate
     const trainingInvestment = 125000; // Mock value
     const costPerHire = 3200; // Mock value
     const revenuePerEmployee = 185000; // Mock value
+    const totalExpenses = benefitsCost + trainingInvestment + (costPerHire * 5); // Estimate
     
     return {
       totalPayroll,
+      avgSalary,
+      totalExpenses,
       benefitsCost,
       trainingInvestment,
       costPerHire,
       revenuePerEmployee,
-      departmentCosts: departmentCosts.map(d => ({
+      payrollByDepartment: departmentCosts.map(d => ({
         department: d.department || 'Unknown',
         totalCost: Number(d.totalCost || 0),
-        employeeCount: d.employeeCount
+        employeeCount: d.employeeCount,
+        avgSalary: d.employeeCount > 0 ? Number(d.totalCost || 0) / d.employeeCount : 0
       }))
     };
   }

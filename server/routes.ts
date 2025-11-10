@@ -1288,11 +1288,15 @@ export function registerRoutes(app: Express) {
   // Analytics routes
   const validateTimeRange = (timeRange: string | undefined): string => {
     const validRanges = ['1m', '3m', '6m', '1y'];
-    const range = timeRange || '3m';
-    if (!validRanges.includes(range)) {
+    // If no time range provided (undefined/null), use default
+    if (timeRange === undefined || timeRange === null) {
+      return '3m';
+    }
+    // If time range provided (including empty string) but invalid, throw error
+    if (!validRanges.includes(timeRange)) {
       throw new Error(`Invalid timeRange. Must be one of: ${validRanges.join(', ')}`);
     }
-    return range;
+    return timeRange;
   };
 
   app.get('/api/analytics/workforce', async (req, res) => {
