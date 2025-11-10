@@ -33,6 +33,11 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
   const { user } = useAuth();
   const queryClient = useQueryClient();
   useEscapeKey(() => onClose(), isOpen);
+  
+  // Debug marker - Enhanced version loaded!
+  if (isOpen) {
+    console.log('[CollaboratorModal] Enhanced multi-select version loaded ✅');
+  }
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
