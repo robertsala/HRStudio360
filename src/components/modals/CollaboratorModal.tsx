@@ -260,30 +260,30 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
                     declineInvitationMutation.isPending;
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <UserPlus className="h-8 w-8" />
-              <div>
-                <h2 className="text-2xl font-bold">Team Collaboration</h2>
-                <p className="text-white/80 text-sm">Invite colleagues to collaborate on projects</p>
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700 p-4 sm:p-6 text-white">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <UserPlus className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0" />
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold truncate">Team Collaboration</h2>
+                <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Invite colleagues to collaborate on projects</p>
               </div>
             </div>
             <button
               onClick={onClose}
               data-testid="button-close-collaborator-modal"
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0 touch-manipulation"
             >
-              <X className="h-6 w-6" />
+              <X className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-100px)] sm:max-h-[calc(90vh-140px)]">
           {/* Notification */}
           {notification && (
             <div
@@ -309,56 +309,56 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
             </h3>
 
             {/* Filter Toolbar */}
-            <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            <div className="mb-4 flex flex-col gap-3">
               {/* Segmented Filter Buttons */}
-              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1 sm:gap-0">
                 <button
                   onClick={() => setActiveFilter('all')}
                   data-testid="filter-all"
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-3 sm:py-2 rounded-md text-sm font-medium transition-colors touch-manipulation ${
                     activeFilter === 'all'
                       ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   <Users className="h-4 w-4" />
-                  All Employees
+                  <span className="whitespace-nowrap">All Employees</span>
                 </button>
                 <button
                   onClick={() => setActiveFilter('my-team')}
                   data-testid="filter-my-team"
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-3 sm:py-2 rounded-md text-sm font-medium transition-colors touch-manipulation ${
                     activeFilter === 'my-team'
                       ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   <UserPlus className="h-4 w-4" />
-                  My Team ({myTeamIds.size})
+                  <span className="whitespace-nowrap">My Team ({myTeamIds.size})</span>
                 </button>
                 <button
                   onClick={() => setActiveFilter('department')}
                   data-testid="filter-department"
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-3 sm:py-2 rounded-md text-sm font-medium transition-colors touch-manipulation ${
                     activeFilter === 'department'
                       ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   <Building className="h-4 w-4" />
-                  Department
+                  <span className="whitespace-nowrap">Department</span>
                 </button>
               </div>
 
               {/* Department Dropdown (conditional) */}
               {activeFilter === 'department' && (
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-400" />
+                  <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <select
                     value={selectedDepartment}
                     onChange={(e) => setSelectedDepartment(e.target.value)}
                     data-testid="select-department"
-                    className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-3 sm:py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 touch-manipulation"
                   >
                     <option value="">Select Department</option>
                     {departmentOptions.map(dept => (
@@ -371,15 +371,15 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
 
             {/* AI Search */}
             <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Sparkles className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-purple-500" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+              <Sparkles className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-purple-500 pointer-events-none" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="AI Search: Try 'senior engineer', 'marketing team', or search by name..."
+                placeholder="Search by name, role, or department..."
                 data-testid="input-search-employees"
-                className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="w-full pl-10 pr-10 py-3 sm:py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base sm:text-sm touch-manipulation"
               />
             </div>
 
@@ -406,32 +406,32 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
                         key={employee.id}
                         onClick={() => toggleEmployeeSelection(employee.id)}
                         data-testid={`button-toggle-employee-${employee.id}`}
-                        className={`p-3 rounded-lg border-2 transition-all text-left relative ${
+                        className={`p-4 sm:p-3 rounded-lg border-2 transition-all text-left relative min-h-[80px] touch-manipulation ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                            : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-800'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-gray-800 active:bg-gray-50 dark:active:bg-gray-750'
                         }`}
                       >
                         {/* Checkbox */}
-                        <div className={`absolute top-3 right-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                        <div className={`absolute top-3 right-3 w-6 h-6 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-all ${
                           isSelected
                             ? 'border-blue-500 bg-blue-500'
                             : 'border-gray-300 dark:border-gray-600'
                         }`}>
-                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                          {isSelected && <Check className="h-4 w-4 sm:h-3 sm:w-3 text-white" />}
                         </div>
 
-                        <div className="flex items-start gap-3 pr-8">
-                          <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                        <div className="flex items-start gap-3 pr-10 sm:pr-8">
+                          <div className="flex-shrink-0 w-12 h-12 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-base sm:text-sm">
                             {getEmployeeDisplayName(employee).charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-white truncate text-sm">
+                            <p className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-sm">
                               {getEmployeeDisplayName(employee)}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1 mt-0.5">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1 mt-1">
                               <Mail className="h-3 w-3 flex-shrink-0" />
-                              {employee.email}
+                              <span className="truncate">{employee.email}</span>
                             </p>
                             <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
                               {getEmployeeSubtitle(employee)}
@@ -447,18 +447,18 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
 
             {/* Selection Summary */}
             {selectedEmployeeIds.length > 0 && (
-              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="mb-4 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    <span className="font-medium text-blue-900 dark:text-blue-100">
+                    <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <span className="font-medium text-blue-900 dark:text-blue-100 text-sm sm:text-base">
                       {selectedEmployeeIds.length} employee{selectedEmployeeIds.length > 1 ? 's' : ''} selected
                     </span>
                   </div>
                   <button
                     onClick={() => setSelectedEmployeeIds([])}
                     data-testid="button-clear-selection"
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium py-1 px-2 touch-manipulation"
                   >
                     Clear Selection
                   </button>
@@ -473,7 +473,7 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
               placeholder="Add a personal message (optional)"
               data-testid="input-invitation-message"
               rows={3}
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base sm:text-sm touch-manipulation resize-none"
             />
 
             {/* Send Button */}
@@ -481,7 +481,7 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
               onClick={handleSendBatchInvitations}
               disabled={selectedEmployeeIds.length === 0 || isPending}
               data-testid="button-send-invitations"
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 active:from-blue-800 active:to-purple-800 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 touch-manipulation text-base sm:text-base"
             >
               <Send className="h-5 w-5" />
               {isPending ? 'Sending...' : `Send ${selectedEmployeeIds.length} Invitation${selectedEmployeeIds.length !== 1 ? 's' : ''}`}
@@ -567,12 +567,12 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
                             "{invitation.message}"
                           </p>
                         )}
-                        <div className="mt-3 flex gap-2">
+                        <div className="mt-3 flex flex-col sm:flex-row gap-2">
                           <button
                             onClick={() => acceptInvitationMutation.mutate(invitation.id)}
                             disabled={isPending}
                             data-testid={`button-accept-${invitation.id}`}
-                            className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 transition-colors"
+                            className="flex-1 py-3 sm:py-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-lg font-medium disabled:opacity-50 transition-colors touch-manipulation"
                           >
                             Accept
                           </button>
@@ -580,7 +580,7 @@ const CollaboratorModal: React.FC<CollaboratorModalProps> = ({ isOpen, onClose }
                             onClick={() => declineInvitationMutation.mutate(invitation.id)}
                             disabled={isPending}
                             data-testid={`button-decline-${invitation.id}`}
-                            className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium disabled:opacity-50 transition-colors"
+                            className="flex-1 py-3 sm:py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 text-gray-800 dark:text-gray-200 rounded-lg font-medium disabled:opacity-50 transition-colors touch-manipulation"
                           >
                             Decline
                           </button>
