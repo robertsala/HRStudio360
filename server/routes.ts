@@ -10,6 +10,7 @@ import {
   insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema,
   insertReviewCycleSchema
 } from '../shared/schema.js';
+import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 
 export function registerRoutes(app: Express) {
   // Profile routes
@@ -1063,6 +1064,24 @@ export function registerRoutes(app: Express) {
         isRead: false
       });
       
+      const [sender, recipient] = await Promise.all([
+        storage.getProfileById(validated.senderId),
+        storage.getProfileById(validated.recipientId)
+      ]);
+      
+      if (sender && recipient) {
+        const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || sender.email;
+        const recipientName = `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || recipient.email;
+        
+        await sendCollaboratorInviteEmail({
+          recipientEmail: validated.recipientEmail,
+          recipientName,
+          senderName,
+          message: validated.message || undefined,
+          invitationId: invitation.id
+        });
+      }
+      
       res.status(201).json(invitation);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -1101,6 +1120,22 @@ export function registerRoutes(app: Express) {
         relatedId: invitation.id,
         isRead: false
       });
+      
+      const [sender, recipient] = await Promise.all([
+        storage.getProfileById(invitation.senderId),
+        storage.getProfileById(invitation.recipientId)
+      ]);
+      
+      if (sender && recipient) {
+        const senderName = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || sender.email;
+        const recipientName = `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || recipient.email;
+        
+        await sendCollaboratorAcceptedEmail({
+          recipientEmail: sender.email,
+          recipientName: senderName,
+          acceptedByName: recipientName
+        });
+      }
       
       res.json(updated);
     } catch (error: any) {
