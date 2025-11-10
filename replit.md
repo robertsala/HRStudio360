@@ -34,9 +34,20 @@ Authentication has been fully migrated from Supabase Auth to the backend Express
 
 The system includes an enterprise chat system with channels, direct messages, and reactions, currently using Supabase Realtime for live updates. It also features a celebration system for birthdays and anniversaries with full-screen modals and notifications, and a general real-time notification system.
 
+### Collaboration Features
+
+**Collaborator Invitation System** (November 2025): Complete end-to-end implementation with backend API and frontend UI, enabling users to invite team members to collaborate on projects. Features include:
+- **Database**: `collaborator_invitations` table with status tracking (pending/accepted/declined) and timestamps
+- **Backend API**: Three RESTful endpoints for create, accept, and decline operations with proper validation
+- **Email Notifications**: Resend integration sends invitation emails and acceptance confirmations with graceful error handling
+- **In-app Notifications**: Real-time notifications via NotificationCenter for invite sent and accepted events
+- **AI-Powered Search**: Smart employee search utility (`src/utils/employeeSearch.ts`) enables finding team members by name, role, department, or location with contextual matching
+- **CollaboratorModal**: Full-featured React component with sent/received invitation lists, role selection (viewer/commenter/decision_maker), and bidirectional confirmation flow
+- **React Query Integration**: Optimistic updates and automatic cache invalidation ensure real-time UI consistency
+
 ### AI Integration
 
-AI capabilities are integrated via an AI Assistant, powered by OpenAI API, offering HR policy guidance and employee information lookup. Additional AI features include candidate screening scores, predictive analytics, and automated insights.
+AI capabilities are integrated via an AI Assistant, powered by OpenAI API, offering HR policy guidance and employee information lookup. Additional AI features include candidate screening scores, predictive analytics, automated insights, and AI-powered employee search for collaboration workflows.
 
 ### File Processing
 
