@@ -22,7 +22,15 @@ The backend consists of an Express.js server running on port 5000, integrated wi
 
 ### Data Storage
 
-The project uses a PostgreSQL database (Neon-backed), with its schema defined using Drizzle ORM. Key tables include `profiles`, `employees`, `leave_requests`, `pay_stubs`, `celebration_badges`, `channels`, and `performance_reviews`. The `profiles` table includes location fields (locationLat, locationLon, locationCity, locationState, locationZipCode, locationManualOverride) for weather widget functionality. Drizzle Kit manages database migrations. The backend provides a complete RESTful API for all tables, with frontend components gradually migrating from direct Supabase client access to this new API.
+The project uses a PostgreSQL database (Neon-backed), with its schema defined using Drizzle ORM. Key tables include `profiles`, `employees`, `leave_requests`, `pay_stubs`, `celebration_badges`, `channels`, `performance_reviews`, and `announcements`. The `profiles` table includes location fields (locationLat, locationLon, locationCity, locationState, locationZipCode, locationManualOverride) for weather widget functionality, plus `canAccessOrgChart` and `managerId` fields for permission management and organizational hierarchy. Drizzle Kit manages database migrations. The backend provides a complete RESTful API for all tables, with frontend components gradually migrating from direct Supabase client access to this new API.
+
+**Dashboard API Migration** (November 2025): Complete migration of dashboard components from direct Supabase calls to backend REST API endpoints:
+- **Statistics Endpoint**: Single consolidated `/api/dashboard/stats` endpoint provides real-time metrics (PTO balance, next payday, pending tasks, team size, upcoming events) with proper userId filtering
+- **Announcements Endpoint**: `/api/announcements?limit=N` returns published announcements with validation (1-100 range), date-window filtering for active announcements only
+- **Permissions Endpoint**: `/api/profiles/:id/permissions` returns user permissions with safe defaults for org chart access
+- **Loading States**: Comprehensive skeleton loaders with animate-pulse animations prevent empty content flashes during data fetching
+- **TanStack Query Integration**: All dashboard data uses TanStack Query v5 with proper caching (5-10 min staleTime), automatic refetching, and loading state management
+- **Error Handling**: Robust validation in API layer (400 for invalid params, 500 for server errors) with graceful UI degradation
 
 ### Authentication & Authorization
 
