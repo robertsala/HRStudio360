@@ -6,6 +6,8 @@ const config: Config = {
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '@/(.*)': '<rootDir>/client/src/$1',
+    '@assets/(.*)': '<rootDir>/attached_assets/$1',
   },
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js)',
@@ -31,6 +33,15 @@ const config: Config = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testEnvironmentOptions: {
     customExportConditions: ['node', 'node-addons']
+  },
+  globals: {
+    'import.meta': {
+      env: {
+        DEV: true,
+        VITE_SUPABASE_URL: 'http://test-supabase-url',
+        VITE_SUPABASE_ANON_KEY: 'test-anon-key'
+      }
+    }
   }
 };
 
