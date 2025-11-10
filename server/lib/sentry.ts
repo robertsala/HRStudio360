@@ -24,7 +24,7 @@ export function initSentry() {
     release: `hrstudio360@${process.env.APP_VERSION || '1.0.0'}`,
     
     // Privacy settings
-    beforeSend(event, hint) {
+    beforeSend(event) {
       // Don't send events in development unless explicitly enabled
       if (process.env.NODE_ENV === 'development' && !process.env.SENTRY_DEBUG) {
         return null;
