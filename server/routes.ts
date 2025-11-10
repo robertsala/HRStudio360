@@ -1215,4 +1215,29 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // New hires endpoint
+  app.post('/api/new-hires', async (req, res) => {
+    try {
+      const { insertNewHireSchema } = await import('../shared/schema.js');
+      
+      // Validate request body
+      const validatedData = insertNewHireSchema.parse(req.body);
+      
+      // Check if email already exists
+      const existingHire = await storage.getNewHireByEmail(validatedData.email);
+      if (existingHire) {
+        return res.status(409).json({ error: 'A new hire with this email already exists' });
+      }
+      
+      // Create new hire
+      const newHire = await storage.createNewHire(validatedData);
+      res.status(201).json(newHire);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
 }

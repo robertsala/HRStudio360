@@ -6,6 +6,7 @@ import type {
   LeaveRequest, InsertLeaveRequest,
   LeaveBalance, InsertLeaveBalance,
   Candidate, InsertCandidate,
+  NewHire, InsertNewHire,
   ExpenseCategory, InsertExpenseCategory,
   Expense, InsertExpense,
   ChatChannel, InsertChatChannel,
@@ -27,7 +28,7 @@ import type {
 } from '../shared/schema.js';
 import { 
   profiles, announcements, employees, leaveRequests, leaveBalances,
-  candidates, expenseCategories, expenses, departments,
+  candidates, newHires, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   userNotifications, collaboratorInvitations,
   changeLog, historicalChanges, changeNotifications,
@@ -165,6 +166,10 @@ export interface IStorage {
   
   // User Permissions
   getUserPermissions(userId: string): Promise<import('../shared/schema.js').UserPermissions>;
+  
+  // New Hires
+  createNewHire(newHire: import('../shared/schema.js').InsertNewHire): Promise<import('../shared/schema.js').NewHire>;
+  getNewHireByEmail(email: string): Promise<import('../shared/schema.js').NewHire | undefined>;
 }
 
 // Database storage implementation
@@ -883,6 +888,17 @@ export class DbStorage implements IStorage {
       };
     }
     
+    return result[0];
+  }
+
+  // New Hires
+  async createNewHire(newHire: import('../shared/schema.js').InsertNewHire): Promise<import('../shared/schema.js').NewHire> {
+    const result = await db.insert(newHires).values(newHire).returning();
+    return result[0];
+  }
+
+  async getNewHireByEmail(email: string): Promise<import('../shared/schema.js').NewHire | undefined> {
+    const result = await db.select().from(newHires).where(eq(newHires.email, email));
     return result[0];
   }
 }

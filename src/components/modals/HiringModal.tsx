@@ -596,8 +596,28 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
 
     setIsConverting(true);
     try {
-      // TODO: Add backend endpoint for converting candidates to new hires
-      // For now, just update status locally
+      // Create new hire record
+      const response = await fetch('/api/new-hires', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: newHireForm.first_name,
+          lastName: newHireForm.last_name,
+          email: newHireForm.email,
+          position: newHireForm.role,
+          department: newHireForm.department,
+          startDate: newHireForm.start_date,
+          salary: newHireForm.salary,
+          status: 'Pending'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create new hire record');
+      }
+
+      // Update candidate status to Hired
       await apiClient.updateCandidate(selectedCandidate.id, { status: 'Hired' });
 
       setCandidates(candidates.map(c =>
@@ -609,7 +629,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
       setShowConfetti(true);
       setNotification({
         type: 'success',
-        message: `${newHireForm.first_name} ${newHireForm.last_name} successfully hired!`
+        message: `${newHireForm.first_name} ${newHireForm.last_name} successfully hired and added to onboarding!`
       });
 
       setTimeout(() => {
@@ -621,7 +641,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
       console.error('Error converting to new hire:', error);
       setNotification({
         type: 'error',
-        message: 'Failed to convert candidate to new hire. Please try again.'
+        message: error.message || 'Failed to convert candidate to new hire. Please try again.'
       });
       setTimeout(() => setNotification(null), 3000);
     } finally {
