@@ -819,8 +819,8 @@ export interface UserPermissions {
 export interface WorkforceMetrics {
   totalEmployees: number;
   newHires: number;
-  departures: number;
-  remoteWorkers: number;
+  departures?: number; // Optional until termination_date field exists
+  remoteWorkers?: number; // Optional until is_remote field exists
   departmentBreakdown: Array<{
     department: string;
     count: number;

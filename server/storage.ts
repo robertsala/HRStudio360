@@ -955,15 +955,14 @@ export class DbStorage implements IStorage {
       .where(eq(employees.status, 'Active'))
       .groupBy(profiles.department);
     
-    // Note: departures and remoteWorkers omitted until schema supports them
-    // TODO: Add termination_date to employees table for reliable departures
+    // Note: departures and remoteWorkers omitted from response until schema supports them
+    // TODO: Add termination_date to employees table for reliable departures tracking
     // TODO: Add is_remote to profiles table for remote worker tracking
     
     return {
       totalEmployees,
       newHires,
-      departures: 0, // Excluded until termination_date field exists
-      remoteWorkers: 0, // Excluded until is_remote field exists
+      // departures and remoteWorkers omitted (not returned) until supported by schema
       departmentBreakdown: departmentData.map(d => ({
         department: d.department || 'Unknown',
         count: d.count
@@ -972,34 +971,51 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getPerformanceMetrics(_timeRange: string): Promise<import('../shared/schema.js').PerformanceMetrics> {
-    // Import performance reviews table
-    const { performanceReviews } = await import('../shared/schema.js');
+  async getPerformanceMetrics(timeRange: string): Promise<import('../shared/schema.js').PerformanceMetrics> {
+    // Import performance reviews and responses tables
+    const { performanceReviews, reviewResponses } = await import('../shared/schema.js');
+    const { startDate } = this.getDateRange(timeRange);
     
-    // Get average performance score from manager ratings
+    // Build time range filter condition using managerAssessmentSubmittedAt
+    const timeFilter = gte(performanceReviews.managerAssessmentSubmittedAt, startDate);
+    
+    // Get average performance score from manager ratings (time-filtered)
     const avgScoreResult = await db.select({
       avg: drizzleSql<number>`AVG(${performanceReviews.managerOverallRating})::numeric`
-    }).from(performanceReviews);
+    })
+      .from(performanceReviews)
+      .where(and(isNotNull(performanceReviews.managerAssessmentSubmittedAt), timeFilter));
     const avgPerformanceScore = Number(avgScoreResult[0]?.avg || 0);
     
-    // Get total reviews
+    // Get total reviews (time-filtered by manager submission)
     const totalResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
-      .from(performanceReviews);
+      .from(performanceReviews)
+      .where(and(isNotNull(performanceReviews.managerAssessmentSubmittedAt), timeFilter));
     const reviewsTotal = totalResult[0]?.count || 0;
     
-    // Get completed reviews (where both self and manager assessments are submitted)
+    // Get completed reviews (time-filtered)
     const completedResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
       .from(performanceReviews)
-      .where(eq(performanceReviews.overallStatus, 'completed'));
+      .where(and(
+        eq(performanceReviews.overallStatus, 'completed'),
+        isNotNull(performanceReviews.managerAssessmentSubmittedAt),
+        timeFilter
+      ));
     const reviewsCompleted = completedResult[0]?.count || 0;
     
-    // Get goals achieved (reviews with rating >= 4.0)
-    const goalsResult = await db.select({ count: drizzleSql<number>`count(*)::int` })
-      .from(performanceReviews)
-      .where(gte(performanceReviews.managerOverallRating, drizzleSql`4.0`));
+    // Get goals achieved from review_responses (ratings >= 4.0 for goal-type questions, time-filtered)
+    // Join with performance_reviews to apply time filter
+    const goalsResult = await db.select({ count: drizzleSql<number>`count(distinct ${reviewResponses.performanceReviewId})::int` })
+      .from(reviewResponses)
+      .leftJoin(performanceReviews, eq(reviewResponses.performanceReviewId, performanceReviews.id))
+      .where(and(
+        gte(reviewResponses.rating, drizzleSql`4.0`),
+        isNotNull(performanceReviews.managerAssessmentSubmittedAt),
+        gte(performanceReviews.managerAssessmentSubmittedAt, startDate)
+      ));
     const goalsAchieved = goalsResult[0]?.count || 0;
     
-    // Get rating distribution (GROUP BY rounded rating)
+    // Get rating distribution (time-filtered, GROUP BY rounded rating)
     const ratingDist = await db.select({
       rating: drizzleSql<string>`CASE 
         WHEN ${performanceReviews.managerOverallRating} >= 5.0 THEN '5.0'
@@ -1011,7 +1027,11 @@ export class DbStorage implements IStorage {
       count: drizzleSql<number>`count(*)::int`
     })
       .from(performanceReviews)
-      .where(isNotNull(performanceReviews.managerOverallRating))
+      .where(and(
+        isNotNull(performanceReviews.managerOverallRating),
+        isNotNull(performanceReviews.managerAssessmentSubmittedAt),
+        timeFilter
+      ))
       .groupBy(drizzleSql`CASE 
         WHEN ${performanceReviews.managerOverallRating} >= 5.0 THEN '5.0'
         WHEN ${performanceReviews.managerOverallRating} >= 4.0 THEN '4.0-4.9'
