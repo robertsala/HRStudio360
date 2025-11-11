@@ -25,15 +25,19 @@ Your repository is ready to deploy! The correct Supabase credentials are already
 4. **Add Environment Variables**
    Click "Environment Variables" and add these **TWO** variables:
 
+   **Important**: Get these values from your [Supabase Dashboard → Project Settings → API](https://supabase.com/dashboard/project/cgqoazepziswoziybhiz/settings/api)
+
    ```
    Variable Name: VITE_SUPABASE_URL
-   Value: https://cgqoazepziswoziybhiz.supabase.co
+   Value: [Your Project URL from Supabase Dashboard]
    ```
 
    ```
    Variable Name: VITE_SUPABASE_ANON_KEY
-   Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNncW9hemVwemlzd296aXliaGl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTgwNDEsImV4cCI6MjA3NzQzNDA0MX0.WGxrf8LVcSXVfRH1OM2mlnNJfxwWKP-PewgSeq_rHeM
+   Value: [Your anon/public key from Supabase Dashboard]
    ```
+   
+   **Security Note**: Never commit these values to your Git repository. Always use environment variables or secrets management.
 
 5. **Deploy!**
    - Click "Deploy"
