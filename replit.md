@@ -66,11 +66,28 @@ The backend is an Express.js server providing a RESTful API across 29 database t
 
 ### Data Storage
 
-The project utilizes a PostgreSQL database (Neon-backed) with its schema defined by Drizzle ORM. Key tables include `profiles`, `employees`, `leave_requests`, `pay_stubs`, `celebration_badges`, `channels`, `performance_reviews`, and `announcements`. Drizzle Kit manages migrations. The backend provides a complete RESTful API for all data, with ongoing migration of frontend components to this API.
+The project utilizes a PostgreSQL database (Neon-backed) with its schema defined by Drizzle ORM. Key tables include `profiles`, `auth_credentials`, `employees`, `leave_requests`, `pay_stubs`, `celebration_badges`, `channels`, `performance_reviews`, and `announcements`. Drizzle Kit manages migrations. The backend provides a complete RESTful API for all data, with ongoing migration of frontend components to this API.
 
 ### Authentication & Authorization
 
-Authentication is managed by the backend Express API using server-side sessions (`express-session`). `AuthContext` in the frontend handles authentication state, session validation, and refresh. An impersonation feature is available for administrators.
+Authentication is managed by the backend Express API using server-side sessions (`express-session`) with secure password-based authentication:
+
+**Password Security (Security Audit Compliant):**
+- **Argon2id hashing**: OWASP-compliant settings (64MB memory, timeCost 3, parallelism 1)
+- **Password requirements**: Minimum 12 characters with at least 3 of 4 character classes (uppercase, lowercase, numbers, special characters)
+- **Common password denylist**: Prevents weak passwords
+- **Progressive account lockout**: 5 failed attempts → 15min lock, 10 attempts → 30min, 15+ → 1 hour
+- **Rate limiting**: 5 authentication requests per 15 minutes per IP address
+- **Database table**: `auth_credentials` stores hashed passwords, failed attempt counters, and lockout timestamps
+
+**Session Management:**
+- `AuthContext` in the frontend handles authentication state, session validation, and refresh
+- Session regeneration on login prevents fixation attacks
+- httpOnly cookies for session security
+
+**Special Access:**
+- **Demo account**: Passwordless authentication for `demo@hrstudio360.com` for ease of access
+- **Impersonation feature**: Available for administrators
 
 ### Real-time Features
 
@@ -114,6 +131,7 @@ Sentry is integrated for comprehensive error tracking and performance monitoring
 
 -   **Core Framework**: `react`, `react-dom`, `typescript`, `vite`, `express`.
 -   **Database & ORM**: `drizzle-orm`, `drizzle-kit`, `drizzle-zod`, `@neondatabase/serverless`.
+-   **Authentication & Security**: `argon2`, `express-rate-limit`, `express-session`.
 -   **Supabase Client**: `@supabase/supabase-js`.
 -   **UI Libraries**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`.
 -   **Forms & Validation**: `react-hook-form`, `@hookform/resolvers`, `zod`.
