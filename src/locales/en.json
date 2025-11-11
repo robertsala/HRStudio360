@@ -170,7 +170,7 @@
     "sendResetLink": "Send Reset Link",
     "sending": "Sending...",
     "checkYourEmail": "Check Your Email",
-    "resetLinkSent": "If an account exists with <1>{{email}}</1>, you'll receive a password reset link shortly.",
+    "resetLinkSent": "If an account exists with {{email}}, you'll receive a password reset link shortly.",
     "resetLinkExpiry": "The link will expire in 30 minutes.",
     "backToSignIn": "Back to Sign In",
     "resetPassword": "Reset Password",
@@ -192,7 +192,12 @@
     "close": "Close",
     "passwordsDoNotMatch": "Passwords do not match",
     "passwordTooShort": "Password must be at least 12 characters",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "invalidOrMissingToken": "Invalid or missing reset token",
+    "passwordResetFailed": "Failed to reset password. Please try again.",
+    "forgotPasswordFailed": "Failed to send reset link. Please try again.",
+    "emailRequired": "Please enter your email address",
+    "emailInvalid": "Please enter a valid email address"
   },
   "language": {
     "selectLanguage": "Select Language",

@@ -31,12 +31,12 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send reset email');
+        throw new Error(data.error || t('auth.forgotPasswordFailed'));
       }
 
       setSuccess(true);
     } catch (error: any) {
-      setError(error.message || 'An error occurred. Please try again.');
+      setError(error.message || t('auth.forgotPasswordFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -73,37 +73,37 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
           <div className="text-center py-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Check Your Email
+              {t('auth.checkYourEmail')}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              If an account exists with <strong>{email}</strong>, you'll receive a password reset link shortly.
+              {t('auth.resetLinkSent', { email })}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              The link will expire in 30 minutes.
+              {t('auth.resetLinkExpiry')}
             </p>
             <button
               onClick={handleClose}
               className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               data-testid="button-close-success"
             >
-              Close
+              {t('auth.close')}
             </button>
           </div>
         ) : (
           <>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Forgot Password?
+                {t('auth.forgotPasswordTitle')}
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                Enter your email address and we'll send you a link to reset your password.
+                {t('auth.forgotPasswordDescription')}
               </p>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Email Address
+                  {t('auth.emailAddress')}
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -113,7 +113,7 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="your@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     required
                     data-testid="input-reset-email"
                   />
@@ -132,7 +132,7 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
                 className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                 data-testid="button-send-reset-link"
               >
-                {isLoading ? 'Sending...' : 'Send Reset Link'}
+                {isLoading ? t('auth.sending') : t('auth.sendResetLink')}
               </button>
             </form>
 
@@ -142,7 +142,7 @@ const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClo
                 className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
                 data-testid="button-back-to-sign-in"
               >
-                Back to Sign In
+                {t('auth.backToSignIn')}
               </button>
             </div>
           </>

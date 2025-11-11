@@ -18,11 +18,11 @@ const ResetPasswordPage: React.FC = () => {
     const tokenParam = urlParams.get('token');
     
     if (!tokenParam) {
-      setError('Invalid or missing reset token');
+      setError(t('auth.invalidOrMissingToken'));
     } else {
       setToken(tokenParam);
     }
-  }, []);
+  }, [t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,13 +30,13 @@ const ResetPasswordPage: React.FC = () => {
     setError('');
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsDoNotMatch'));
       setIsLoading(false);
       return;
     }
 
     if (newPassword.length < 12) {
-      setError('Password must be at least 12 characters');
+      setError(t('auth.passwordTooShort'));
       setIsLoading(false);
       return;
     }
@@ -51,7 +51,7 @@ const ResetPasswordPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to reset password');
+        throw new Error(data.error || t('auth.passwordResetFailed'));
       }
 
       setSuccess(true);
@@ -60,7 +60,7 @@ const ResetPasswordPage: React.FC = () => {
         window.location.href = '/';
       }, 3000);
     } catch (error: any) {
-      setError(error.message || 'An error occurred. Please try again.');
+      setError(error.message || t('auth.passwordResetFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +71,7 @@ const ResetPasswordPage: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">{t('auth.loading')}</p>
         </div>
       </div>
     );
@@ -84,51 +84,51 @@ const ResetPasswordPage: React.FC = () => {
           <div className="text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Password Reset Successful!
+              {t('auth.passwordResetSuccessful')}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Your password has been successfully reset. You'll be redirected to the login page in a few seconds.
+              {t('auth.passwordResetSuccessMessage')}
             </p>
             <button
               onClick={() => window.location.href = '/'}
               className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               data-testid="button-go-to-login"
             >
-              Go to Login
+              {t('auth.goToLogin')}
             </button>
           </div>
         ) : error && !token ? (
           <div className="text-center">
             <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Invalid Reset Link
+              {t('auth.invalidResetLink')}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              This password reset link is invalid or has expired. Please request a new one.
+              {t('auth.invalidResetLinkMessage')}
             </p>
             <button
               onClick={() => window.location.href = '/'}
               className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               data-testid="button-back-to-home"
             >
-              Back to Home
+              {t('auth.backToHome')}
             </button>
           </div>
         ) : (
           <>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Reset Your Password
+                {t('auth.resetYourPassword')}
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                Enter your new password below.
+                {t('auth.enterNewPassword')}
               </p>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  New Password
+                  {t('auth.newPassword')}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -138,7 +138,7 @@ const ResetPasswordPage: React.FC = () => {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="Enter new password"
+                    placeholder={t('auth.enterNewPasswordPlaceholder')}
                     required
                     minLength={12}
                     data-testid="input-new-password"
@@ -152,13 +152,13 @@ const ResetPasswordPage: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Must be at least 12 characters with uppercase, lowercase, numbers, and special characters
+                  {t('auth.passwordRequirements')}
                 </p>
               </div>
 
               <div className="mb-4">
                 <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Confirm New Password
+                  {t('auth.confirmNewPassword')}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -168,7 +168,7 @@ const ResetPasswordPage: React.FC = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="Confirm new password"
+                    placeholder={t('auth.confirmNewPasswordPlaceholder')}
                     required
                     minLength={12}
                     data-testid="input-confirm-password"
@@ -195,7 +195,7 @@ const ResetPasswordPage: React.FC = () => {
                 className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                 data-testid="button-reset-password"
               >
-                {isLoading ? 'Resetting Password...' : 'Reset Password'}
+                {isLoading ? t('auth.resettingPassword') : t('auth.resetPassword')}
               </button>
             </form>
 
@@ -205,7 +205,7 @@ const ResetPasswordPage: React.FC = () => {
                 className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
                 data-testid="button-cancel-reset"
               >
-                Cancel
+                {t('auth.cancel')}
               </button>
             </div>
           </>
