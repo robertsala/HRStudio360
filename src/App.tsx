@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Route, Switch } from 'wouter';
+import { useState, useRef } from 'react';
+import { Route, Switch, useLocation } from 'wouter';
 import Layout from './components/Layout';
 import Hero from './components/Hero';
 import Problems from './components/Problems';
@@ -16,43 +16,26 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'profile' | 'reset-password'>('landing');
   const { isAuthenticated, isLoading, celebration, dismissCelebration, user } = useAuth();
   const dashboardRef = useRef<any>(null);
+  const [, setLocation] = useLocation();
 
-  // --- AUTHENTICATION REDIRECT LOGIC ---
-  useEffect(() => {
-    if (isAuthenticated) {
-      // If the user is authenticated and on landing, redirect to dashboard
-      if (currentView === 'landing') {
-        setCurrentView('dashboard');
-      }
-    } else {
-      // If the user is NOT authenticated, show landing (unless on reset-password)
-      if (currentView !== 'landing' && currentView !== 'reset-password') {
-        setCurrentView('landing');
-      }
-    }
-  }, [isAuthenticated, currentView]);
-
-  // Handle navigation (this part is good)
-  const handleNavigation = (view: 'landing' | 'dashboard' | 'profile' | 'reset-password') => {
-    if (!isAuthenticated && view !== 'landing' && view !== 'reset-password') {
-      // Don't allow navigation to protected views when not authenticated
+  // Handle navigation
+  const handleNavigation = (view: 'landing' | 'dashboard' | 'profile') => {
+    if (!isAuthenticated && view !== 'landing') {
       return;
     }
-    setCurrentView(view);
+    
+    if (view === 'landing') setLocation('/');
+    else if (view === 'dashboard') setLocation('/dashboard');
+    else if (view === 'profile') setLocation('/profile');
   };
 
-  // Handle opening modals from sidebar (this part is good)
+  // Handle opening modals from sidebar
   const handleOpenModal = (modalName: string) => {
     console.log('[App.tsx] handleOpenModal called with:', modalName);
-    console.log('[App.tsx] dashboardRef.current:', dashboardRef.current);
     if (dashboardRef.current && dashboardRef.current.openModal) {
-      console.log('[App.tsx] Calling dashboardRef.current.openModal');
       dashboardRef.current.openModal(modalName);
-    } else {
-      console.error('[App.tsx] dashboardRef.current or openModal not available');
     }
   };
 
@@ -68,44 +51,37 @@ function App() {
     );
   }
 
-  // Render logic based on currentView
-  if (currentView === 'dashboard') {
-    return (
-      <Layout currentView={currentView} onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
-        <ProtectedRoute>
-          <Dashboard ref={dashboardRef} />
-        </ProtectedRoute>
-      </Layout>
-    );
-  }
-
-  if (currentView === 'profile') {
-    return (
-      <Layout currentView={currentView} onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
-        <ProtectedRoute>
-          <UserProfile onNavigate={handleNavigation} />
-        </ProtectedRoute>
-      </Layout>
-    );
-  }
-
   return (
     <>
       <Switch>
         {/* Password reset route - accessible without authentication */}
-        <Route path="/reset-password">
-          <ResetPasswordPage />
+        <Route path="/reset-password" component={ResetPasswordPage} />
+
+        {/* Dashboard route - protected */}
+        <Route path="/dashboard">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+            <ProtectedRoute>
+              <Dashboard ref={dashboardRef} />
+            </ProtectedRoute>
+          </Layout>
         </Route>
 
-        {/* All other routes use the Layout */}
-        <Route>
-          <Layout currentView={currentView} onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+        {/* Profile route - protected */}
+        <Route path="/profile">
+          <Layout currentView="profile" onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+            <ProtectedRoute>
+              <UserProfile onNavigate={handleNavigation} />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        {/* Landing page - default route */}
+        <Route path="/">
+          <Layout currentView="landing" onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
             <Hero />
             <Problems />
             <Features />
             <Advantages />
-            {/* Calendar component was imported but not used, uncomment if needed */}
-            {/* <Calendar /> */}
             <Contact />
             <Footer />
           </Layout>
