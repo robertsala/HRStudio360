@@ -78,14 +78,12 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('department, role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      setUserProfile(data);
+      const response = await fetch(`/api/profiles/${user.id}`);
+      if (!response.ok) {
+        throw new Error('Failed to load user profile');
+      }
+      const data = await response.json();
+      setUserProfile({ department: data.department, role: data.role });
     } catch (error) {
       console.error('Error loading user profile:', error);
     }
@@ -196,23 +194,25 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
         title: formData.title.trim(),
         content: formData.content.trim(),
         priority: formData.priority,
-        target_audience_type: formData.target_audience_type,
-        target_employee_ids: formData.target_audience_type === 'specific_employees' ? formData.target_employee_ids : [],
-        target_departments: formData.target_audience_type === 'departments' ? formData.target_departments : [],
-        target_locations: formData.target_audience_type === 'locations' ? formData.target_locations : [],
+        targetAudienceType: formData.target_audience_type === 'all' ? 'all_employees' : formData.target_audience_type,
+        specificEmployeeIds: formData.target_audience_type === 'specific_employees' ? formData.target_employee_ids : [],
+        departments: formData.target_audience_type === 'departments' ? formData.target_departments : [],
+        locations: formData.target_audience_type === 'locations' ? formData.target_locations : [],
         published: formData.publish_immediately,
-        published_at: formData.publish_immediately ? new Date().toISOString() : null,
-        expires_at: formData.expires_at || null,
-        created_by: user.id
+        publicationDate: formData.publish_immediately ? new Date().toISOString() : null,
+        expirationDate: formData.expires_at || null,
+        creatorUserId: user.id
       };
 
-      const { data, error } = await supabase
-        .from('announcements')
-        .insert(announcementData)
-        .select()
-        .single();
+      const response = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(announcementData)
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to create announcement');
+      }
 
       setToast({ message: 'Announcement created successfully!', type: 'success' });
       setTimeout(() => {
@@ -253,15 +253,14 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
     if (!user) return;
 
     try {
-      const { error } = await supabase
-        .from('announcement_reads')
-        .insert({
-          announcement_id: announcementId,
-          user_id: user.id
-        });
+      const response = await fetch(`/api/announcements/${announcementId}/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
 
-      if (error && error.code !== '23505') {
-        throw error;
+      if (!response.ok && response.status !== 409) {
+        throw new Error('Failed to mark announcement as read');
       }
     } catch (error) {
       console.error('Error marking announcement as read:', error);
@@ -298,22 +297,24 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
         title: formData.title.trim(),
         content: formData.content.trim(),
         priority: formData.priority,
-        target_audience_type: formData.target_audience_type,
-        target_employee_ids: formData.target_audience_type === 'specific_employees' ? formData.target_employee_ids : [],
-        target_departments: formData.target_audience_type === 'departments' ? formData.target_departments : [],
-        target_locations: formData.target_audience_type === 'locations' ? formData.target_locations : [],
+        targetAudienceType: formData.target_audience_type === 'all' ? 'all_employees' : formData.target_audience_type,
+        specificEmployeeIds: formData.target_audience_type === 'specific_employees' ? formData.target_employee_ids : [],
+        departments: formData.target_audience_type === 'departments' ? formData.target_departments : [],
+        locations: formData.target_audience_type === 'locations' ? formData.target_locations : [],
         published: formData.publish_immediately,
-        published_at: formData.publish_immediately ? new Date().toISOString() : null,
-        expires_at: formData.expires_at || null,
-        updated_at: new Date().toISOString()
+        publicationDate: formData.publish_immediately ? new Date().toISOString() : null,
+        expirationDate: formData.expires_at || null
       };
 
-      const { error } = await supabase
-        .from('announcements')
-        .update(announcementData)
-        .eq('id', editingAnnouncementId);
+      const response = await fetch(`/api/announcements/${editingAnnouncementId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(announcementData)
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to update announcement');
+      }
 
       setToast({ message: 'Announcement updated successfully!', type: 'success' });
       setTimeout(() => {
@@ -330,12 +331,13 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
 
   const handleDeleteAnnouncement = async (announcementId: string) => {
     try {
-      const { error } = await supabase
-        .from('announcements')
-        .delete()
-        .eq('id', announcementId);
+      const response = await fetch(`/api/announcements/${announcementId}`, {
+        method: 'DELETE'
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to delete announcement');
+      }
 
       setToast({ message: 'Announcement deleted successfully!', type: 'success' });
       setTimeout(() => {
