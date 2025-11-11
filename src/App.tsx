@@ -37,13 +37,18 @@ function App() {
 
   // --- REFINED AUTHENTICATION REDIRECT LOGIC ---
   useEffect(() => {
+    // Don't redirect if we're on the reset-password page
+    if (window.location.pathname === '/reset-password') {
+      return;
+    }
+
     if (isAuthenticated) {
       // If the user is authenticated and on landing, redirect to dashboard
       if (currentView === 'landing') {
         setCurrentView('dashboard');
       }
     } else {
-      // If the user is NOT authenticated, allow landing and reset-password
+      // If the user is NOT authenticated, show landing (unless on reset-password)
       if (currentView !== 'landing' && currentView !== 'reset-password') {
         setCurrentView('landing');
       }
