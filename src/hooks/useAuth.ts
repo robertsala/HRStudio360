@@ -88,11 +88,10 @@ export const useAuth = () => {
       if (error) throw error;
 
       if (data.user) {
-        await loadUserProfile(data.user.id, data.user.email || '');
+        await loadUserProfile(data.user.id, data.user.email!);
       }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      throw error;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign in');
     }
   };
 
@@ -100,42 +99,31 @@ export const useAuth = () => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName
+          }
+        }
       });
 
       if (error) throw error;
 
       if (data.user) {
-        // Create profile
-        await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            first_name: firstName,
-            last_name: lastName
-          });
-
-        await loadUserProfile(data.user.id, data.user.email || '');
+        await loadUserProfile(data.user.id, data.user.email!);
       }
-    } catch (error) {
-      console.error('Sign up error:', error);
-      throw error;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign up');
     }
   };
 
   const signOut = async () => {
     try {
-      // Sign out from Supabase - this triggers SIGNED_OUT event
       await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Sign out exception:', error);
-      // Still clear local state on error
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
+      setAuthState({ user: null, isAuthenticated: false, isLoading: false });
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to sign out');
     }
   };
 
@@ -143,19 +131,6 @@ export const useAuth = () => {
     ...authState,
     signIn,
     signUp,
-    signOut,
-    updateProfilePicture: async (pictureUrl: string) => {
-      if (authState.user) {
-        await supabase
-          .from('profiles')
-          .update({ profile_picture: pictureUrl })
-          .eq('id', authState.user.id);
-
-        setAuthState(prev => ({
-          ...prev,
-          user: prev.user ? { ...prev.user, profilePicture: pictureUrl } : null
-        }));
-      }
-    }
+    signOut
   };
 };

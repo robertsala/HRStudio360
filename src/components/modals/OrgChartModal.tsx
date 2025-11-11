@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, GitBranch, User, Search, ChevronDown, ChevronRight, Mail, Phone, Briefcase, Building2, Sparkles, Download, Layout, Grid, List, BarChart2, Users as UsersIcon, TrendingUp, Move, Eye, FileText, Image, Presentation } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuthContext } from '../../contexts/AuthContext';
 import { mockOrgChartEmployees, type MockEmployee } from '../../data/mockOrgChartEmployees';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -38,7 +38,7 @@ type ViewMode = 'flowchart' | 'tree' | 'grid' | 'compact';
 type ColorMode = 'department' | 'level' | 'none';
 
 const OrgChartModal: React.FC<OrgChartModalProps> = ({ onClose }) => {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [orgData, setOrgData] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

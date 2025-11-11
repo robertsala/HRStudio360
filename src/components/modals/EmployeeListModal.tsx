@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Filter, Mail, Phone, MapPin, User, Building, Briefcase, Calendar, Eye, Clock, DollarSign, Award, TrendingUp, Users, Star, CheckCircle, AlertTriangle, X, Plus, CreditCard as Edit3, LayoutGrid, List, Sparkles, Trophy, Medal, Shield } from 'lucide-react';
 import { mockOrgChartEmployees, type MockEmployee } from '../../data/mockOrgChartEmployees';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuthContext } from '../../contexts/AuthContext';
 
 interface Employee {
   id: string;
@@ -536,7 +536,7 @@ const _originalMockEmployees: Employee[] = [
 ];
 
 const EmployeeListModal: React.FC<EmployeeListModalProps> = ({ employees, onViewProfile, userRole = 'employee', onClose, initialFilter }) => {
-  const { user, startImpersonation } = useAuth();
+  const { user, startImpersonation } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('All');
   const [filterEmployeeType, setFilterEmployeeType] = useState('All');

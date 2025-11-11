@@ -25,7 +25,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuthContext } from '../../contexts/AuthContext';
 
 interface Category {
   id: string;
@@ -74,7 +74,7 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
 };
 
 export default function KnowledgeBaseModal({ isOpen, onClose }: KnowledgeBaseModalProps) {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [view, setView] = useState<'browse' | 'article' | 'search'>('browse');
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);

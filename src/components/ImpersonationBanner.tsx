@@ -1,11 +1,11 @@
 import React from 'react';
 import { X, Eye, AlertTriangle } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthContext } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 
 const ImpersonationBanner: React.FC = () => {
   const { t } = useTranslation();
-  const { isImpersonating, impersonatedUser, actualUser, stopImpersonation } = useAuth();
+  const { isImpersonating, impersonatedUser, actualUser, stopImpersonation } = useAuthContext();
 
   if (!isImpersonating || !impersonatedUser || !actualUser) {
     return null;

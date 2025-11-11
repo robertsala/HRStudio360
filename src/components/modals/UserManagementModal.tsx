@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Shield, Search, Save, Edit, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuthContext } from '../../contexts/AuthContext';
 
 interface UserManagementModalProps {
   onClose?: () => void;
@@ -39,7 +39,7 @@ const ROLES = [
 ];
 
 const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) => {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
