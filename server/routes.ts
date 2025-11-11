@@ -14,6 +14,18 @@ import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './em
 import { seedProductionDatabase } from './seed-production.js';
 
 export function registerRoutes(app: Express) {
+  // Helper function to check if user can manage announcements
+  async function canManageAnnouncements(userId: string): Promise<boolean> {
+    try {
+      const profile = await storage.getProfileById(userId);
+      if (!profile) return false;
+      
+      return profile.department === 'HR' || profile.role === 'Product Owner';
+    } catch (error) {
+      return false;
+    }
+  }
+
   // Profile routes
   app.get('/api/profiles', async (req, res) => {
     try {
