@@ -50,7 +50,33 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/profiles', async (req, res) => {
     try {
-      const validated = insertProfileSchema.parse(req.body);
+      // Require authentication
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has permission to create profiles with elevated roles
+      const hasPrivilegedRole = await canManageAnnouncements(userId);
+      
+      // Extract role and department from request
+      const { role, department, ...basicFields } = req.body;
+      const requestingElevatedRole = role === 'Product Owner' || role === 'Admin';
+      const requestingHRDepartment = department === 'HR';
+
+      // Only privileged users can create profiles with elevated roles or HR department
+      if ((requestingElevatedRole || requestingHRDepartment) && !hasPrivilegedRole) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create profiles with elevated roles' 
+        });
+      }
+
+      // Build the profile data with safe defaults for non-privileged users
+      const profileData = hasPrivilegedRole 
+        ? req.body 
+        : { ...basicFields, role: role || 'Employee', department: department || 'General' };
+
+      const validated = insertProfileSchema.parse(profileData);
       const profile = await storage.createProfile(validated);
       res.status(201).json(profile);
     } catch (error: any) {
@@ -60,7 +86,40 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/profiles/:id', async (req, res) => {
     try {
-      const profile = await storage.updateProfile(req.params.id, req.body);
+      // Require authentication
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const targetProfileId = req.params.id;
+      const isOwnProfile = userId === targetProfileId;
+      
+      // Check if user has permission to manage profiles
+      const hasPrivilegedRole = await canManageAnnouncements(userId);
+      
+      // Restrict who can edit which profiles
+      if (!isOwnProfile && !hasPrivilegedRole) {
+        return res.status(403).json({ error: 'Forbidden: You can only edit your own profile' });
+      }
+
+      // Extract sensitive fields from the update payload
+      const { role, department, ...basicFields } = req.body;
+      const hasSensitiveFields = role !== undefined || department !== undefined;
+
+      // Only privileged users can change role/department
+      if (hasSensitiveFields && !hasPrivilegedRole) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can change role or department' 
+        });
+      }
+
+      // Build the final update payload
+      const updateData = hasSensitiveFields && hasPrivilegedRole
+        ? req.body  // Include all fields for privileged users
+        : basicFields;  // Only basic fields for regular users
+
+      const profile = await storage.updateProfile(targetProfileId, updateData);
       if (!profile) {
         return res.status(404).json({ error: 'Profile not found' });
       }
