@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, CheckCircle, AlertTriangle, Eye, Download, FileText, User, Tag, Building2 } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PayrollExpenseReviewModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ const PayrollExpenseReviewModal: React.FC<PayrollExpenseReviewModalProps> = ({
   payrollPeriodEnd,
   onExpenseDataUpdate
 }) => {
+  const { user } = useAuth();
   const [expenses, setExpenses] = useState<ExpenseForPayroll[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedExpenses, setSelectedExpenses] = useState<Set<string>>(new Set());
@@ -118,8 +120,8 @@ const PayrollExpenseReviewModal: React.FC<PayrollExpenseReviewModalProps> = ({
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const selectedExpensesList = expenses.filter(e => selectedExpenses.has(e.id));
       const totalAmount = selectedExpensesList.reduce((sum, e) => sum + e.amount, 0);

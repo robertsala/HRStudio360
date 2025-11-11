@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, AlertCircle, CheckCircle, Info, Clock, Trash2, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Notification {
   id: string;
@@ -85,6 +86,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({ onTakeAction, o
     };
   }, [onClose]);
 
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState(getMockNotifications(t));
   const [collaborationNotifications, setCollaborationNotifications] = useState<any[]>([]);
   const [filter, setFilter] = useState('All');

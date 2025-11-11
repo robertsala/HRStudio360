@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Search, Edit, Save, History, AlertCircle, TrendingUp, User, ArrowRight } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ReportingRelationshipsModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ const ReportingRelationshipsModal: React.FC<ReportingRelationshipsModalProps> = 
   isOpen,
   onClose
 }) => {
+  const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [relationships, setRelationships] = useState<ReportingRelationship[]>([]);
   const [history, setHistory] = useState<RelationshipHistory[]>([]);
@@ -200,8 +202,8 @@ const ReportingRelationshipsModal: React.FC<ReportingRelationshipsModalProps> = 
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const currentRel = relationships.find(r => r.employee_id === selectedEmployee);
       const employee = employees.find(e => e.id === selectedEmployee);

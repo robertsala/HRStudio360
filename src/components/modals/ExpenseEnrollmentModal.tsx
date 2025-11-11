@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Search, UserCheck, UserX, CreditCard as Edit, Save, Building2, DollarSign, Calendar, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 import { mockOrgChartEmployees, type MockEmployee } from '../../data/mockOrgChartEmployees';
 
 interface ExpenseEnrollmentModalProps {
@@ -37,6 +38,7 @@ const ExpenseEnrollmentModal: React.FC<ExpenseEnrollmentModalProps> = ({
   isOpen,
   onClose
 }) => {
+  const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [enrollments, setEnrollments] = useState<EnrollmentRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -182,8 +184,8 @@ const ExpenseEnrollmentModal: React.FC<ExpenseEnrollmentModalProps> = ({
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const enrollment = enrollments.find(e => e.employee_id === selectedEmployee);
 
@@ -245,8 +247,8 @@ const ExpenseEnrollmentModal: React.FC<ExpenseEnrollmentModalProps> = ({
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const deptEmployees = enrollments.filter(
         e => e.employee?.department === department && !e.is_enrolled

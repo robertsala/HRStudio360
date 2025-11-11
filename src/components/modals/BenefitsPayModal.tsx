@@ -3,6 +3,7 @@ import { X, DollarSign, Heart, FileText, Download, Eye, Calendar, TrendingUp, Aw
 import { generatePayStubPDF, generateW2PDF, generateBenefitsSummaryPDF } from '../../utils/pdfGenerator';
 import { getRandomFunFact, getCategoryIcon, getCategoryColor, getManualFunFact, getDailyUsageInfo, type FunFactResult, type DailyUsageInfo } from '../../utils/paycheckFunFacts';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface BenefitsPayModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface BenefitsPayModalProps {
 }
 
 const BenefitsPayModal: React.FC<BenefitsPayModalProps> = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedPayStub, setSelectedPayStub] = useState<any>(null);
   const [selectedW2, setSelectedW2] = useState<any>(null);

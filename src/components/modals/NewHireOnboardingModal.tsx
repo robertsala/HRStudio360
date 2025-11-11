@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Calendar, CheckCircle, Clock, AlertTriangle, Users, Briefcase, ChevronRight, Filter, Search } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface NewHireOnboardingModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ interface OnboardingTask {
 }
 
 export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboardingModalProps) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks'>('overview');
   const [newHires, setNewHires] = useState<NewHire[]>([]);
   const [selectedNewHire, setSelectedNewHire] = useState<NewHire | null>(null);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, Save, FileText, Calendar, User, MapPin, Clock, Activity, Users, Building, Shield, ClipboardList, Send, Plus } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 import BodyDiagram from '../BodyDiagram';
 import { mockEmployees } from '../../data/mockEmployees';
 
@@ -41,6 +42,7 @@ interface IncidentForm {
 }
 
 export default function WorkersCompensationModal({ isOpen, onClose }: WorkersCompensationModalProps) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'report' | 'incidents' | 'osha'>('report');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [incidents, setIncidents] = useState<any[]>([]);

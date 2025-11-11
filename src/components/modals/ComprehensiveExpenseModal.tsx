@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Upload, DollarSign, Calendar, Tag, FileText, CheckCircle, XCircle, Clock, Search, Filter, Download, Eye, Users, Settings, TrendingUp, AlertTriangle, BarChart3, UserCheck, Building2, Receipt, Sparkles, HelpCircle, Info } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ComprehensiveExpenseModalProps {
   isOpen: boolean;
@@ -72,6 +73,7 @@ const ComprehensiveExpenseModal: React.FC<ComprehensiveExpenseModalProps> = ({
   onClose,
   userRole = 'employee'
 }) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'my-expenses' | 'submit' | 'approvals' | 'enrollment' | 'categories' | 'vendors' | 'reports'>('my-expenses');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -155,8 +157,8 @@ const ComprehensiveExpenseModal: React.FC<ComprehensiveExpenseModalProps> = ({
 
   const loadExpenses = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
+      // User already available from useAuth hook
+      if (!user) return;
 
       let query = supabase
         .from('expenses')
@@ -248,8 +250,8 @@ const ComprehensiveExpenseModal: React.FC<ComprehensiveExpenseModalProps> = ({
 
   const loadEnrollmentStatus = async () => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
+      // User already available from useAuth hook
+      if (!user) return;
 
       const { data: empData } = await supabase
         .from('employees')
@@ -293,8 +295,8 @@ const ComprehensiveExpenseModal: React.FC<ComprehensiveExpenseModalProps> = ({
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const { data: employeeData } = await supabase
         .from('employees')
@@ -341,8 +343,8 @@ const ComprehensiveExpenseModal: React.FC<ComprehensiveExpenseModalProps> = ({
   const handleApproveExpense = async (expenseId: string, comments: string = '') => {
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const { error: updateError } = await supabase
         .from('expenses')
@@ -386,8 +388,8 @@ const ComprehensiveExpenseModal: React.FC<ComprehensiveExpenseModalProps> = ({
 
     setLoading(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      // User already available from useAuth hook
+      if (!user) throw new Error('Not authenticated');
 
       const { error: updateError } = await supabase
         .from('expenses')
