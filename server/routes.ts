@@ -1248,6 +1248,12 @@ export function registerRoutes(app: Express) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      // Check authorization
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Forbidden: Only HR department and Product Owners can create announcements' });
+      }
+
       // Validate request body
       const announcementData = {
         ...req.body,
@@ -1268,6 +1274,12 @@ export function registerRoutes(app: Express) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      // Check authorization
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Forbidden: Only HR department and Product Owners can edit announcements' });
+      }
+
       const { id } = req.params;
       const announcement = await storage.updateAnnouncement(id, req.body);
       
@@ -1286,6 +1298,12 @@ export function registerRoutes(app: Express) {
       const userId = (req.session as any).userId;
       if (!userId) {
         return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check authorization
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Forbidden: Only HR department and Product Owners can delete announcements' });
       }
 
       const { id } = req.params;
