@@ -725,15 +725,20 @@ export function registerRoutes(app: Express) {
       // Check if profile exists
       let profile = await storage.getProfileByEmail(email);
       
-      // Create demo profile if doesn't exist
+      // Only auto-create profile for the demo account
       if (!profile) {
-        profile = await storage.createProfile({
-          email,
-          firstName: 'Demo',
-          lastName: 'User',
-          role: 'admin',
-          department: 'IT'
-        });
+        // Only allow demo@hrstudio360.com to auto-create with admin role
+        if (email === 'demo@hrstudio360.com') {
+          profile = await storage.createProfile({
+            email,
+            firstName: 'Demo',
+            lastName: 'User',
+            role: 'Product Manager',
+            department: 'Product'
+          });
+        } else {
+          return res.status(401).json({ error: 'Invalid credentials. Please sign up first.' });
+        }
       }
       
       // Regenerate session to prevent fixation attacks
@@ -769,6 +774,52 @@ export function registerRoutes(app: Express) {
       res.clearCookie('connect.sid');
       res.json({ success: true });
     });
+  });
+
+  app.post('/api/auth/signup', async (req, res) => {
+    try {
+      const { email, firstName, lastName, preferredLanguage } = req.body;
+      
+      if (!email || !firstName || !lastName) {
+        return res.status(400).json({ error: 'Email, first name, and last name are required' });
+      }
+      
+      // Check if profile already exists
+      const existingProfile = await storage.getProfileByEmail(email);
+      if (existingProfile) {
+        return res.status(409).json({ error: 'An account with this email already exists' });
+      }
+      
+      // Create new profile
+      const profile = await storage.createProfile({
+        email,
+        firstName,
+        lastName,
+        role: 'employee',
+        department: 'General',
+        languagePreference: preferredLanguage || 'en'
+      });
+      
+      // Log the user in immediately by creating a session
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error('Session regeneration error:', err);
+          return res.status(500).json({ error: 'Signup successful but login failed' });
+        }
+        
+        (req.session as any).userId = profile.id;
+        
+        req.session.save((err) => {
+          if (err) {
+            console.error('Session save error:', err);
+            return res.status(500).json({ error: 'Signup successful but login failed' });
+          }
+          res.status(201).json({ user: profile });
+        });
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.get('/api/auth/session', async (req, res) => {

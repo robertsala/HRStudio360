@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../utils/supabaseClient';
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -82,50 +81,52 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
 
     try {
       if (isSignUp) {
-        // Sign up new user
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password
+        // Sign up new user via backend API
+        const response = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            firstName,
+            lastName,
+            preferredLanguage: selectedLanguage
+          })
         });
 
-        if (signUpError) throw signUpError;
-
-        if (data.user) {
-          // Create profile with language preference
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: data.user.email,
-              first_name: firstName,
-              last_name: lastName,
-              preferred_language: selectedLanguage
-            });
-
-          if (profileError) throw profileError;
-
-          // Now sign in
-          await onSignIn(email, password);
-          resetForm();
-          onClose();
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Sign up failed');
         }
+
+        // Signup automatically logs in the user, so we're done
+        resetForm();
+        onClose();
+        
+        // Reload to get the new user session
+        window.location.reload();
       } else {
         // Sign in existing user
         await onSignIn(email, password);
 
-        // After successful sign-in, update the language preference in the database
+        // After successful sign-in, update the language preference via backend API
         console.log('Updating language preference for existing user to:', selectedLanguage);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ preferred_language: selectedLanguage })
-            .eq('id', user.id);
+        
+        // Get current user ID from session
+        const sessionResponse = await fetch('/api/auth/session');
+        if (sessionResponse.ok) {
+          const { user } = await sessionResponse.json();
+          if (user) {
+            const updateResponse = await fetch(`/api/profiles/${user.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ preferredLanguage: selectedLanguage })
+            });
 
-          if (updateError) {
-            console.error('Error updating language preference:', updateError);
-          } else {
-            console.log('Language preference updated successfully');
+            if (!updateResponse.ok) {
+              console.error('Error updating language preference');
+            } else {
+              console.log('Language preference updated successfully');
+            }
           }
         }
 
