@@ -158,6 +158,10 @@ export interface IStorage {
   createReviewCycle(cycle: InsertReviewCycle): Promise<ReviewCycle>;
   updateReviewCycle(id: string, cycle: Partial<InsertReviewCycle>): Promise<ReviewCycle | undefined>;
   
+  // Performance Reviews
+  getPerformanceReviews(cycleId?: string): Promise<any[]>;
+  getPerformanceReviewById(id: string): Promise<any | undefined>;
+  
   // Dashboard Stats
   getDashboardStats(userId: string): Promise<import('../shared/schema.js').DashboardStats>;
   
@@ -723,6 +727,25 @@ export class DbStorage implements IStorage {
       .set({ ...cycle, updatedAt: new Date() })
       .where(eq(reviewCycles.id, id))
       .returning();
+    return result[0];
+  }
+
+  async getPerformanceReviews(cycleId?: string): Promise<any[]> {
+    const { performanceReviews } = await import('../shared/schema.js');
+    let query = db.select().from(performanceReviews);
+    
+    if (cycleId) {
+      query = query.where(eq(performanceReviews.reviewCycleId, cycleId)) as any;
+    }
+    
+    return query.orderBy(desc(performanceReviews.createdAt));
+  }
+
+  async getPerformanceReviewById(id: string): Promise<any | undefined> {
+    const { performanceReviews } = await import('../shared/schema.js');
+    const result = await db.select()
+      .from(performanceReviews)
+      .where(eq(performanceReviews.id, id));
     return result[0];
   }
 

@@ -973,6 +973,29 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Performance Reviews
+  app.get('/api/performance/reviews', async (req, res) => {
+    try {
+      const cycleId = req.query.cycleId as string | undefined;
+      const reviews = await storage.getPerformanceReviews(cycleId);
+      res.json(reviews);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/performance/reviews/:id', async (req, res) => {
+    try {
+      const review = await storage.getPerformanceReviewById(req.params.id);
+      if (!review) {
+        return res.status(404).json({ error: 'Performance review not found' });
+      }
+      res.json(review);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // User Notification routes
   app.get('/api/user-notifications', async (req, res) => {
     try {
