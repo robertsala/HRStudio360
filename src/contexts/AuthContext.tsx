@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient } from '../lib/api';
-import { supabase } from '../utils/supabaseClient';
 import i18n from '../i18n';
 import { celebrationService, CelebrationData } from '../utils/celebrationService';
 
@@ -27,7 +26,6 @@ interface AuthContextType {
   startImpersonation: (targetUserId: string, targetEmail: string) => Promise<void>;
   stopImpersonation: () => void;
   isImpersonating: boolean;
-  sessionExpiryWarning: number | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,8 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [actualUser, setActualUser] = useState<User | null>(null);
   const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
-  const [sessionExpiryWarning, setSessionExpiryWarning] = useState<number | null>(null);
-  const [lastActivityTime, setLastActivityTime] = useState<number>(Date.now());
 
   const loadUserProfile = React.useCallback(async (userId: string, email: string) => {
     try {
@@ -126,26 +122,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log(`[AuthContext] Starting auth initialization (attempt ${retryCount + 1}/${maxRetries + 1})...`);
 
         // Check session with our backend
-        let session = await apiClient.getSession();
+        const session = await apiClient.getSession();
 
         console.log('[AuthContext] Backend session check:', !!session);
-
-        // If backend returns no session, check Supabase as fallback (during migration)
-        if (!session?.user) {
-          console.log('[AuthContext] Backend returned no session, checking Supabase as fallback...');
-          const { data: { session: supabaseSession } } = await supabase.auth.getSession();
-          if (supabaseSession?.user) {
-            console.log('[AuthContext] Found Supabase session for user:', supabaseSession.user.email);
-            session = {
-              user: {
-                id: supabaseSession.user.id,
-                email: supabaseSession.user.email || ''
-              }
-            };
-          }
-        }
-
-        console.log('[AuthContext] Auth check completed - session:', !!session);
 
         if (!mounted) return;
 
@@ -208,29 +187,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [loadUserProfile]);
 
-  // Activity tracking to keep session alive
-  useEffect(() => {
-    if (!isAuthenticated || !user) return;
-
-    const updateActivity = () => {
-      setLastActivityTime(Date.now());
-    };
-
-    // Track user activity
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => {
-      window.addEventListener(event, updateActivity);
-    });
-
-    // Session refresh is now handled by backend via cookies
-    // No need for manual refresh
-
-    return () => {
-      events.forEach(event => {
-        window.removeEventListener(event, updateActivity);
-      });
-    };
-  }, [isAuthenticated, user, lastActivityTime]);
+  // Session refresh is now handled by backend via cookies automatically
+  // No manual activity tracking needed
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -408,8 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     actualUser,
     startImpersonation,
     stopImpersonation,
-    isImpersonating,
-    sessionExpiryWarning
+    isImpersonating
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
