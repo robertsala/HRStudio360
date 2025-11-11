@@ -976,36 +976,48 @@ export function registerRoutes(app: Express) {
 
       const RESEND_API_KEY = process.env.RESEND_API_KEY;
       if (RESEND_API_KEY) {
-        const { Resend } = await import('resend');
-        const resend = new Resend(RESEND_API_KEY);
+        try {
+          const { Resend } = await import('resend');
+          const resend = new Resend(RESEND_API_KEY);
 
-        const domain = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-        const protocol = process.env.REPLIT_DEV_DOMAIN ? 'https' : 'http';
-        const resetUrl = `${protocol}://${domain}/reset-password?token=${token}`;
+          const domain = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+          const protocol = process.env.REPLIT_DEV_DOMAIN ? 'https' : 'http';
+          const resetUrl = `${protocol}://${domain}/reset-password?token=${token}`;
 
-        await resend.emails.send({
-          from: 'HRStudio360 <noreply@hrstudio360.com>',
-          to: email,
-          subject: 'Password Reset Request',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Password Reset Request</h2>
-              <p>Hello ${user.firstName || 'there'},</p>
-              <p>We received a request to reset your password for your HRStudio360 account.</p>
-              <p>Click the button below to reset your password. This link will expire in 30 minutes.</p>
-              <div style="margin: 30px 0;">
-                <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  Reset Password
-                </a>
+          console.log('[Password Reset] Attempting to send email to:', email);
+          console.log('[Password Reset] Reset URL:', resetUrl);
+
+          const result = await resend.emails.send({
+            from: 'HRStudio360 <onboarding@resend.dev>',
+            to: email,
+            subject: 'Password Reset Request - HRStudio360',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">Password Reset Request</h2>
+                <p>Hello ${user.firstName || 'there'},</p>
+                <p>We received a request to reset your password for your HRStudio360 account.</p>
+                <p>Click the button below to reset your password. This link will expire in 30 minutes.</p>
+                <div style="margin: 30px 0;">
+                  <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    Reset Password
+                  </a>
+                </div>
+                <p>If you didn't request this, you can safely ignore this email.</p>
+                <p style="color: #666; font-size: 12px; margin-top: 40px;">
+                  If the button doesn't work, copy and paste this link into your browser:<br>
+                  ${resetUrl}
+                </p>
               </div>
-              <p>If you didn't request this, you can safely ignore this email.</p>
-              <p style="color: #666; font-size: 12px; margin-top: 40px;">
-                If the button doesn't work, copy and paste this link into your browser:<br>
-                ${resetUrl}
-              </p>
-            </div>
-          `
-        });
+            `
+          });
+
+          console.log('[Password Reset] Email sent successfully:', result);
+        } catch (emailError: any) {
+          console.error('[Password Reset] Failed to send email:', emailError.message);
+          console.error('[Password Reset] Full error:', emailError);
+        }
+      } else {
+        console.warn('[Password Reset] RESEND_API_KEY not configured - email not sent');
       }
 
       res.json({ 
