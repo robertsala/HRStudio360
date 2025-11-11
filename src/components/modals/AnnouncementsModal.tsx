@@ -200,8 +200,8 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
         locations: formData.target_audience_type === 'locations' ? formData.target_locations : [],
         published: formData.publish_immediately,
         publicationDate: formData.publish_immediately ? new Date().toISOString() : null,
-        expirationDate: formData.expires_at || null,
-        creatorUserId: user.id
+        expirationDate: formData.expires_at || null
+        // creatorUserId is set by backend from session
       };
 
       const response = await fetch('/api/announcements', {
@@ -255,8 +255,7 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
     try {
       const response = await fetch(`/api/announcements/${announcementId}/read`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id })
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!response.ok && response.status !== 409) {

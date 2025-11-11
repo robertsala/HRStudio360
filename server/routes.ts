@@ -1211,7 +1211,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Announcements endpoint
+  // Announcements endpoints
   app.get('/api/announcements', async (req, res) => {
     try {
       let limit = 10; // Default
@@ -1224,6 +1224,76 @@ export function registerRoutes(app: Express) {
       }
       const announcements = await storage.getPublishedAnnouncements(limit);
       res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/announcements', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Validate request body
+      const announcementData = {
+        ...req.body,
+        creatorUserId: userId // Use authenticated user ID, not client-provided
+      };
+
+      const announcement = await storage.createAnnouncement(announcementData);
+      res.status(201).json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/announcements/:id', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { id } = req.params;
+      const announcement = await storage.updateAnnouncement(id, req.body);
+      
+      if (!announcement) {
+        return res.status(404).json({ error: 'Announcement not found' });
+      }
+
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/announcements/:id', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { id } = req.params;
+      await storage.deleteAnnouncement(id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/announcements/:id/read', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { id } = req.params;
+      await storage.markAnnouncementAsRead(id, userId);
+      res.status(200).json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

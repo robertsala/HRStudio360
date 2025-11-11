@@ -167,6 +167,10 @@ export interface IStorage {
   
   // Announcements
   getPublishedAnnouncements(limit?: number): Promise<import('../shared/schema.js').Announcement[]>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  updateAnnouncement(id: string, announcement: Partial<InsertAnnouncement>): Promise<Announcement | undefined>;
+  deleteAnnouncement(id: string): Promise<void>;
+  markAnnouncementAsRead(announcementId: string, userId: string): Promise<void>;
   
   // User Permissions
   getUserPermissions(userId: string): Promise<import('../shared/schema.js').UserPermissions>;
@@ -900,6 +904,29 @@ export class DbStorage implements IStorage {
       .limit(limit);
     
     return result;
+  }
+
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const result = await db.insert(announcements).values(announcement).returning();
+    return result[0];
+  }
+
+  async updateAnnouncement(id: string, announcement: Partial<InsertAnnouncement>): Promise<Announcement | undefined> {
+    const result = await db.update(announcements)
+      .set(announcement)
+      .where(eq(announcements.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAnnouncement(id: string): Promise<void> {
+    await db.delete(announcements).where(eq(announcements.id, id));
+  }
+
+  async markAnnouncementAsRead(announcementId: string, userId: string): Promise<void> {
+    // TODO: Implement when announcement_reads table is added to schema
+    // For now, this is a no-op
+    console.log(`Mark announcement ${announcementId} as read for user ${userId}`);
   }
 
   async getUserPermissions(userId: string): Promise<import('../shared/schema.js').UserPermissions> {
