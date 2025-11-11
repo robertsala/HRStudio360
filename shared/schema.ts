@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json, smallint } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
@@ -39,6 +39,15 @@ export const profiles = pgTable('profiles', {
   managerId: uuid('manager_id').references((): any => profiles.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Authentication credentials table
+export const authCredentials = pgTable('auth_credentials', {
+  profileId: uuid('profile_id').primaryKey().references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  passwordHash: text('password_hash').notNull(),
+  passwordUpdatedAt: timestamp('password_updated_at').defaultNow(),
+  failedAttempts: smallint('failed_attempts').default(0).notNull(),
+  lockedUntil: timestamp('locked_until')
 });
 
 // Announcements table
@@ -658,6 +667,7 @@ export const reviewAuditLog = pgTable('review_audit_log', {
 
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAuthCredentialSchema = createInsertSchema(authCredentials).omit({ passwordUpdatedAt: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
@@ -700,6 +710,8 @@ export const insertWeatherCacheSchema = createInsertSchema(weatherCache).omit({ 
 // Types
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
+export type AuthCredential = typeof authCredentials.$inferSelect;
+export type InsertAuthCredential = z.infer<typeof insertAuthCredentialSchema>;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Department = typeof departments.$inferSelect;
