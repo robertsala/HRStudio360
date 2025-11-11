@@ -34,6 +34,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
       role: 'Product Owner',
       canAccessOrgChart: true,
       hireDate: '2024-01-15',
+      profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DemoUser&backgroundColor=b6e3f4',
     }).returning();
     console.log(`   ✓ Demo User created with ID: ${demoUser.id}`);
 
@@ -47,6 +48,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
       role: 'CEO',
       canAccessOrgChart: true,
       hireDate: '2023-01-01',
+      profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=RobertSala&backgroundColor=c0aede',
     }).returning();
     console.log(`   ✓ Robert Sala created with ID: ${robertSala.id}`);
 
@@ -61,6 +63,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'Senior Engineer',
         canAccessOrgChart: true,
         hireDate: '2023-06-15',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=ffd5dc',
       },
       {
         email: 'michael.chen@hrstudio360.com',
@@ -70,6 +73,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'Product Manager',
         canAccessOrgChart: true,
         hireDate: '2023-08-01',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MichaelChen&backgroundColor=d1d4f9',
       },
       {
         email: 'emily.rodriguez@hrstudio360.com',
@@ -79,6 +83,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'UX Designer',
         canAccessOrgChart: true,
         hireDate: '2024-02-10',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=EmilyRodriguez&backgroundColor=ffdfbf',
       },
       {
         email: 'james.wilson@hrstudio360.com',
@@ -88,6 +93,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'HR Manager',
         canAccessOrgChart: true,
         hireDate: '2023-04-20',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=JamesWilson&backgroundColor=c7ede6',
       },
       {
         email: 'lisa.anderson@hrstudio360.com',
@@ -97,6 +103,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'Marketing Director',
         canAccessOrgChart: true,
         hireDate: '2023-09-15',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=LisaAnderson&backgroundColor=feca57',
       },
     ];
 
@@ -287,6 +294,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         skills: ['React', 'Node.js', 'TypeScript', 'AWS'],
         education: 'BS Computer Science, Stanford University',
         previousCompany: 'Tech Corp Inc',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AlexThompson&backgroundColor=a8e6cf',
         aiMatchScore: 92,
         rating: 5
       },
@@ -303,6 +311,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         skills: ['Figma', 'Adobe XD', 'User Research', 'Prototyping'],
         education: 'BFA Design, Parsons',
         previousCompany: 'Creative Studio LLC',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=JessicaMartinez&backgroundColor=ffaaa5',
         aiMatchScore: 88,
         rating: 4
       },
@@ -319,6 +328,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         skills: ['SEO', 'Content Marketing', 'Analytics', 'Campaign Management'],
         education: 'MBA Marketing, UT Austin',
         previousCompany: 'Marketing Pro Inc',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DavidKim&backgroundColor=b4a7d6',
         aiMatchScore: 95,
         rating: 5
       }
