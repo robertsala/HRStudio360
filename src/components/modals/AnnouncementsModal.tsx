@@ -9,18 +9,18 @@ interface Announcement {
   title: string;
   content: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
-  target_audience_type: 'all' | 'specific_employees' | 'departments' | 'locations';
-  target_employee_ids?: string[];
-  target_departments?: string[];
-  target_locations?: string[];
+  targetAudienceType: 'all_employees' | 'specific_employees' | 'departments' | 'locations';
+  specificEmployeeIds?: string[];
+  departments?: string[];
+  locations?: string[];
   published: boolean;
-  published_at?: string;
-  expires_at?: string;
-  created_by: string;
-  created_at: string;
-  author_name?: string;
-  read_count?: number;
-  is_read?: boolean;
+  publicationDate?: string;
+  expirationDate?: string;
+  creatorUserId: string;
+  createdAt: string;
+  authorName?: string;
+  readCount?: number;
+  isRead?: boolean;
 }
 
 interface AnnouncementsModalProps {
@@ -172,14 +172,11 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
 
   const loadAnnouncements = async () => {
     try {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('published', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
+      const response = await fetch('/api/announcements');
+      if (!response.ok) {
+        throw new Error('Failed to load announcements');
+      }
+      const data = await response.json();
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
@@ -273,15 +270,16 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
   };
 
   const handleEditAnnouncement = (announcement: Announcement) => {
+    const audienceType = announcement.targetAudienceType === 'all_employees' ? 'all' : announcement.targetAudienceType;
     setFormData({
       title: announcement.title,
       content: announcement.content,
       priority: announcement.priority,
-      target_audience_type: announcement.target_audience_type,
-      target_employee_ids: announcement.target_employee_ids || [],
-      target_departments: announcement.target_departments || [],
-      target_locations: announcement.target_locations || [],
-      expires_at: announcement.expires_at ? new Date(announcement.expires_at).toISOString().slice(0, 16) : '',
+      target_audience_type: audienceType,
+      target_employee_ids: announcement.specificEmployeeIds || [],
+      target_departments: announcement.departments || [],
+      target_locations: announcement.locations || [],
+      expires_at: announcement.expirationDate ? new Date(announcement.expirationDate).toISOString().slice(0, 16) : '',
       publish_immediately: announcement.published
     });
     setEditingAnnouncementId(announcement.id);
@@ -404,15 +402,15 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
   };
 
   const getAudienceDescription = (announcement: Announcement) => {
-    switch (announcement.target_audience_type) {
-      case 'all':
+    switch (announcement.targetAudienceType) {
+      case 'all_employees':
         return 'All Employees';
       case 'specific_employees':
-        return `${announcement.target_employee_ids?.length || 0} Specific Employees`;
+        return `${announcement.specificEmployeeIds?.length || 0} Specific Employees`;
       case 'departments':
-        return announcement.target_departments?.join(', ') || 'Departments';
+        return announcement.departments?.join(', ') || 'Departments';
       case 'locations':
-        return announcement.target_locations?.join(', ') || 'Locations';
+        return announcement.locations?.join(', ') || 'Locations';
       default:
         return 'Unknown';
     }
@@ -875,12 +873,12 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
               <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400 mb-6">
                 <div className="flex items-center">
                   <Calendar className="h-4 w-4 mr-2" />
-                  <span>{new Date(selectedAnnouncement.created_at).toLocaleDateString()}</span>
+                  <span>{new Date(selectedAnnouncement.createdAt).toLocaleDateString()}</span>
                 </div>
-                {selectedAnnouncement.expires_at && (
+                {selectedAnnouncement.expirationDate && (
                   <div className="flex items-center text-orange-600">
                     <Calendar className="h-4 w-4 mr-2" />
-                    <span>Expires: {new Date(selectedAnnouncement.expires_at).toLocaleDateString()}</span>
+                    <span>Expires: {new Date(selectedAnnouncement.expirationDate).toLocaleDateString()}</span>
                   </div>
                 )}
               </div>
@@ -992,7 +990,7 @@ const AnnouncementsModal: React.FC<AnnouncementsModalProps> = ({ selectedAnnounc
                   </div>
                   <div className="flex items-center text-sm text-gray-500">
                     <Calendar className="h-4 w-4 mr-1" />
-                    <span>{new Date(announcement.created_at).toLocaleDateString()}</span>
+                    <span>{new Date(announcement.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               ))}
