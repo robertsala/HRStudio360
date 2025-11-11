@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Globe, Calendar, User, Eye, ChevronRight, Bell, Pin, MessageSquare, ThumbsUp, Share2, Bookmark, Filter, Search, Plus, Send, Users, MapPin, Briefcase, ChevronDown, Maximize, Minimize, CheckCircle, AlertCircle, Trash2, Edit } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../contexts/AuthContext';
 import { mockEmployees } from '../../data/mockEmployees';
 
 interface Announcement {
