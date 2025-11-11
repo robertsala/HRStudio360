@@ -8,12 +8,18 @@ import {
   insertUserNotificationSchema, insertCollaboratorInvitationSchema,
   insertChangeLogSchema, insertHistoricalChangeSchema, insertChangeNotificationSchema,
   insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema,
-  insertReviewCycleSchema
+  insertReviewCycleSchema,
+  profiles,
+  authCredentials,
+  passwordResetTokens,
+  passwordAuditLog
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { seedProductionDatabase } from './seed-production.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
 import rateLimit from 'express-rate-limit';
+import { db } from './db.js';
+import { eq } from 'drizzle-orm';
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -935,6 +941,148 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Session check error:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Password reset - request reset email
+  app.post('/api/auth/forgot-password', authRateLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      const profile = await db.select().from(profiles).where(eq(profiles.email, email)).limit(1);
+      
+      if (!profile || profile.length === 0) {
+        return res.json({ 
+          success: true, 
+          message: 'If an account exists with this email, a password reset link has been sent.' 
+        });
+      }
+
+      const user = profile[0];
+      const crypto = await import('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+      await db.insert(passwordResetTokens).values({
+        profileId: user.id,
+        token,
+        expiresAt,
+        used: false
+      });
+
+      const RESEND_API_KEY = process.env.RESEND_API_KEY;
+      if (RESEND_API_KEY) {
+        const { Resend } = await import('resend');
+        const resend = new Resend(RESEND_API_KEY);
+
+        const domain = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+        const protocol = process.env.REPLIT_DEV_DOMAIN ? 'https' : 'http';
+        const resetUrl = `${protocol}://${domain}/reset-password?token=${token}`;
+
+        await resend.emails.send({
+          from: 'HRStudio360 <noreply@hrstudio360.com>',
+          to: email,
+          subject: 'Password Reset Request',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Password Reset Request</h2>
+              <p>Hello ${user.firstName || 'there'},</p>
+              <p>We received a request to reset your password for your HRStudio360 account.</p>
+              <p>Click the button below to reset your password. This link will expire in 30 minutes.</p>
+              <div style="margin: 30px 0;">
+                <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Reset Password
+                </a>
+              </div>
+              <p>If you didn't request this, you can safely ignore this email.</p>
+              <p style="color: #666; font-size: 12px; margin-top: 40px;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                ${resetUrl}
+              </p>
+            </div>
+          `
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'If an account exists with this email, a password reset link has been sent.' 
+      });
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: 'Failed to process password reset request' });
+    }
+  });
+
+  // Password reset - complete reset with token
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: 'Token and new password are required' });
+      }
+
+      const resetToken = await db.select()
+        .from(passwordResetTokens)
+        .where(eq(passwordResetTokens.token, token))
+        .limit(1);
+
+      if (!resetToken || resetToken.length === 0) {
+        return res.status(400).json({ error: 'Invalid or expired reset token' });
+      }
+
+      const tokenData = resetToken[0];
+
+      if (tokenData.used) {
+        return res.status(400).json({ error: 'This reset link has already been used' });
+      }
+
+      if (new Date() > new Date(tokenData.expiresAt)) {
+        return res.status(400).json({ error: 'This reset link has expired' });
+      }
+
+      const validationResult = validatePassword(newPassword);
+      if (!validationResult.valid) {
+        return res.status(400).json({ error: validationResult.errors.join(', ') });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+
+      await db.update(authCredentials)
+        .set({ 
+          passwordHash: hashedPassword,
+          passwordUpdatedAt: new Date(),
+          failedAttempts: 0,
+          lockedUntil: null
+        })
+        .where(eq(authCredentials.profileId, tokenData.profileId));
+
+      await db.update(passwordResetTokens)
+        .set({ used: true })
+        .where(eq(passwordResetTokens.id, tokenData.id));
+
+      const ipAddress = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+
+      await db.insert(passwordAuditLog).values({
+        profileId: tokenData.profileId,
+        action: 'password_reset',
+        method: 'email_reset_link',
+        adminId: null,
+        ipAddress,
+        userAgent,
+        success: true
+      });
+
+      res.json({ success: true, message: 'Password has been reset successfully' });
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
     }
   });
 
