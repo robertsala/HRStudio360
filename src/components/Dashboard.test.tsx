@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import Dashboard from './Dashboard';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 
 // Mock the useAuth hook
-jest.mock('../hooks/useAuth');
+jest.mock('../contexts/AuthContext');
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 describe('Dashboard Component', () => {
