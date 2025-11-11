@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Route, Switch } from 'wouter';
 import Layout from './components/Layout';
 import Hero from './components/Hero';
 import Problems from './components/Problems';
@@ -19,29 +20,8 @@ function App() {
   const { isAuthenticated, isLoading, celebration, dismissCelebration, user } = useAuth();
   const dashboardRef = useRef<any>(null);
 
-  // Check if we're on the reset-password page
+  // --- AUTHENTICATION REDIRECT LOGIC ---
   useEffect(() => {
-    const checkResetPasswordPath = () => {
-      if (window.location.pathname === '/reset-password') {
-        console.log('[App.tsx] Detected reset-password path, setting view');
-        setCurrentView('reset-password');
-      }
-    };
-    
-    checkResetPasswordPath();
-    
-    // Also listen for URL changes
-    window.addEventListener('popstate', checkResetPasswordPath);
-    return () => window.removeEventListener('popstate', checkResetPasswordPath);
-  }, []);
-
-  // --- REFINED AUTHENTICATION REDIRECT LOGIC ---
-  useEffect(() => {
-    // Don't redirect if we're on the reset-password page
-    if (window.location.pathname === '/reset-password') {
-      return;
-    }
-
     if (isAuthenticated) {
       // If the user is authenticated and on landing, redirect to dashboard
       if (currentView === 'landing') {
@@ -53,7 +33,7 @@ function App() {
         setCurrentView('landing');
       }
     }
-  }, [isAuthenticated, currentView]); // Include currentView to properly handle all cases
+  }, [isAuthenticated, currentView]);
 
   // Handle navigation (this part is good)
   const handleNavigation = (view: 'landing' | 'dashboard' | 'profile' | 'reset-password') => {
@@ -88,12 +68,7 @@ function App() {
     );
   }
 
-  // Handle reset-password page
-  if (currentView === 'reset-password') {
-    return <ResetPasswordPage />;
-  }
-
-  // Render logic based on currentView (this part is good)
+  // Render logic based on currentView
   if (currentView === 'dashboard') {
     return (
       <Layout currentView={currentView} onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
@@ -116,16 +91,26 @@ function App() {
 
   return (
     <>
-      <Layout currentView={currentView} onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
-        <Hero />
-        <Problems />
-        <Features />
-        <Advantages />
-        {/* Calendar component was imported but not used, uncomment if needed */}
-        {/* <Calendar /> */}
-        <Contact />
-        <Footer />
-      </Layout>
+      <Switch>
+        {/* Password reset route - accessible without authentication */}
+        <Route path="/reset-password">
+          <ResetPasswordPage />
+        </Route>
+
+        {/* All other routes use the Layout */}
+        <Route>
+          <Layout currentView={currentView} onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+            <Hero />
+            <Problems />
+            <Features />
+            <Advantages />
+            {/* Calendar component was imported but not used, uncomment if needed */}
+            {/* <Calendar /> */}
+            <Contact />
+            <Footer />
+          </Layout>
+        </Route>
+      </Switch>
 
       {celebration && user && celebration.type === 'birthday' && (
         <BirthdayCelebrationModal
