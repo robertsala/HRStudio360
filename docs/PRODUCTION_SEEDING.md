@@ -25,15 +25,36 @@ The production seed script (`server/seed-production.ts`) creates:
 
 ## How to Seed Production Database
 
-### Step 1: Access Your Deployed Application Console
+### ⭐ Recommended Method: Admin Seed Endpoint
 
-1. Go to your Replit deployment dashboard
-2. Navigate to your deployed app: https://hr-studio-360-robertsala.replit.app
-3. Click on the **"Console"** or **"Shell"** tab for the production deployment
+Since Replit doesn't provide direct console access to production deployments, the easiest way to seed your production database is through a secure admin API endpoint.
 
-### Step 2: Run the Seed Script
+**📖 [See Complete Admin Endpoint Guide →](./ADMIN_SEED_ENDPOINT.md)**
 
-In the production console, execute:
+**Quick Steps:**
+
+1. **Set Admin Secret** in Replit Secrets:
+   - Key: `ADMIN_SEED_SECRET`
+   - Value: A strong random string (e.g., `prod_seed_2024_xyz789abc`)
+
+2. **Deploy Your App** using the Publish button
+
+3. **Call the Seed Endpoint:**
+   ```bash
+   curl -X POST https://your-app.replit.app/api/admin/seed \
+     -H "Content-Type: application/json" \
+     -d '{"secret": "YOUR_ADMIN_SEED_SECRET"}'
+   ```
+
+4. **Remove the Secret** after seeding for security
+
+📖 **Full instructions with security details:** [ADMIN_SEED_ENDPOINT.md](./ADMIN_SEED_ENDPOINT.md)
+
+---
+
+### Alternative Method: CLI Script (Development Only)
+
+If you're running in development or have shell access, you can use:
 
 ```bash
 npm run seed
