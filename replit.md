@@ -4,6 +4,30 @@
 
 HR Studio 360 is an AI-powered Human Resources management platform designed to streamline the entire employee lifecycle, from recruitment to offboarding. It offers comprehensive HR functionality, including hiring, employee management, payroll, performance reviews, benefits administration, time tracking, and analytics. The platform features a modular dashboard with over 40 specialized components, emphasizing user experience with celebration systems, real-time chat, and extensive customization. The project aims to provide an end-to-end HR solution, enhancing efficiency and employee engagement.
 
+## Demo Account Access
+
+The platform includes a pre-configured demo account for instant access to all features:
+
+- **Demo Email**: `demo@hrstudio360.com`
+- **Access Method**: Click the "Try Demo Account" button on the landing page or in the sign-in modal
+- **Authentication**: Passwordless email-based authentication - no password required
+- **Seeded Data**: When production database is seeded, the demo account includes sample employees, departments, job titles, and announcements
+
+### Seeding Production Database
+
+To populate the production database with demo data, run:
+```bash
+npm run seed
+```
+
+This creates:
+- 7 user profiles (Demo User, Robert Sala, + 5 team members)
+- 6 departments (Engineering, Product, Design, People, Marketing, Executive)
+- 7 job titles
+- 2 announcements
+
+See `docs/PRODUCTION_SEEDING.md` for detailed seeding instructions.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
