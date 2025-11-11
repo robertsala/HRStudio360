@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import type { 
-  Profile, InsertProfile, 
+  Profile, InsertProfile,
+  AuthCredential, InsertAuthCredential,
   Announcement, InsertAnnouncement,
   Employee, InsertEmployee, EmployeeWithProfile,
   LeaveRequest, InsertLeaveRequest,
@@ -27,7 +28,7 @@ import type {
   ReviewCycle, InsertReviewCycle
 } from '../shared/schema.js';
 import { 
-  profiles, announcements, employees, leaveRequests, leaveBalances,
+  profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
   candidates, newHires, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   userNotifications, collaboratorInvitations,
@@ -45,6 +46,14 @@ export interface IStorage {
   getProfileByEmail(email: string): Promise<Profile | undefined>;
   createProfile(profile: InsertProfile): Promise<Profile>;
   updateProfile(id: string, profile: Partial<InsertProfile>): Promise<Profile | undefined>;
+  
+  // Auth Credentials
+  createAuthCredential(credential: InsertAuthCredential): Promise<AuthCredential>;
+  getAuthCredentialByProfileId(profileId: string): Promise<AuthCredential | undefined>;
+  updateAuthCredential(profileId: string, updates: Partial<InsertAuthCredential>): Promise<AuthCredential | undefined>;
+  incrementFailedLoginAttempts(profileId: string): Promise<void>;
+  resetFailedLoginAttempts(profileId: string): Promise<void>;
+  lockAccount(profileId: string, lockedUntil: Date): Promise<void>;
   
   // Employees
   getEmployees(): Promise<Employee[]>;
