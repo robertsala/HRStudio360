@@ -11,6 +11,7 @@ import {
   insertReviewCycleSchema
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
+import { seedProductionDatabase } from './seed-production.js';
 
 export function registerRoutes(app: Express) {
   // Profile routes
@@ -1361,6 +1362,40 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: error.message });
       }
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin seed endpoint - Protected with secret key
+  app.post('/api/admin/seed', async (req, res) => {
+    try {
+      // Security: Check for admin secret key
+      const providedSecret = req.body.secret || req.query.secret;
+      const adminSecret = process.env.ADMIN_SEED_SECRET;
+
+      if (!adminSecret) {
+        return res.status(500).json({ 
+          error: 'Admin seeding not configured. Set ADMIN_SEED_SECRET environment variable.' 
+        });
+      }
+
+      if (providedSecret !== adminSecret) {
+        console.warn('⚠️  Unauthorized seed attempt with invalid secret');
+        return res.status(401).json({ 
+          error: 'Unauthorized. Invalid admin secret key.' 
+        });
+      }
+
+      // Run the seed function
+      console.log('🔐 Admin seed endpoint called with valid credentials');
+      const result = await seedProductionDatabase();
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('❌ Admin seed endpoint error:', error);
+      res.status(500).json({ 
+        error: 'Seeding failed', 
+        details: error.message 
+      });
     }
   });
 }
