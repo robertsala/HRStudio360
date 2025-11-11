@@ -226,6 +226,83 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  // Auth Credentials
+  async createAuthCredential(credential: InsertAuthCredential): Promise<AuthCredential> {
+    const result = await db.insert(authCredentials).values(credential).returning();
+    return result[0];
+  }
+
+  async getAuthCredentialByProfileId(profileId: string): Promise<AuthCredential | undefined> {
+    const result = await db.select().from(authCredentials).where(eq(authCredentials.profileId, profileId));
+    return result[0];
+  }
+
+  /**
+   * Update auth credential. IMPORTANT: passwordHash must be pre-hashed with hashPassword()
+   */
+  async updateAuthCredential(profileId: string, updates: Partial<InsertAuthCredential>): Promise<AuthCredential | undefined> {
+    const result = await db.update(authCredentials)
+      .set(updates)
+      .where(eq(authCredentials.profileId, profileId))
+      .returning();
+    return result[0];
+  }
+
+  /**
+   * Atomically increment failed login attempts and lock account if threshold reached
+   */
+  async incrementFailedLoginAttempts(profileId: string): Promise<void> {
+    // First, get current failed attempts to calculate lockout
+    const credential = await this.getAuthCredentialByProfileId(profileId);
+    if (!credential) return;
+
+    const newFailedAttempts = (credential.failedAttempts || 0) + 1;
+    
+    // Calculate lockout duration based on failed attempts
+    const lockoutMs = this.calculateLockoutDuration(newFailedAttempts);
+    const lockedUntil = lockoutMs > 0 ? new Date(Date.now() + lockoutMs) : null;
+
+    // Atomic update: increment attempts and set lock in single operation
+    await db.update(authCredentials)
+      .set({
+        failedAttempts: newFailedAttempts,
+        lockedUntil: lockedUntil
+      })
+      .where(eq(authCredentials.profileId, profileId));
+  }
+
+  /**
+   * Reset failed login attempts and clear account lock
+   */
+  async resetFailedLoginAttempts(profileId: string): Promise<void> {
+    await db.update(authCredentials)
+      .set({
+        failedAttempts: 0,
+        lockedUntil: null
+      })
+      .where(eq(authCredentials.profileId, profileId));
+  }
+
+  /**
+   * Lock account until specified time
+   */
+  async lockAccount(profileId: string, lockedUntil: Date): Promise<void> {
+    await db.update(authCredentials)
+      .set({ lockedUntil })
+      .where(eq(authCredentials.profileId, profileId));
+  }
+
+  /**
+   * Calculate lockout duration based on failed attempts
+   * Progressive lockout: 5 failures = 15 min, 10 = 30 min, 15+ = 1 hour
+   */
+  private calculateLockoutDuration(failedAttempts: number): number {
+    if (failedAttempts >= 15) return 60 * 60 * 1000; // 1 hour
+    if (failedAttempts >= 10) return 30 * 60 * 1000; // 30 minutes
+    if (failedAttempts >= 5) return 15 * 60 * 1000;  // 15 minutes
+    return 0; // No lockout yet
+  }
+
   // Employees
   async getEmployees(): Promise<Employee[]> {
     return db.select().from(employees);
