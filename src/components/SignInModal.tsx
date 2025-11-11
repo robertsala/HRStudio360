@@ -51,13 +51,12 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
     setError('');
 
     const demoEmail = 'demo@hrstudio360.com';
-    const demoPassword = 'demo';
 
     try {
       console.log('Demo button: Signing in with demo account...');
       
-      // Use the backend API via the onSignIn prop
-      await onSignIn(demoEmail, demoPassword);
+      // Use the backend API via the onSignIn prop with empty password for passwordless demo login
+      await onSignIn(demoEmail, '');
       
       console.log('Demo account sign-in successful!');
       resetForm();
@@ -89,6 +88,7 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
             email,
             firstName,
             lastName,
+            password,
             preferredLanguage: selectedLanguage
           })
         });
@@ -244,7 +244,7 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder={t('auth.enterPassword')}
                 required
-                minLength={6}
+                minLength={12}
               />
               <button
                 type="button"
@@ -255,7 +255,9 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
               </button>
             </div>
             {isSignUp && (
-              <p className="text-xs text-gray-500 mt-1">{t('auth.passwordMinLength')}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Password must be at least 12 characters with uppercase, lowercase, numbers, and special characters
+              </p>
             )}
           </div>
 

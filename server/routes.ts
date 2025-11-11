@@ -12,8 +12,21 @@ import {
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { seedProductionDatabase } from './seed-production.js';
+import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
+import rateLimit from 'express-rate-limit';
 
 export function registerRoutes(app: Express) {
+  // Rate limiting for authentication endpoints to prevent brute-force attacks
+  const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per windowMs
+    message: { error: 'Too many authentication attempts. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip rate limiting for demo account to ensure accessibility
+    skip: (req) => req.body?.email === 'demo@hrstudio360.com'
+  });
+
   // Helper function to check if user can manage announcements
   async function canManageAnnouncements(userId: string): Promise<boolean> {
     try {
@@ -715,9 +728,9 @@ export function registerRoutes(app: Express) {
   });
 
   // Authentication endpoints with session management
-  app.post('/api/auth/login', async (req, res) => {
+  app.post('/api/auth/login', authRateLimiter, async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, password } = req.body;
       if (!email) {
         return res.status(400).json({ error: 'Email is required' });
       }
@@ -725,10 +738,9 @@ export function registerRoutes(app: Express) {
       // Check if profile exists
       let profile = await storage.getProfileByEmail(email);
       
-      // Only auto-create profile for the demo account
-      if (!profile) {
-        // Only allow demo@hrstudio360.com to auto-create with admin role
-        if (email === 'demo@hrstudio360.com') {
+      // Demo account passwordless login for backward compatibility
+      if (email === 'demo@hrstudio360.com' && !password) {
+        if (!profile) {
           profile = await storage.createProfile({
             email,
             firstName: 'Demo',
@@ -736,10 +748,71 @@ export function registerRoutes(app: Express) {
             role: 'Product Manager',
             department: 'Product'
           });
-        } else {
-          return res.status(401).json({ error: 'Invalid credentials. Please sign up first.' });
         }
+        
+        // Safety check (should always be defined at this point)
+        if (!profile) {
+          return res.status(500).json({ error: 'Failed to create demo profile' });
+        }
+        
+        // Capture profile for closure
+        const demoProfile = profile;
+        
+        // Regenerate session for demo login
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error('Session regeneration error:', err);
+            return res.status(500).json({ error: 'Login failed' });
+          }
+          
+          (req.session as any).userId = demoProfile.id;
+          
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              return res.status(500).json({ error: 'Login failed' });
+            }
+            res.json({ user: demoProfile });
+          });
+        });
+        return;
       }
+      
+      // Password-based authentication
+      if (!password) {
+        return res.status(400).json({ error: 'Password is required' });
+      }
+      
+      if (!profile) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      // Get auth credentials
+      const authCredential = await storage.getAuthCredentialByProfileId(profile.id);
+      if (!authCredential) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      // Check if account is locked
+      if (isAccountLocked(authCredential.lockedUntil)) {
+        const lockTime = new Date(authCredential.lockedUntil!);
+        const minutesRemaining = Math.ceil((lockTime.getTime() - Date.now()) / (60 * 1000));
+        return res.status(403).json({ 
+          error: `Account locked due to multiple failed login attempts. Try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.` 
+        });
+      }
+      
+      // Verify password
+      const isValidPassword = await verifyPassword(authCredential.passwordHash, password);
+      
+      if (!isValidPassword) {
+        // Increment failed attempts
+        await storage.incrementFailedLoginAttempts(profile.id);
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      // Successful login - reset failed attempts
+      await storage.resetFailedLoginAttempts(profile.id);
       
       // Regenerate session to prevent fixation attacks
       req.session.regenerate((err) => {
@@ -761,6 +834,7 @@ export function registerRoutes(app: Express) {
         });
       });
     } catch (error: any) {
+      console.error('Login error:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -776,12 +850,21 @@ export function registerRoutes(app: Express) {
     });
   });
 
-  app.post('/api/auth/signup', async (req, res) => {
+  app.post('/api/auth/signup', authRateLimiter, async (req, res) => {
     try {
-      const { email, firstName, lastName, preferredLanguage } = req.body;
+      const { email, firstName, lastName, password, preferredLanguage } = req.body;
       
-      if (!email || !firstName || !lastName) {
-        return res.status(400).json({ error: 'Email, first name, and last name are required' });
+      if (!email || !firstName || !lastName || !password) {
+        return res.status(400).json({ error: 'Email, first name, last name, and password are required' });
+      }
+      
+      // Validate password
+      const passwordValidation = validatePassword(password, email);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ 
+          error: 'Password does not meet requirements', 
+          details: passwordValidation.errors 
+        });
       }
       
       // Check if profile already exists
@@ -789,6 +872,9 @@ export function registerRoutes(app: Express) {
       if (existingProfile) {
         return res.status(409).json({ error: 'An account with this email already exists' });
       }
+      
+      // Hash password
+      const passwordHash = await hashPassword(password);
       
       // Create new profile
       const profile = await storage.createProfile({
@@ -798,6 +884,14 @@ export function registerRoutes(app: Express) {
         role: 'employee',
         department: 'General',
         languagePreference: preferredLanguage || 'en'
+      });
+      
+      // Create auth credentials
+      await storage.createAuthCredential({
+        profileId: profile.id,
+        passwordHash,
+        failedAttempts: 0,
+        lockedUntil: null
       });
       
       // Log the user in immediately by creating a session
@@ -818,6 +912,7 @@ export function registerRoutes(app: Express) {
         });
       });
     } catch (error: any) {
+      console.error('Signup error:', error);
       res.status(500).json({ error: error.message });
     }
   });
