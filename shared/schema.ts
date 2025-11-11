@@ -50,6 +50,29 @@ export const authCredentials = pgTable('auth_credentials', {
   lockedUntil: timestamp('locked_until')
 });
 
+// Password reset tokens table
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  used: boolean('used').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Password audit log table
+export const passwordAuditLog = pgTable('password_audit_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  action: text('action').notNull(),
+  method: text('method').notNull(),
+  adminId: uuid('admin_id').references(() => profiles.id, { onDelete: 'set null' }),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  success: boolean('success').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 // Announcements table
 export const announcements = pgTable('announcements', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -668,6 +691,8 @@ export const reviewAuditLog = pgTable('review_audit_log', {
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAuthCredentialSchema = createInsertSchema(authCredentials).omit({ passwordUpdatedAt: true });
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
+export const insertPasswordAuditLogSchema = createInsertSchema(passwordAuditLog).omit({ id: true, createdAt: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
@@ -712,6 +737,10 @@ export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
 export type AuthCredential = typeof authCredentials.$inferSelect;
 export type InsertAuthCredential = z.infer<typeof insertAuthCredentialSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordAuditLog = typeof passwordAuditLog.$inferSelect;
+export type InsertPasswordAuditLog = z.infer<typeof insertPasswordAuditLogSchema>;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Department = typeof departments.$inferSelect;
