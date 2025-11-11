@@ -15,16 +15,38 @@ The platform includes a pre-configured demo account for instant access to all fe
 
 ### Seeding Production Database
 
-To populate the production database with demo data, run:
+To populate the production database with comprehensive demo data, run:
 ```bash
 npm run seed
 ```
 
-This creates:
+This creates a complete, production-ready demo environment:
+
+**Organizational Structure:**
 - 7 user profiles (Demo User, Robert Sala, + 5 team members)
 - 6 departments (Engineering, Product, Design, People, Marketing, Executive)
-- 7 job titles
-- 2 announcements
+- 7 job titles with department assignments
+
+**Employee Data:**
+- 7 employee records with employment details
+- 7 leave balance records (20 vacation, 10 sick, 5 personal days)
+- 2 sample leave requests (1 pending, 1 approved)
+
+**Recruitment Pipeline:**
+- 3 active candidates at various stages (Interview, Phone Screen, Offer Sent)
+- 1 new hire for onboarding (starts in 7 days)
+
+**Performance Management:**
+- 1 active review cycle (2025 Annual Performance Review)
+- 2 performance reviews (1 completed with full feedback, 1 in-progress)
+- 5 review questions with template
+- 10 review responses (self and manager assessments)
+- Goals and development plans
+
+**Communications:**
+- 2 company announcements
+
+This comprehensive seed data demonstrates the full capabilities of HRStudio360 for client demos and showcases a realistic, active HR environment.
 
 See `docs/PRODUCTION_SEEDING.md` for detailed seeding instructions.
 

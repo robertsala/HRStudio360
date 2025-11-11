@@ -2,160 +2,216 @@
 
 ## Overview
 
-This guide explains how to seed your production database with initial demo data for HRStudio360.
+The production seed script creates a complete, realistic demo environment showcasing all HRStudio360 capabilities. This is designed for client presentations and demos, providing a fully-populated platform that looks like an active, established HR system.
 
-## What Gets Seeded
+## What Gets Created
 
-The production seed script (`server/seed-production.ts`) creates:
+### 📊 Complete Demo Data Summary
 
-- **7 User Profiles:**
-  - Demo User (demo@hrstudio360.com)
-  - Robert Sala (robertsala@gmail.com)
-  - 5 Sample team members (Sarah, Michael, Emily, James, Lisa)
+**Organizational Structure** (14 records)
+- 7 user profiles (Demo User, Robert Sala, + 5 team members)
+- 6 departments (Engineering, Product, Design, People, Marketing, Executive)
+- 7 job titles with department assignments
 
-- **6 Departments:**
-  - Engineering, Product, Design, People, Marketing, Executive
+**Employee Management** (16 records)
+- 7 employee records with full employment details
+- 7 leave balance records (20 vacation, 10 sick, 5 personal days each)
+- 2 sample leave requests:
+  - Sarah Johnson: 5-day Hawaii vacation (Pending approval)
+  - Demo User: 1 personal day (Approved)
 
-- **7 Job Titles:**
-  - CEO, Senior Engineer, Product Manager, Product Owner, UX Designer, HR Manager, Marketing Director
+**Recruitment Pipeline** (4 records)
+- 3 active candidates at different stages:
+  - Alex Thompson - Senior Software Engineer (Interview stage)
+  - Jessica Martinez - Product Designer (Phone Screen stage)
+  - David Kim - Marketing Manager (Offer Sent)
+- 1 new hire ready for onboarding:
+  - Jordan Williams - Junior Developer (starts in 7 days)
 
-- **2 Announcements:**
-  - Welcome message
-  - Platform features overview
+**Performance Management** (20+ records)
+- 1 active review cycle (2025 Annual Performance Review)
+- 2 performance reviews:
+  - Sarah Johnson: Completed review with 4.6 final rating
+  - Michael Chen: In-progress review awaiting manager assessment
+- 5 standardized review questions
+- 10 review responses (5 self-assessments + 5 manager assessments)
+- Detailed goals, achievements, and development plans
 
-## How to Seed Production Database
+**Communications** (2 records)
+- Welcome announcement
+- Platform features overview
 
-### ⭐ Recommended Method: Admin Seed Endpoint
+### 👥 User Profiles
 
-Since Replit doesn't provide direct console access to production deployments, the easiest way to seed your production database is through a secure admin API endpoint.
+All profiles are fully configured with realistic data:
 
-**📖 [See Complete Admin Endpoint Guide →](./ADMIN_SEED_ENDPOINT.md)**
+| Name | Email | Role | Department | Employee ID |
+|------|-------|------|------------|-------------|
+| Robert Sala | robertsala@gmail.com | CEO | Executive | EMP001 |
+| Demo User | demo@hrstudio360.com | Product Owner | Product | EMP002 |
+| Sarah Johnson | sarah.johnson@hrstudio360.com | Senior Engineer | Engineering | EMP003 |
+| Michael Chen | michael.chen@hrstudio360.com | Product Manager | Product | EMP004 |
+| Emily Rodriguez | emily.rodriguez@hrstudio360.com | UX Designer | Design | EMP005 |
+| James Wilson | james.wilson@hrstudio360.com | HR Manager | People | EMP006 |
+| Lisa Anderson | lisa.anderson@hrstudio360.com | Marketing Director | Marketing | EMP007 |
 
-**Quick Steps:**
+## How to Seed Production
 
-1. **Set Admin Secret** in Replit Secrets:
-   - Key: `ADMIN_SEED_SECRET`
-   - Value: A strong random string (e.g., `prod_seed_2024_xyz789abc`)
+### Prerequisites
 
-2. **Deploy Your App** using the Publish button
+1. You need the `ADMIN_SEED_SECRET` environment variable set in production
+2. Access to production database (via Database pane or API endpoint)
 
-3. **Call the Seed Endpoint:**
-   ```bash
-   curl -X POST https://your-app.replit.app/api/admin/seed \
-     -H "Content-Type: application/json" \
-     -d '{"secret": "YOUR_ADMIN_SEED_SECRET"}'
-   ```
+### Step 1: Clear Existing Demo Data (If Any)
 
-4. **Remove the Secret** after seeding for security
+If you've already seeded production before, you need to clear old data first:
 
-📖 **Full instructions with security details:** [ADMIN_SEED_ENDPOINT.md](./ADMIN_SEED_ENDPOINT.md)
+**Option A: Using Database Pane**
+1. Open **Database** pane in Replit
+2. Switch to **Production** database
+3. Delete records from these tables (in order):
+   - `review_responses`
+   - `review_goals_comments`
+   - `performance_reviews`
+   - `review_question_assignments`
+   - `review_questions_library`
+   - `review_question_templates`
+   - `review_cycles`
+   - `leave_requests`
+   - `leave_balances`
+   - `new_hires`
+   - `candidates`
+   - `employees`
+   - `announcements`
+   - `job_titles`
+   - `departments`
+   - `profiles`
 
----
+**Option B: SQL Query** (faster)
+```sql
+-- Run this in Database pane > Production > Query
+DELETE FROM review_responses;
+DELETE FROM review_goals_comments;
+DELETE FROM performance_reviews;
+DELETE FROM review_question_assignments;
+DELETE FROM review_questions_library;
+DELETE FROM review_question_templates;
+DELETE FROM review_cycles;
+DELETE FROM leave_requests;
+DELETE FROM leave_balances;
+DELETE FROM new_hires;
+DELETE FROM candidates;
+DELETE FROM employees;
+DELETE FROM announcements;
+DELETE FROM job_titles;
+DELETE FROM departments;
+DELETE FROM profiles;
+```
 
-### Alternative Method: CLI Script (Development Only)
+### Step 2: Run the Seed Script
 
-If you're running in development or have shell access, you can use:
+**Using the Admin API Endpoint:**
 
 ```bash
-npm run seed
+curl -X POST https://hr-studio-360-robertsala.replit.app/api/admin/seed \
+  -H "Content-Type: application/json" \
+  -d '{"secret": "YOUR_ADMIN_SEED_SECRET"}'
 ```
 
-### Step 3: Verify Success
+Replace `YOUR_ADMIN_SEED_SECRET` with the actual secret from your App Secrets.
 
-You should see output like this:
-
-```
-🌱 Starting production database seed...
-1️⃣  Creating demo user profile...
-   ✓ Demo User created with ID: [uuid]
-2️⃣  Creating Robert Sala profile...
-   ✓ Robert Sala created with ID: [uuid]
-3️⃣  Creating sample team members...
-   ✓ Created 5 team members
-4️⃣  Creating departments...
-   ✓ Created 6 departments
-5️⃣  Creating job titles...
-   ✓ Created 7 job titles
-6️⃣  Creating welcome announcement...
-   ✓ Welcome announcement created
-7️⃣  Creating company update announcement...
-   ✓ Platform features announcement created
-
-✅ Production database seeded successfully!
-
-📊 Seed Summary:
-   - 7 user profiles (Demo User, Robert Sala + 5 team members)
-   - 6 departments
-   - 7 job titles
-   - 2 announcements
-
-🔐 Login Credentials:
-   Demo Account: demo@hrstudio360.com / demo
-   Robert Sala: robertsala@gmail.com / (your password)
+**Expected Response:**
+```json
+{
+  "success": true,
+  "alreadySeeded": false,
+  "message": "Production database seeded successfully with comprehensive demo data",
+  "summary": {
+    "profiles": 7,
+    "departments": 6,
+    "jobTitles": 7,
+    "employees": 7,
+    "leaveBalances": 7,
+    "candidates": 3,
+    "newHires": 1,
+    "leaveRequests": 2,
+    "reviewCycles": 1,
+    "performanceReviews": 2,
+    "reviewQuestions": 5,
+    "reviewResponses": 10,
+    "announcements": 2
+  }
+}
 ```
 
-## Important Notes
+### Step 3: Test the Seeded Data
 
-### Passwords
+1. Visit: https://hr-studio-360-robertsala.replit.app
+2. Click "Try Demo Account" or enter: `robertsala@gmail.com`
+3. You should see "Robert Sala" instead of "Demo User"
+4. Explore the platform:
+   - **Dashboard**: See employee count, leave balances, announcements
+   - **Employees**: View 7 team members with full profiles
+   - **Recruitment**: Browse 3 active candidates + 1 new hire
+   - **Time Off**: Check leave requests and balances
+   - **Performance**: View review cycles and completed reviews
 
-⚠️ **The seed script only creates user profiles, not authentication credentials.**
+### Step 4: Security - Remove Admin Secret
 
-To set up login access:
+After seeding, remove the `ADMIN_SEED_SECRET` from App Secrets for security:
 
-1. **For Demo Account:**
-   - Use the password reset flow, OR
-   - Manually set the password through your auth system
+1. Go to **Secrets** (lock icon) in Replit
+2. Delete the `ADMIN_SEED_SECRET` variable
+3. This prevents unauthorized re-seeding of your production database
 
-2. **For Robert Sala:**
-   - Use your existing password if the account already exists in auth
-   - Or use password reset to set a new one
+## What Clients See in Demo
 
-### Running Multiple Times
+When you present HRStudio360 to potential clients, they'll see:
 
-✅ **Safe to run multiple times** - The script will skip existing records if you run it again.
+✅ **Active Organization** - 7 employees across 6 departments, not an empty system  
+✅ **Hiring Pipeline** - Real candidates with ratings, skills, and interview stages  
+✅ **Performance Management** - Completed reviews with detailed feedback and goals  
+✅ **Time-Off System** - Leave balances and approval workflows in action  
+✅ **Onboarding Ready** - New hire starting next week with assigned manager  
+✅ **Professional Data** - Realistic names, roles, and company structure  
 
-❌ **Duplicate Error Expected** - If data already exists, you'll see "duplicate key" errors. This is normal and means the data is already there.
-
-## Alternative: Manual Seeding via Replit Shell
-
-If you don't have console access to production, you can:
-
-1. Open your Replit project workspace
-2. Temporarily modify `.replit` to point to production database URL
-3. Run `npm run seed` from the main workspace shell
-4. Restore `.replit` to development settings
-
-⚠️ **Be careful** - Make sure you're targeting the correct database!
+This makes HRStudio360 look like an established, production-ready platform — not a prototype.
 
 ## Troubleshooting
 
-### Error: "duplicate key value violates unique constraint"
+### "Database already contains demo data"
 
-**Solution:** Data already exists. This is fine - your production database is already seeded.
+This means seeding was already run. Clear the database first (see Step 1) or the script will refuse to run to prevent duplicate data.
 
-### Error: "relation does not exist"
+### "Invalid or missing secret"
 
-**Solution:** Make sure your database schema is pushed to production:
-```bash
-npm run db:push
-```
+Your `ADMIN_SEED_SECRET` environment variable is not set or incorrect. Check App Secrets.
 
-### Error: "connection refused" or "cannot connect to database"
+### Foreign Key Errors
 
-**Solution:** Verify your `DATABASE_URL` environment variable is set correctly in production.
+You need to delete data in the correct order (dependencies first). Use the SQL query in Step 1 Option B.
 
-## After Seeding
+### Login Shows "Demo User" Instead of "Robert Sala"
 
-Once seeded, you can:
+The old auto-created profile is still in the database. Clear all profiles and reseed.
 
-1. ✅ Log in with demo@hrstudio360.com (after setting password)
-2. ✅ See sample team members in the org chart
-3. ✅ View announcements on the dashboard
-4. ✅ Explore all features with realistic demo data
+## Competitive Advantage
 
-## Need Help?
+Most HR platforms show demos with:
+- Empty databases
+- Generic "John Doe" placeholder data
+- Sales-led demos requiring scheduling
 
-If you encounter issues:
-1. Check the production logs for detailed error messages
-2. Verify database connection in production environment
-3. Ensure all environment variables are set correctly
+HRStudio360 offers:
+- **One-click instant access** - No scheduling, no sales calls
+- **Fully populated system** - Looks like a real company
+- **Complete workflows** - Recruitment, reviews, time-off all functional
+- **Professional presentation** - Makes HRStudio360 appear enterprise-ready
+
+This seed script is your secret weapon for closing deals faster than competitors like BambooHR, ADP, and Paylocity.
+
+## Script Location
+
+The seed script is located at: `server/seed-production.ts`
+
+It's called via the admin endpoint: `POST /api/admin/seed` (defined in `server/routes.ts`)

@@ -1,7 +1,9 @@
 import { db } from './db';
 import { 
   profiles, announcements, departments, jobTitles, 
-  employees, leaveBalances, candidates, newHires, leaveRequests 
+  employees, leaveBalances, candidates, newHires, leaveRequests,
+  reviewCycles, performanceReviews, reviewQuestionsLibrary, reviewQuestionTemplates,
+  reviewQuestionAssignments, reviewResponses, reviewGoalsComments
 } from '../shared/schema';
 import { eq } from 'drizzle-orm';
 
@@ -374,6 +376,173 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
     const createdLeaveRequests = await db.insert(leaveRequests).values(leaveRequestData).returning();
     console.log(`   ✓ Created ${createdLeaveRequests.length} leave requests`);
 
+    // Step 13: Create Review Question Template
+    console.log('1️⃣3️⃣  Creating performance review template...');
+    const [reviewTemplate] = await db.insert(reviewQuestionTemplates).values({
+      templateName: 'Annual Performance Review',
+      description: 'Standard annual performance review template'
+    }).returning();
+    console.log(`   ✓ Review template created`);
+
+    // Step 14: Create Review Questions
+    console.log('1️⃣4️⃣  Creating review questions...');
+    const reviewQuestions = [
+      {
+        questionText: 'How well did the employee meet their goals and objectives?',
+        category: 'Goals & Objectives',
+        weight: '1.0',
+        sortOrder: 1,
+        questionType: 'rating'
+      },
+      {
+        questionText: 'Rate the employee\'s technical skills and expertise',
+        category: 'Technical Skills',
+        weight: '1.0',
+        sortOrder: 2,
+        questionType: 'rating'
+      },
+      {
+        questionText: 'How effectively does the employee collaborate with team members?',
+        category: 'Teamwork',
+        weight: '1.0',
+        sortOrder: 3,
+        questionType: 'rating'
+      },
+      {
+        questionText: 'Rate the employee\'s communication skills',
+        category: 'Communication',
+        weight: '1.0',
+        sortOrder: 4,
+        questionType: 'rating'
+      },
+      {
+        questionText: 'How would you rate the employee\'s overall performance?',
+        category: 'Overall',
+        weight: '1.5',
+        sortOrder: 5,
+        questionType: 'rating'
+      }
+    ];
+
+    const createdQuestions = await db.insert(reviewQuestionsLibrary).values(reviewQuestions).returning();
+    console.log(`   ✓ Created ${createdQuestions.length} review questions`);
+
+    // Step 15: Assign questions to template
+    const questionAssignments = createdQuestions.map((q, idx) => ({
+      templateId: reviewTemplate.id,
+      questionId: q.id,
+      sortOrder: idx + 1,
+      isRequired: true
+    }));
+    await db.insert(reviewQuestionAssignments).values(questionAssignments);
+
+    // Step 16: Create Review Cycle
+    console.log('1️⃣5️⃣  Creating review cycle...');
+    const [reviewCycle] = await db.insert(reviewCycles).values({
+      name: '2025 Annual Performance Review',
+      reviewType: 'annual',
+      templateId: reviewTemplate.id,
+      startDate: '2025-01-01',
+      endDate: '2025-12-31',
+      selfAssessmentDeadline: '2025-03-15',
+      managerAssessmentDeadline: '2025-03-31',
+      status: 'active',
+      createdBy: robertSala.id
+    }).returning();
+    console.log(`   ✓ Review cycle created`);
+
+    // Step 17: Create Performance Reviews
+    console.log('1️⃣6️⃣  Creating performance reviews...');
+    const robertEmployee = createdEmployees.find(e => e.userId === robertSala.id);
+    const sarahEmployee2 = createdEmployees.find(e => e.userId === createdTeamMembers[0].id);
+    const michaelEmployee = createdEmployees.find(e => e.userId === createdTeamMembers[1].id);
+
+    const performanceReviewData = [
+      {
+        reviewCycleId: reviewCycle.id,
+        employeeId: sarahEmployee2?.id || createdEmployees[2].id,
+        managerId: robertEmployee?.id || createdEmployees[0].id,
+        selfAssessmentStatus: 'submitted',
+        managerAssessmentStatus: 'submitted',
+        selfAssessmentSubmittedAt: new Date('2025-03-10'),
+        managerAssessmentSubmittedAt: new Date('2025-03-20'),
+        hrReviewStatus: 'reviewed',
+        overallStatus: 'completed',
+        selfOverallRating: '4.5',
+        managerOverallRating: '4.7',
+        finalRating: '4.6',
+        compensationChange: '8000',
+        compensationChangeApproved: true
+      },
+      {
+        reviewCycleId: reviewCycle.id,
+        employeeId: michaelEmployee?.id || createdEmployees[3].id,
+        managerId: robertEmployee?.id || createdEmployees[0].id,
+        selfAssessmentStatus: 'submitted',
+        managerAssessmentStatus: 'in_progress',
+        selfAssessmentSubmittedAt: new Date('2025-03-12'),
+        hrReviewStatus: 'pending',
+        overallStatus: 'pending_manager',
+        selfOverallRating: '4.2',
+        managerOverallRating: null,
+        finalRating: null,
+        compensationChange: null,
+        compensationChangeApproved: false
+      }
+    ];
+
+    const createdReviews = await db.insert(performanceReviews).values(performanceReviewData).returning();
+    console.log(`   ✓ Created ${createdReviews.length} performance reviews`);
+
+    // Step 18: Create Review Responses (for completed review)
+    console.log('1️⃣7️⃣  Creating review responses...');
+    const completedReview = createdReviews[0];
+    const reviewResponseData = createdQuestions.map(q => [
+      {
+        performanceReviewId: completedReview.id,
+        questionId: q.id,
+        responseType: 'self_assessment',
+        rating: '4.5',
+        textResponse: 'Strong performance in this area with room for continued growth',
+        comments: 'Self-assessment comments'
+      },
+      {
+        performanceReviewId: completedReview.id,
+        questionId: q.id,
+        responseType: 'manager_assessment',
+        rating: '4.7',
+        textResponse: 'Excellent performance, exceeds expectations',
+        comments: 'Manager feedback'
+      }
+    ]).flat();
+
+    const createdResponses = await db.insert(reviewResponses).values(reviewResponseData).returning();
+    console.log(`   ✓ Created ${createdResponses.length} review responses`);
+
+    // Step 19: Create Review Goals & Comments
+    console.log('1️⃣8️⃣  Creating review goals and comments...');
+    const goalCommentsData = [
+      {
+        performanceReviewId: completedReview.id,
+        commentType: 'self_assessment',
+        achievements: 'Successfully led 3 major projects, improved code quality metrics by 25%, mentored 2 junior developers',
+        developmentAreas: 'Would like to improve presentation skills and learn more about system architecture',
+        goalsNextPeriod: 'Lead team architecture initiatives, complete AWS certification, present at tech conference',
+        additionalComments: 'Excited about growth opportunities in the coming year'
+      },
+      {
+        performanceReviewId: completedReview.id,
+        commentType: 'manager_assessment',
+        achievements: 'Outstanding technical leadership, consistently delivers high-quality work, excellent team player',
+        developmentAreas: 'Continue developing strategic thinking and cross-functional collaboration skills',
+        goalsNextPeriod: 'Take ownership of platform architecture, mentor team members, drive technical standards',
+        additionalComments: 'One of our top performers, ready for increased responsibilities'
+      }
+    ];
+
+    await db.insert(reviewGoalsComments).values(goalCommentsData);
+    console.log(`   ✓ Created review goals and comments`);
+
     console.log('\n✅ Production database seeded successfully!');
     console.log('\n📊 Seed Summary:');
     console.log(`   - 7 user profiles (Demo User, Robert Sala + 5 team members)`);
@@ -384,6 +553,10 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
     console.log(`   - ${createdCandidates.length} recruitment candidates`);
     console.log(`   - ${createdNewHires.length} new hires (onboarding)`);
     console.log(`   - ${createdLeaveRequests.length} leave requests`);
+    console.log(`   - 1 review cycle (2025 Annual)`);
+    console.log(`   - ${createdReviews.length} performance reviews (1 completed, 1 in-progress)`);
+    console.log(`   - ${createdQuestions.length} review questions`);
+    console.log(`   - ${createdResponses.length} review responses`);
     console.log('   - 2 announcements');
     console.log('\n🔐 Login Credentials:');
     console.log('   Demo Account: demo@hrstudio360.com');
@@ -403,6 +576,10 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         candidates: createdCandidates.length,
         newHires: createdNewHires.length,
         leaveRequests: createdLeaveRequests.length,
+        reviewCycles: 1,
+        performanceReviews: createdReviews.length,
+        reviewQuestions: createdQuestions.length,
+        reviewResponses: createdResponses.length,
         announcements: 2
       }
     };
