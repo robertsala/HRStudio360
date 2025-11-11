@@ -21,9 +21,18 @@ function App() {
 
   // Check if we're on the reset-password page
   useEffect(() => {
-    if (window.location.pathname === '/reset-password') {
-      setCurrentView('reset-password');
-    }
+    const checkResetPasswordPath = () => {
+      if (window.location.pathname === '/reset-password') {
+        console.log('[App.tsx] Detected reset-password path, setting view');
+        setCurrentView('reset-password');
+      }
+    };
+    
+    checkResetPasswordPath();
+    
+    // Also listen for URL changes
+    window.addEventListener('popstate', checkResetPasswordPath);
+    return () => window.removeEventListener('popstate', checkResetPasswordPath);
   }, []);
 
   // --- REFINED AUTHENTICATION REDIRECT LOGIC ---
@@ -34,12 +43,12 @@ function App() {
         setCurrentView('dashboard');
       }
     } else {
-      // If the user is NOT authenticated, always show landing
-      if (currentView !== 'landing') {
+      // If the user is NOT authenticated, allow landing and reset-password
+      if (currentView !== 'landing' && currentView !== 'reset-password') {
         setCurrentView('landing');
       }
     }
-  }, [isAuthenticated]); // Only depend on isAuthenticated to avoid loops
+  }, [isAuthenticated, currentView]); // Include currentView to properly handle all cases
 
   // Handle navigation (this part is good)
   const handleNavigation = (view: 'landing' | 'dashboard' | 'profile' | 'reset-password') => {
