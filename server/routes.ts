@@ -1365,6 +1365,108 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Admin cleanup endpoint - Deletes all demo data
+  app.post('/api/admin/cleanup', async (req, res) => {
+    try {
+      // Security: Check for admin secret key
+      const providedSecret = req.body.secret || req.query.secret;
+      const adminSecret = process.env.ADMIN_SEED_SECRET;
+
+      if (!adminSecret) {
+        return res.status(500).json({ 
+          error: 'Admin cleanup not configured. Set ADMIN_SEED_SECRET environment variable.' 
+        });
+      }
+
+      if (providedSecret !== adminSecret) {
+        console.warn('⚠️  Unauthorized cleanup attempt with invalid secret');
+        return res.status(401).json({ 
+          error: 'Unauthorized. Invalid admin secret key.' 
+        });
+      }
+
+      // Delete data in correct order (respecting foreign key constraints)
+      console.log('🔐 Admin cleanup endpoint called with valid credentials');
+      console.log('🧹 Starting database cleanup...');
+      
+      const { db } = await import('./db.js');
+      const { 
+        reviewResponses, reviewGoalsComments, performanceReviews,
+        reviewQuestionAssignments, reviewQuestionsLibrary, reviewQuestionTemplates, reviewCycles,
+        leaveRequests, leaveBalances, newHires, candidates, employees,
+        announcements, jobTitles, departments, profiles
+      } = await import('../shared/schema.js');
+
+      // Delete in reverse dependency order
+      await db.delete(reviewResponses);
+      console.log('   ✓ Deleted review responses');
+      
+      await db.delete(reviewGoalsComments);
+      console.log('   ✓ Deleted review goals/comments');
+      
+      await db.delete(performanceReviews);
+      console.log('   ✓ Deleted performance reviews');
+      
+      await db.delete(reviewQuestionAssignments);
+      console.log('   ✓ Deleted review question assignments');
+      
+      await db.delete(reviewQuestionsLibrary);
+      console.log('   ✓ Deleted review questions');
+      
+      await db.delete(reviewQuestionTemplates);
+      console.log('   ✓ Deleted review templates');
+      
+      await db.delete(reviewCycles);
+      console.log('   ✓ Deleted review cycles');
+      
+      await db.delete(leaveRequests);
+      console.log('   ✓ Deleted leave requests');
+      
+      await db.delete(leaveBalances);
+      console.log('   ✓ Deleted leave balances');
+      
+      await db.delete(newHires);
+      console.log('   ✓ Deleted new hires');
+      
+      await db.delete(candidates);
+      console.log('   ✓ Deleted candidates');
+      
+      await db.delete(employees);
+      console.log('   ✓ Deleted employees');
+      
+      await db.delete(announcements);
+      console.log('   ✓ Deleted announcements');
+      
+      await db.delete(jobTitles);
+      console.log('   ✓ Deleted job titles');
+      
+      await db.delete(departments);
+      console.log('   ✓ Deleted departments');
+      
+      await db.delete(profiles);
+      console.log('   ✓ Deleted profiles');
+
+      console.log('✅ Database cleanup completed successfully!');
+      
+      res.json({
+        success: true,
+        message: 'All demo data has been deleted successfully',
+        tablesCleared: [
+          'review_responses', 'review_goals_comments', 'performance_reviews',
+          'review_question_assignments', 'review_questions_library', 'review_question_templates', 'review_cycles',
+          'leave_requests', 'leave_balances', 'new_hires', 'candidates', 'employees',
+          'announcements', 'job_titles', 'departments', 'profiles'
+        ]
+      });
+    } catch (error: any) {
+      console.error('❌ Admin cleanup endpoint error:', error);
+      res.status(500).json({ 
+        error: 'Cleanup failed', 
+        details: error.message 
+      });
+    }
+  });
+
   // Admin seed endpoint - Protected with secret key
   app.post('/api/admin/seed', async (req, res) => {
     try {
