@@ -91,7 +91,11 @@ Authentication is managed by the backend Express API using server-side sessions 
 
 ### Real-time Features
 
-The system includes an enterprise chat system with channels and direct messages, a celebration system for milestones, and a general real-time notification system, leveraging Supabase Realtime for live updates.
+⚠️ **Migration Status**: Real-time features are currently being migrated from Supabase to backend infrastructure.
+
+The system includes an enterprise chat system with channels and direct messages, a celebration system for milestones, and a general real-time notification system. These features previously leveraged Supabase Realtime and are being migrated to WebSocket-based backend APIs.
+
+**See `docs/SUPABASE_REMOVAL_IMPACT.md` for detailed migration status and affected features.**
 
 ### Collaboration Features
 
@@ -121,23 +125,25 @@ Sentry is integrated for comprehensive error tracking and performance monitoring
 
 ### Third-Party Services
 
--   **Supabase**: For real-time subscriptions, file storage, and some edge functions.
 -   **Resend**: For transactional email delivery.
 -   **OpenAI**: Powers AI functionalities.
 -   **Neon**: Provides PostgreSQL database hosting.
 -   **Sentry**: For error tracking and performance monitoring.
+
+**Note**: Supabase has been removed as part of the backend migration. Real-time features and file storage are being migrated to self-hosted backend infrastructure.
 
 ### NPM Dependencies
 
 -   **Core Framework**: `react`, `react-dom`, `typescript`, `vite`, `express`.
 -   **Database & ORM**: `drizzle-orm`, `drizzle-kit`, `drizzle-zod`, `@neondatabase/serverless`.
 -   **Authentication & Security**: `argon2`, `express-rate-limit`, `express-session`.
--   **Supabase Client**: `@supabase/supabase-js`.
 -   **UI Libraries**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`.
 -   **Forms & Validation**: `react-hook-form`, `@hookform/resolvers`, `zod`.
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
 
 ### Environment Variables
 
--   **Required**: `DATABASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+-   **Required**: `DATABASE_URL`.
 -   **Optional**: `RESEND_API_KEY`, `OPENAI_API_KEY`, `SENTRY_DSN`, `VITE_SENTRY_DSN`.
+
+**Note**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are no longer required after Supabase removal.
