@@ -1,10 +1,21 @@
 import { db } from './db';
 import { profiles, announcements, departments, jobTitles } from '../shared/schema';
+import { eq } from 'drizzle-orm';
 
-async function seedProductionDatabase() {
+export async function seedProductionDatabase() {
   console.log('🌱 Starting production database seed...');
 
   try {
+    // Safety check: Prevent duplicate seeding
+    const existingDemo = await db.select().from(profiles).where(eq(profiles.email, 'demo@hrstudio360.com')).limit(1);
+    if (existingDemo.length > 0) {
+      console.log('⚠️  Database already seeded (demo user exists). Skipping...');
+      return {
+        success: true,
+        alreadySeeded: true,
+        message: 'Database already contains demo data'
+      };
+    }
     // Step 1: Create Demo User Profile
     console.log('1️⃣  Creating demo user profile...');
     const [demoUser] = await db.insert(profiles).values({
@@ -155,19 +166,34 @@ async function seedProductionDatabase() {
     console.log('   Robert Sala: robertsala@gmail.com / (your password)');
     console.log('\n💡 Note: Passwords need to be set via the authentication system');
     
+    return {
+      success: true,
+      alreadySeeded: false,
+      message: 'Production database seeded successfully',
+      summary: {
+        profiles: 7,
+        departments: createdDepartments.length,
+        jobTitles: createdJobTitles.length,
+        announcements: 2
+      }
+    };
+    
   } catch (error) {
     console.error('\n❌ Error seeding database:', error);
     throw error;
   }
 }
 
-// Run the seed function
-seedProductionDatabase()
-  .then(() => {
-    console.log('\n🎉 Production seeding completed successfully!');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('\n💥 Production seeding failed:', error);
-    process.exit(1);
-  });
+// Only run if this file is executed directly (not imported as module)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seedProductionDatabase()
+    .then((result) => {
+      console.log('\n🎉 Production seeding completed successfully!');
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('\n💥 Production seeding failed:', error);
+      process.exit(1);
+    });
+}
