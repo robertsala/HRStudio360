@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
   const [isSignUp, setIsSignUp] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   React.useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -259,6 +261,18 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
                 Password must be at least 12 characters with uppercase, lowercase, numbers, and special characters
               </p>
             )}
+            {!isSignUp && (
+              <div className="flex justify-end mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  data-testid="button-forgot-password"
+                >
+                  {t('auth.forgotPassword')}?
+                </button>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -310,6 +324,11 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
           </button>
         </div>
       </div>
+      
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 };

@@ -11,12 +11,20 @@ import UserProfile from './components/UserProfile';
 import ProtectedRoute from './components/ProtectedRoute';
 import BirthdayCelebrationModal from './components/modals/BirthdayCelebrationModal';
 import AnniversaryCelebrationModal from './components/modals/AnniversaryCelebrationModal';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'profile'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'profile' | 'reset-password'>('landing');
   const { isAuthenticated, isLoading, celebration, dismissCelebration, user } = useAuth();
   const dashboardRef = useRef<any>(null);
+
+  // Check if we're on the reset-password page
+  useEffect(() => {
+    if (window.location.pathname === '/reset-password') {
+      setCurrentView('reset-password');
+    }
+  }, []);
 
   // --- REFINED AUTHENTICATION REDIRECT LOGIC ---
   useEffect(() => {
@@ -34,8 +42,8 @@ function App() {
   }, [isAuthenticated]); // Only depend on isAuthenticated to avoid loops
 
   // Handle navigation (this part is good)
-  const handleNavigation = (view: 'landing' | 'dashboard' | 'profile') => {
-    if (!isAuthenticated && view !== 'landing') {
+  const handleNavigation = (view: 'landing' | 'dashboard' | 'profile' | 'reset-password') => {
+    if (!isAuthenticated && view !== 'landing' && view !== 'reset-password') {
       // Don't allow navigation to protected views when not authenticated
       return;
     }
@@ -64,6 +72,11 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  // Handle reset-password page
+  if (currentView === 'reset-password') {
+    return <ResetPasswordPage />;
   }
 
   // Render logic based on currentView (this part is good)
