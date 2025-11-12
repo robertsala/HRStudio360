@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { apiClient } from '../lib/api';
 import i18n from '../i18n';
 import { celebrationService, CelebrationData } from '../utils/celebrationService';
@@ -31,6 +32,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [, setLocation] = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -249,6 +251,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setIsAuthenticated(false);
 
+      // Redirect to homepage
+      setLocation('/');
+
       console.log('Sign out completed successfully');
     } catch (error) {
       console.error('Sign out error:', error);
@@ -274,6 +279,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActualUser(null);
       setImpersonatedUser(null);
       setIsImpersonating(false);
+
+      // Redirect to homepage even on error
+      setLocation('/');
     }
   };
 
