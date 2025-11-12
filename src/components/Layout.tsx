@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, Shield, Smartphone, GraduationCap, Clock, Inbox, UserX, Star, Sparkles, Timer } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SignInModal from './SignInModal';
@@ -17,6 +18,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNavigate, onOpenModal }) => {
   const { t } = useTranslation();
   const { user, isAuthenticated, signIn, signOut } = useAuth();
+  const [, setLocation] = useLocation();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
@@ -203,12 +205,9 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
       await signIn(email, password);
       setShowSignInModal(false);
       
-      // Navigate to dashboard after successful sign-in
-      setTimeout(() => {
-        if (onNavigate) {
-          onNavigate('dashboard');
-        }
-      }, 100);
+      // Navigate to dashboard after successful sign-in using direct routing
+      console.log('[Layout] Navigating to dashboard after successful sign-in');
+      setLocation('/dashboard');
     } catch (error) {
       // Error will be displayed in SignInModal
       throw error;
