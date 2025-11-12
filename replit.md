@@ -91,11 +91,21 @@ Authentication is managed by the backend Express API using server-side sessions 
 
 ### Real-time Features
 
-⚠️ **Migration Status**: Real-time features are currently being migrated from Supabase to backend infrastructure.
+The system includes real-time chat, celebration system for milestones, and notification system.
 
-The system includes an enterprise chat system with channels and direct messages, a celebration system for milestones, and a general real-time notification system. These features previously leveraged Supabase Realtime and are being migrated to WebSocket-based backend APIs.
+**Chat System (✅ Migration Complete - November 12, 2025):**
+- **Architecture**: WebSocket-based (`ws` library) with session-based authentication at `/ws/chat`
+- **Backend**: Express REST API for persistence + WebSocket server for real-time broadcasting
+- **Message Flow**: Client → REST API → Database → WebSocket broadcast → All connected clients
+- **Features**: Real-time messaging, typing indicators, presence tracking, channel management
+- **Security**: Session-based WebSocket authentication (no userId spoofing), end-to-end message encryption
+- **Components**: `EnterpriseChatModal`, `NewChannelModal` fully migrated from Supabase to backend API
+- **Client**: `src/utils/websocketClient.ts` with auto-reconnection and heartbeat monitoring
+- **Service**: `src/utils/chatService.ts` handles decryption and event dispatching ('chat:*' events)
 
-**See `docs/SUPABASE_REMOVAL_IMPACT.md` for detailed migration status and affected features.**
+**Celebration & Notifications (⚠️ Migration In Progress):**
+- Celebration badges and notification system still being migrated from Supabase
+- **See `docs/SUPABASE_REMOVAL_IMPACT.md` for detailed migration status**
 
 ### Collaboration Features
 
