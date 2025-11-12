@@ -366,6 +366,15 @@ export class ChatService {
         ? content
         : await chatEncryption.encryptMessage(content);
 
+      // For AI Assistant channels, fetch channel info to check type
+      let isAIChannel = false;
+      try {
+        const channel = await apiClient.getChatChannel(channelId);
+        isAIChannel = channel?.channelType === 'ai_assistant';
+      } catch (error) {
+        console.warn('Could not determine channel type:', error);
+      }
+      
       const message = await apiClient.createChatMessage(channelId, {
         senderId: this.currentUserId,
         encryptedContent,
@@ -373,7 +382,9 @@ export class ChatService {
         fileUrl: fileUrl || null,
         fileName: fileName || null,
         fileSize: fileSize || null,
-        replyToMessageId: replyToMessageId || null
+        replyToMessageId: replyToMessageId || null,
+        // Send plain text for AI processing if this is an AI channel
+        ...(isAIChannel && { plainContent: content })
       });
 
       const normalized = normalizeMessage(message);
