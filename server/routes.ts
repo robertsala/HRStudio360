@@ -478,17 +478,16 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Channel not found' });
       }
       
-      // Prepare message data, stripping plainContent unless it's an AI channel
+      // Extract plainContent for AI processing (before validation)
+      // plainContent is not a database column, it's only used for AI analysis
+      const plainContent = channel.channelType === 'ai_assistant' ? req.body.plainContent : null;
+      
+      // Prepare message data WITHOUT plainContent (not a database field)
       const messageData = {
         ...req.body,
         channelId: req.params.channelId
       };
-      
-      // SECURITY: Remove plainContent if channel is not ai_assistant
-      // This prevents encryption bypass by malicious clients
-      if (channel.channelType !== 'ai_assistant') {
-        delete messageData.plainContent;
-      }
+      delete messageData.plainContent; // Always remove - not a database column
       
       const validated = insertChatMessageSchema.parse(messageData);
       const message = await storage.createChatMessage(validated);
@@ -517,9 +516,8 @@ export function registerRoutes(app: Express) {
         const { getAIResponse } = await import('./ai-assistant');
         
         // Generate AI response based on user message
-        // Use plainContent if available (sent by client for AI processing), otherwise use encryptedContent
-        // Note: For AI channels, we expect the client to send plainContent for analysis
-        const userMessage = req.body.plainContent || req.body.encryptedContent;
+        // Use plainContent (extracted above for security) if available, otherwise use encryptedContent
+        const userMessage = plainContent || message.encryptedContent;
         const aiResponse = getAIResponse(userMessage);
         
         // Create AI response message with dedicated AI sender identity
