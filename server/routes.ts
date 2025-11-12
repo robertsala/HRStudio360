@@ -471,10 +471,25 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/chat/channels/:channelId/messages', async (req, res) => {
     try {
+      // SECURITY: Validate channel type before accepting plainContent
+      // Only ai_assistant channels are allowed to send plainContent
+      const channel = await storage.getChatChannelById(req.params.channelId);
+      if (!channel) {
+        return res.status(404).json({ error: 'Channel not found' });
+      }
+      
+      // Prepare message data, stripping plainContent unless it's an AI channel
       const messageData = {
         ...req.body,
         channelId: req.params.channelId
       };
+      
+      // SECURITY: Remove plainContent if channel is not ai_assistant
+      // This prevents encryption bypass by malicious clients
+      if (channel.channelType !== 'ai_assistant') {
+        delete messageData.plainContent;
+      }
+      
       const validated = insertChatMessageSchema.parse(messageData);
       const message = await storage.createChatMessage(validated);
       
@@ -496,8 +511,8 @@ export function registerRoutes(app: Express) {
       }
       
       // Check if this is an AI Assistant channel and auto-respond
-      const channel = await storage.getChatChannelById(req.params.channelId);
-      if (channel && channel.channelType === 'ai_assistant') {
+      // (channel already fetched above for security validation)
+      if (channel.channelType === 'ai_assistant') {
         // Import AI response generator
         const { getAIResponse } = await import('./ai-assistant');
         
@@ -545,10 +560,27 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/chat/messages/:id', async (req, res) => {
     try {
-      const message = await storage.updateChatMessage(req.params.id, req.body);
-      if (!message) {
+      // SECURITY: Validate channel type before accepting plainContent in updates
+      // First get the existing message to find its channel
+      const existingMessage = await storage.getChatMessageById(req.params.id);
+      if (!existingMessage) {
         return res.status(404).json({ error: 'Message not found' });
       }
+      
+      // Get the channel to check its type
+      const channel = await storage.getChatChannelById(existingMessage.channelId);
+      if (!channel) {
+        return res.status(404).json({ error: 'Channel not found' });
+      }
+      
+      // SECURITY: Remove plainContent from update if channel is not ai_assistant
+      // This prevents encryption bypass on message edits
+      const updateData = { ...req.body };
+      if (channel.channelType !== 'ai_assistant') {
+        delete updateData.plainContent;
+      }
+      
+      const message = await storage.updateChatMessage(req.params.id, updateData);
       res.json(message);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

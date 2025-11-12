@@ -164,6 +164,19 @@ export class ChatWebSocketServer {
           this.handleLeaveChannel(ws, payload);
           break;
 
+        case 'ping':
+          // Client heartbeat ping - respond with pong
+          this.sendToClient(ws, {
+            type: 'pong',
+            payload: { timestamp: new Date().toISOString() }
+          });
+          break;
+
+        case 'pong':
+          // Client responding to server ping - mark as alive
+          ws.isAlive = true;
+          break;
+
         default:
           console.log(`[WebSocket] Unknown message type: ${type}`);
       }
