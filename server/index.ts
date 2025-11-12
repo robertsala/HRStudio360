@@ -4,6 +4,7 @@ import { registerRoutes } from './routes';
 import { setupVite } from './vite';
 import { createServer } from 'http';
 import { initSentry, setupExpressErrorHandler } from './lib/sentry';
+import { ChatWebSocketServer } from './websocket';
 
 // Initialize Sentry for backend error tracking
 initSentry();
@@ -22,7 +23,7 @@ if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
 }
 
 // Session configuration
-app.use(session({
+const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production-' + Math.random(),
   resave: false,
   saveUninitialized: false,
@@ -32,7 +33,9 @@ app.use(session({
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     sameSite: 'lax'
   }
-}));
+});
+
+app.use(sessionMiddleware);
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -68,6 +71,12 @@ registerRoutes(app);
 
 const PORT = 5000;
 const server = createServer(app);
+
+// Initialize WebSocket server with session authentication
+const wsServer = new ChatWebSocketServer(server, sessionMiddleware);
+
+// Make WebSocket server available to routes
+app.set('wsServer', wsServer);
 
 // Setup Vite dev server
 setupVite(app, server).then(() => {
