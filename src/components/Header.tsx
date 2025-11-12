@@ -27,7 +27,13 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen, onNa
     try {
       await signIn(email, password);
       setShowSignInModal(false);
-      // Navigation will happen automatically via App.tsx useEffect
+      
+      // Navigate to dashboard after successful sign-in
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate('dashboard');
+        }
+      }, 100);
     } catch (error) {
       // Error will be displayed in SignInModal
       throw error;
