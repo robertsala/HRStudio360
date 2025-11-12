@@ -198,16 +198,21 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
     };
   }, [showSearchResults]);
 
-  const handleSignIn = (email: string, password: string) => {
-    signIn(email, password);
-    setShowSignInModal(false);
-    
-    // Force immediate redirect to dashboard
-    setTimeout(() => {
-      if (onNavigate) {
-        onNavigate('dashboard');
-      }
-    }, 100);
+  const handleSignIn = async (email: string, password: string) => {
+    try {
+      await signIn(email, password);
+      setShowSignInModal(false);
+      
+      // Navigate to dashboard after successful sign-in
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate('dashboard');
+        }
+      }, 100);
+    } catch (error) {
+      // Error will be displayed in SignInModal
+      throw error;
+    }
   };
 
   const handleSignOut = async () => {
