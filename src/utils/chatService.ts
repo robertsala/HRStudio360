@@ -229,17 +229,6 @@ export class ChatService {
     }
   }
 
-  private handleNewMessage(message: Message): void {
-    window.dispatchEvent(new CustomEvent('chat:new-message', { detail: message }));
-  }
-
-  private handleTypingIndicator(indicator: TypingIndicator): void {
-    window.dispatchEvent(new CustomEvent('chat:typing', { detail: indicator }));
-  }
-
-  private handlePresenceUpdate(presence: UserPresence): void {
-    window.dispatchEvent(new CustomEvent('chat:presence', { detail: presence }));
-  }
 
   async getChannels(): Promise<Channel[]> {
     if (!this.currentUserId) throw new Error('Not initialized');
@@ -787,22 +776,52 @@ export class ChatService {
     }
   }
 
-  private handleNewMessage(payload: any): void {
+  private async handleNewMessage(payload: any): Promise<void> {
     console.log('[ChatService] New message received:', payload);
     
-    // Create message object with normalized structure
-    const message = normalizeMessage({
-      id: payload.id || payload.messageId,
-      channelId: payload.channelId,
-      senderId: payload.senderId,
-      encryptedContent: payload.content,
-      messageType: payload.messageType || 'text',
-      createdAt: payload.timestamp || new Date().toISOString(),
-      ...payload
-    });
+    try {
+      // Decrypt message content (skip for system messages)
+      const isSystemMessage = payload.messageType === 'system';
+      const decryptedContent = isSystemMessage
+        ? payload.content
+        : await chatEncryption.decryptMessage(payload.content);
 
-    // Dispatch event for components to handle
-    window.dispatchEvent(new CustomEvent('new-message', { detail: message }));
+      // Create message object with normalized structure
+      const message = normalizeMessage({
+        id: payload.id || payload.messageId,
+        channelId: payload.channelId,
+        senderId: payload.senderId,
+        encryptedContent: payload.content,
+        messageType: payload.messageType || 'text',
+        createdAt: payload.timestamp || new Date().toISOString(),
+        ...payload
+      });
+
+      // Add decrypted content for UI display
+      const fullMessage = {
+        ...message,
+        decrypted_content: decryptedContent
+      };
+
+      // Dispatch event with legacy 'chat:' prefix for compatibility
+      window.dispatchEvent(new CustomEvent('chat:new-message', { detail: fullMessage }));
+    } catch (error) {
+      console.error('[ChatService] Failed to decrypt message:', error);
+      // Dispatch with error indicator
+      const message = normalizeMessage({
+        id: payload.id || payload.messageId,
+        channelId: payload.channelId,
+        senderId: payload.senderId,
+        encryptedContent: payload.content,
+        messageType: payload.messageType || 'text',
+        createdAt: payload.timestamp || new Date().toISOString(),
+        ...payload
+      });
+      
+      window.dispatchEvent(new CustomEvent('chat:new-message', { 
+        detail: { ...message, decrypted_content: '[Decryption failed]' }
+      }));
+    }
   }
 
   private handleTypingStart(payload: any): void {
@@ -812,7 +831,8 @@ export class ChatService {
       started_typing_at: payload.timestamp || new Date().toISOString()
     };
     
-    window.dispatchEvent(new CustomEvent('typing-indicator', { detail: indicator }));
+    // Dispatch event with legacy 'chat:' prefix for compatibility
+    window.dispatchEvent(new CustomEvent('chat:typing', { detail: indicator }));
   }
 
   private handleTypingStop(payload: any): void {
@@ -822,7 +842,8 @@ export class ChatService {
       started_typing_at: null
     };
     
-    window.dispatchEvent(new CustomEvent('typing-indicator', { detail: indicator }));
+    // Dispatch event with legacy 'chat:' prefix for compatibility
+    window.dispatchEvent(new CustomEvent('chat:typing', { detail: indicator }));
   }
 
   private handlePresenceUpdate(payload: any): void {
@@ -832,7 +853,8 @@ export class ChatService {
       last_seen_at: payload.timestamp || new Date().toISOString()
     };
     
-    window.dispatchEvent(new CustomEvent('presence-update', { detail: presence }));
+    // Dispatch event with legacy 'chat:' prefix for compatibility
+    window.dispatchEvent(new CustomEvent('chat:presence', { detail: presence }));
   }
 
   async ensureAIAssistantChannel(): Promise<void> {
