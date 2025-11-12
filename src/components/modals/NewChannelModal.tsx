@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Search, Users, Hash, User, Check, UserPlus, Loader2, Sparkles } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUserPresence } from '../../hooks/useUserPresence';
 import { chatService } from '../../utils/chatService';
@@ -128,27 +127,16 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
       setIsSearching(true);
       setError(null);
 
-      // Try with full query first
-      let { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, profile_picture, department, role, job_title, status')
-        .order('first_name');
+      // Fetch profiles from backend API
+      const response = await fetch('/api/profiles', {
+        credentials: 'include'
+      });
 
-      // If columns don't exist yet, fall back to basic query
-      if (error && (error.message.includes('column') || error.message.includes('does not exist'))) {
-        console.log('Some employee columns not yet in profiles table, using basic query');
-        const basicResult = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email, profile_picture')
-          .order('first_name');
-        data = basicResult.data;
-        error = basicResult.error;
+      if (!response.ok) {
+        throw new Error(`Failed to load users: ${response.statusText}`);
       }
 
-      if (error) {
-        console.error('Database error loading users:', error);
-        throw new Error(`Failed to load users: ${error.message}`);
-      }
+      const data = await response.json();
 
       if (!data || data.length === 0) {
         console.warn('No user profiles found in database');
@@ -163,12 +151,12 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
 
       const formattedUsers: UserProfile[] = activeUsers.map((profile: any) => ({
         id: profile.id,
-        firstName: profile.first_name || 'Unknown',
-        lastName: profile.last_name || 'User',
+        firstName: profile.firstName || 'Unknown',
+        lastName: profile.lastName || 'User',
         email: profile.email || '',
-        profilePicture: profile.profile_picture,
+        profilePicture: profile.profilePicture,
         department: profile.department || 'General',
-        jobTitle: profile.job_title || profile.role || 'Employee',
+        jobTitle: profile.jobTitle || profile.role || 'Employee',
         location: undefined
       }));
 
@@ -219,30 +207,31 @@ const NewChannelModal: React.FC<NewChannelModalProps> = ({ isOpen, onClose, onCh
     setError(null);
 
     try {
-      const { data: newProfile, error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          first_name: newUserData.firstName.trim(),
-          last_name: newUserData.lastName.trim(),
+      // Create profile via backend API
+      const response = await fetch('/api/profiles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          firstName: newUserData.firstName.trim(),
+          lastName: newUserData.lastName.trim(),
           email: newUserData.email.trim().toLowerCase(),
           department: newUserData.department.trim() || null,
           role: newUserData.role.trim() || null
         })
-        .select()
-        .single();
+      });
 
-      if (insertError) throw insertError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create user');
+      }
 
+      const newProfile = await response.json();
+
+      // Reload users to get the new user
       await loadUsers();
-
-      const newUser = allUsers.find(u => u.id === newProfile.id) || {
-        id: newProfile.id,
-        firstName: newProfile.first_name,
-        lastName: newProfile.last_name,
-        email: newProfile.email,
-        department: newProfile.department,
-        profilePicture: newProfile.profile_picture
-      };
 
       const newSelected = new Set(selectedUsers);
       if (channelType === 'direct') {

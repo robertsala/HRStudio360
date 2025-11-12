@@ -475,6 +475,24 @@ export function registerRoutes(app: Express) {
       };
       const validated = insertChatMessageSchema.parse(messageData);
       const message = await storage.createChatMessage(validated);
+      
+      // Broadcast new message via WebSocket to all connected clients
+      const wsServer = app.get('wsServer');
+      if (wsServer) {
+        wsServer.broadcastToChannel(req.params.channelId, {
+          type: 'new_message',
+          payload: {
+            id: message.id,
+            channelId: message.channelId,
+            senderId: message.senderId,
+            content: message.encryptedContent,
+            messageType: message.messageType,
+            timestamp: message.createdAt,
+            ...message
+          }
+        });
+      }
+      
       res.status(201).json(message);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

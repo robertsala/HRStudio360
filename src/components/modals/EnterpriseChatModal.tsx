@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, MessageCircle, Users, Search, Plus, Hash, Send, Paperclip, Smile, MoreVertical, Phone, Video, Settings, Bot, UserPlus, Archive, Trash2, Edit2, Reply, Check, CheckCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { chatService, Channel, Message, ChannelMember } from '../../utils/chatService';
-import { supabase } from '../../utils/supabaseClient';
 import { useUserPresence } from '../../hooks/useUserPresence';
 import NewChannelModal from './NewChannelModal';
 import EmojiPicker from '../EmojiPicker';

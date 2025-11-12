@@ -1,5 +1,6 @@
 import { apiClient } from '../lib/api';
 import { chatEncryption } from './chatEncryptionService';
+import { getChatWebSocketClient, type ChatWebSocketClient } from './websocketClient';
 
 // Normalization helpers to convert camelCase API responses to snake_case for backward compatibility
 function normalizeUser(user: any): any {
@@ -168,7 +169,7 @@ export interface TypingIndicator {
 export class ChatService {
   private static instance: ChatService;
   private currentUserId: string | null = null;
-  private realtimeChannel: any = null;
+  private wsClient: ChatWebSocketClient | null = null;
 
   private constructor() {}
 
@@ -718,24 +719,120 @@ export class ChatService {
     return [];
   }
 
-  // Real-time subscription methods - stubbed for now
   private async setupRealtimeSubscription(): Promise<void> {
-    // TODO: Implement WebSocket or polling for real-time updates
-    console.log('Real-time subscriptions will be implemented via WebSocket/polling in future update');
+    if (!this.currentUserId) {
+      console.error('[ChatService] Cannot setup WebSocket - no user ID');
+      return;
+    }
+
+    try {
+      // Get or create WebSocket client
+      this.wsClient = getChatWebSocketClient();
+
+      // Connect to WebSocket server
+      await this.wsClient.connect(this.currentUserId);
+      console.log('[ChatService] WebSocket connected successfully');
+
+      // Subscribe to new messages
+      this.wsClient.on('new_message', (payload) => {
+        this.handleNewMessage(payload);
+      });
+
+      // Subscribe to typing indicators
+      this.wsClient.on('user_typing', (payload) => {
+        this.handleTypingStart(payload);
+      });
+
+      this.wsClient.on('user_stopped_typing', (payload) => {
+        this.handleTypingStop(payload);
+      });
+
+      // Subscribe to presence updates
+      this.wsClient.on('user_presence', (payload) => {
+        this.handlePresenceUpdate(payload);
+      });
+
+      // Subscribe to channel events
+      this.wsClient.on('user_joined_channel', (payload) => {
+        console.log('[ChatService] User joined channel:', payload);
+        // Trigger channel list refresh
+        window.dispatchEvent(new CustomEvent('channel-updated'));
+      });
+
+      this.wsClient.on('user_left_channel', (payload) => {
+        console.log('[ChatService] User left channel:', payload);
+        // Trigger channel list refresh
+        window.dispatchEvent(new CustomEvent('channel-updated'));
+      });
+
+      // Handle reconnection
+      this.wsClient.onConnect(() => {
+        console.log('[ChatService] WebSocket reconnected');
+        // Update presence to online
+        if (this.currentUserId) {
+          this.updatePresence('online').catch(console.error);
+        }
+      });
+
+      this.wsClient.onDisconnect(() => {
+        console.log('[ChatService] WebSocket disconnected');
+      });
+
+      // Set initial presence to online
+      this.wsClient.updatePresence('online');
+
+    } catch (error) {
+      console.error('[ChatService] WebSocket setup failed:', error);
+      throw error;
+    }
+  }
+
+  private handleNewMessage(payload: any): void {
+    console.log('[ChatService] New message received:', payload);
     
-    /* Future WebSocket implementation:
-    const ws = new WebSocket(`${websocketUrl}/chat?userId=${this.currentUserId}`);
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'new_message') {
-        this.handleNewMessage(data.message);
-      } else if (data.type === 'typing') {
-        this.handleTypingIndicator(data.indicator);
-      } else if (data.type === 'presence') {
-        this.handlePresenceUpdate(data.presence);
-      }
+    // Create message object with normalized structure
+    const message = normalizeMessage({
+      id: payload.id || payload.messageId,
+      channelId: payload.channelId,
+      senderId: payload.senderId,
+      encryptedContent: payload.content,
+      messageType: payload.messageType || 'text',
+      createdAt: payload.timestamp || new Date().toISOString(),
+      ...payload
+    });
+
+    // Dispatch event for components to handle
+    window.dispatchEvent(new CustomEvent('new-message', { detail: message }));
+  }
+
+  private handleTypingStart(payload: any): void {
+    const indicator = {
+      channel_id: payload.channelId,
+      user_id: payload.userId,
+      started_typing_at: payload.timestamp || new Date().toISOString()
     };
-    */
+    
+    window.dispatchEvent(new CustomEvent('typing-indicator', { detail: indicator }));
+  }
+
+  private handleTypingStop(payload: any): void {
+    const indicator = {
+      channel_id: payload.channelId,
+      user_id: payload.userId,
+      started_typing_at: null
+    };
+    
+    window.dispatchEvent(new CustomEvent('typing-indicator', { detail: indicator }));
+  }
+
+  private handlePresenceUpdate(payload: any): void {
+    const presence = {
+      user_id: payload.userId,
+      status: payload.status,
+      last_seen_at: payload.timestamp || new Date().toISOString()
+    };
+    
+    window.dispatchEvent(new CustomEvent('presence-update', { detail: presence }));
   }
 
   async ensureAIAssistantChannel(): Promise<void> {
@@ -777,13 +874,15 @@ export class ChatService {
   }
 
   cleanup(): void {
-    if (this.realtimeChannel) {
-      // TODO: Close WebSocket connection when implemented
-      this.realtimeChannel = null;
-    }
-
-    if (this.currentUserId) {
-      this.updatePresence('offline').catch(console.error);
+    if (this.wsClient) {
+      if (this.currentUserId) {
+        // Set presence to offline before disconnecting
+        this.wsClient.updatePresence('offline');
+      }
+      // Disconnect WebSocket
+      this.wsClient.disconnect();
+      this.wsClient = null;
+      console.log('[ChatService] WebSocket cleaned up');
     }
   }
 }
