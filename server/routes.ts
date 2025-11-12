@@ -388,13 +388,15 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/chat/channels/:id', async (req, res) => {
     try {
+      console.log('[PATCH channel] ID:', req.params.id, 'Body:', req.body);
       const channel = await storage.updateChatChannel(req.params.id, req.body);
       if (!channel) {
         return res.status(404).json({ error: 'Channel not found' });
       }
       res.json(channel);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('[PATCH channel] Error:', error);
+      res.status(500).json({ error: error.message || 'Failed to update channel' });
     }
   });
 

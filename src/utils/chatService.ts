@@ -376,11 +376,6 @@ export class ChatService {
         replyToMessageId: replyToMessageId || null
       });
 
-      // Update channel's updatedAt
-      await apiClient.updateChatChannel(channelId, {
-        updatedAt: new Date()
-      });
-
       const normalized = normalizeMessage(message);
       return {
         ...normalized,
