@@ -1094,6 +1094,11 @@ export function registerRoutes(app: Express) {
                     Reset Password
                   </a>
                 </div>
+                <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 20px 0;">
+                  <p style="margin: 0; color: #92400e; font-size: 14px;">
+                    <strong>Troubleshooting Tip:</strong> If the reset page appears blank or doesn't load properly, try temporarily disabling browser extensions like ad blockers or privacy tools (uBlock Origin, Privacy Badger, etc.), or try a different browser.
+                  </p>
+                </div>
                 <p>If you didn't request this, you can safely ignore this email.</p>
                 <p style="color: #666; font-size: 12px; margin-top: 40px;">
                   If the button doesn't work, copy and paste this link into your browser:<br>
