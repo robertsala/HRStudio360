@@ -888,8 +888,13 @@ export function registerRoutes(app: Express) {
       // Get auth credentials
       const authCredential = await storage.getAuthCredentialByProfileId(profile.id);
       if (!authCredential) {
+        console.error('[Login] No auth_credentials found for profile:', profile.id, 'email:', email);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
+      
+      console.log('[Login] Found auth credentials for:', email);
+      console.log('[Login] Hash starts with:', authCredential.passwordHash.substring(0, 20));
+      console.log('[Login] Hash type:', authCredential.passwordHash.startsWith('$argon2') ? 'Argon2' : authCredential.passwordHash.startsWith('$2b$') ? 'BCrypt' : 'Unknown');
       
       // Check if account is locked
       if (isAccountLocked(authCredential.lockedUntil)) {
@@ -901,7 +906,9 @@ export function registerRoutes(app: Express) {
       }
       
       // Verify password
+      console.log('[Login] Attempting password verification...');
       const isValidPassword = await verifyPassword(authCredential.passwordHash, password);
+      console.log('[Login] Password verification result:', isValidPassword);
       
       if (!isValidPassword) {
         // Increment failed attempts
@@ -1165,14 +1172,23 @@ export function registerRoutes(app: Express) {
 
       const hashedPassword = await hashPassword(newPassword);
 
-      await db.update(authCredentials)
+      console.log('[Password Reset] Updating password for profile ID:', tokenData.profileId);
+      console.log('[Password Reset] New hash starts with:', hashedPassword.substring(0, 20));
+
+      const updateResult = await db.update(authCredentials)
         .set({ 
           passwordHash: hashedPassword,
           passwordUpdatedAt: new Date(),
           failedAttempts: 0,
           lockedUntil: null
         })
-        .where(eq(authCredentials.profileId, tokenData.profileId));
+        .where(eq(authCredentials.profileId, tokenData.profileId))
+        .returning();
+
+      console.log('[Password Reset] Update completed, rows affected:', updateResult.length);
+      if (updateResult.length === 0) {
+        console.error('[Password Reset] WARNING: No rows were updated! Profile ID might not have auth_credentials record');
+      }
 
       await db.update(passwordResetTokens)
         .set({ used: true })
