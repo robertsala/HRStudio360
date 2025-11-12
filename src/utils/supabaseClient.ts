@@ -104,7 +104,7 @@ const createStubSupabaseClient = () => {
 export const supabase = createStubSupabaseClient();
 
 // Log warning in development
-if (import.meta.env.DEV) {
+if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
   console.warn(
     '%c[SUPABASE STUB] Real-time features disabled during migration',
     'color: orange; font-weight: bold;',
