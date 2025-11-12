@@ -55,7 +55,9 @@ function App() {
     <>
       <Switch>
         {/* Password reset route - accessible without authentication */}
-        <Route path="/reset-password" component={ResetPasswordPage} />
+        <Route path="/reset-password">
+          <ResetPasswordPage />
+        </Route>
 
         {/* Dashboard route - protected */}
         <Route path="/dashboard">
