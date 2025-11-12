@@ -3,9 +3,10 @@ import {
   profiles, announcements, departments, jobTitles, 
   employees, leaveBalances, candidates, newHires, leaveRequests,
   reviewCycles, performanceReviews, reviewQuestionsLibrary, reviewQuestionTemplates,
-  reviewQuestionAssignments, reviewResponses, reviewGoalsComments
+  reviewQuestionAssignments, reviewResponses, reviewGoalsComments, authCredentials
 } from '../shared/schema';
 import { eq } from 'drizzle-orm';
+import { hashPassword } from './lib/password';
 
 export async function seedProductionDatabase(options: { force?: boolean } = {}) {
   console.log('🌱 Starting production database seed...');
@@ -109,6 +110,24 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
 
     const createdTeamMembers = await db.insert(profiles).values(teamMembers).returning();
     console.log(`   ✓ Created ${createdTeamMembers.length} team members`);
+
+    // Step 3.5: Create authentication credentials for all users
+    console.log('3️⃣.5 Creating authentication credentials...');
+    const defaultPassword = 'HRStudio360Demo!'; // Strong default password
+    const hashedPassword = await hashPassword(defaultPassword);
+    
+    const authCredentialsData = [
+      { profileId: demoUser.id, passwordHash: hashedPassword },
+      { profileId: robertSala.id, passwordHash: hashedPassword },
+      ...createdTeamMembers.map(member => ({
+        profileId: member.id,
+        passwordHash: hashedPassword
+      }))
+    ];
+    
+    await db.insert(authCredentials).values(authCredentialsData);
+    console.log(`   ✓ Created authentication credentials for ${authCredentialsData.length} users`);
+    console.log(`   ℹ️  Default password for all users: ${defaultPassword}`);
 
     // Step 4: Create Departments
     console.log('4️⃣  Creating departments...');
