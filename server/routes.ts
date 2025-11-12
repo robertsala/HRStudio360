@@ -1072,9 +1072,10 @@ export function registerRoutes(app: Express) {
           const { Resend } = await import('resend');
           const resend = new Resend(RESEND_API_KEY);
 
-          // Use REPLIT_DOMAINS for production, otherwise fall back to dev domain
+          // Use explicit PRODUCTION_URL if set, otherwise fall back to REPLIT_DOMAINS
+          const productionUrl = process.env.PRODUCTION_URL;
           const domains = process.env.REPLIT_DOMAINS?.split(',') || [];
-          const primaryDomain = domains[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+          const primaryDomain = productionUrl || domains[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
           const isHttps = primaryDomain !== 'localhost:5000';
           const resetUrl = `${isHttps ? 'https' : 'http'}://${primaryDomain}/reset-password?token=${token}`;
 
