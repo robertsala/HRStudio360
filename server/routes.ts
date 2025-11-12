@@ -1072,15 +1072,11 @@ export function registerRoutes(app: Express) {
           const { Resend } = await import('resend');
           const resend = new Resend(RESEND_API_KEY);
 
-          // Use production URL if available, otherwise development domain
-          const deploymentUrl = process.env.REPL_SLUG && process.env.REPL_OWNER 
-            ? `https://${process.env.REPL_SLUG}-${process.env.REPL_OWNER}.replit.app`
-            : null;
-          const domain = deploymentUrl || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-          const protocol = deploymentUrl || process.env.REPLIT_DEV_DOMAIN ? 'https' : 'http';
-          const resetUrl = deploymentUrl 
-            ? `${deploymentUrl}/reset-password?token=${token}`
-            : `${protocol}://${domain}/reset-password?token=${token}`;
+          // Use REPLIT_DOMAINS for production, otherwise fall back to dev domain
+          const domains = process.env.REPLIT_DOMAINS?.split(',') || [];
+          const primaryDomain = domains[0] || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+          const isHttps = primaryDomain !== 'localhost:5000';
+          const resetUrl = `${isHttps ? 'https' : 'http'}://${primaryDomain}/reset-password?token=${token}`;
 
           console.log('[Password Reset] Attempting to send email to:', email);
           console.log('[Password Reset] Reset URL:', resetUrl);
