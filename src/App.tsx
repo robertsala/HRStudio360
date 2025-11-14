@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import BirthdayCelebrationModal from './components/modals/BirthdayCelebrationModal';
 import AnniversaryCelebrationModal from './components/modals/AnniversaryCelebrationModal';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import CareersPage from './pages/CareersPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -57,6 +58,11 @@ function App() {
         {/* Password reset route - accessible without authentication */}
         <Route path="/reset-password">
           <ResetPasswordPage />
+        </Route>
+
+        {/* Public Careers page - accessible without authentication */}
+        <Route path="/careers">
+          <CareersPage />
         </Route>
 
         {/* Dashboard route - protected */}

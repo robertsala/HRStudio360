@@ -4,6 +4,38 @@
 
 HR Studio 360 is an AI-powered Human Resources management platform designed to streamline the entire employee lifecycle, from recruitment to offboarding. It offers comprehensive HR functionality, including hiring, employee management, payroll, performance reviews, benefits administration, time tracking, and analytics. The platform features a modular dashboard with over 40 specialized components, emphasizing user experience with celebration systems, real-time chat, and extensive customization. The project aims to provide an end-to-end HR solution, enhancing efficiency and employee engagement.
 
+### Enterprise ATS Module (November 14, 2025)
+
+HRStudio360 now includes an enterprise-grade Applicant Tracking System (ATS) inspired by BambooHR and LinkedIn Recruiter:
+
+**Backend Infrastructure (✅ Complete):**
+- 11 new database tables: `job_postings`, `applications`, `candidates`, `resume_data`, `interview_stages`, `interviews`, `application_stage_transitions`, `team_assignments`, `job_sources`, `application_activity_log`, `offer_letters`
+- 20+ REST API endpoints (3 public, 17 authenticated with proper `requireAuth` validation)
+- Complete storage layer with type-safe Drizzle operations
+- AI resume parser using OpenAI GPT-4 with basic fallback (`server/ai-resume-parser.ts`)
+- Object storage integration for resume and profile picture uploads
+
+**Public Career Portal (✅ Frontend Complete):**
+- Public job browsing at `/careers` route
+- Search and filter functionality (department, employment type, keywords)
+- Responsive card-based job listings
+- Professional UI with Tailwind CSS
+- Click-to-apply functionality with modal form
+
+**Application Form (⚠️ Needs Schema Refinement):**
+- Resume upload with ObjectUploader integration
+- AI-powered auto-fill from resume parsing (pending backend contract alignment)
+- Profile picture upload (optional)
+- Two-step application process: Upload Resume → Application Details
+- Form validation and error handling
+- **Note**: Requires refactoring to use react-hook-form + zodResolver with shared schemas for production use
+
+**Next Steps:**
+1. Refactor ApplicationFormModal to align with backend contract (`{ candidate, application, resumeData }` payload structure)
+2. Build HR dashboard for job posting management
+3. Implement kanban-style pipeline board for candidate tracking
+4. Add team access control and recruiter assignment features
+
 ## Demo Account Access
 
 The platform includes a pre-configured demo account for instant access to all features:
