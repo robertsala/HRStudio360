@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { X, Bot, Clock, CheckCircle, AlertCircle, Play, Loader2, RefreshCw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/queryClient';
-import { useToast } from '../../hooks/use-toast';
 
 interface AgentActivityModalProps {
   isOpen: boolean;
@@ -18,7 +17,6 @@ interface ActivityLog {
 }
 
 const AgentActivityModal: React.FC<AgentActivityModalProps> = ({ isOpen, onClose }) => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activities, setActivities] = useState<ActivityLog[]>([]);
 
@@ -54,10 +52,6 @@ const AgentActivityModal: React.FC<AgentActivityModalProps> = ({ isOpen, onClose
           ? { ...act, status: 'success' as const, details: `✅ Screened ${response.results?.length || 0} candidates. ${response.message}` }
           : act
       ));
-      toast({
-        title: 'Screening Complete',
-        description: `Successfully screened ${response.results?.length || 0} candidates`,
-      });
       queryClient.invalidateQueries({ queryKey: ['/api/applications'] });
     },
     onError: (error: any, _, activityId: any) => {
@@ -66,11 +60,6 @@ const AgentActivityModal: React.FC<AgentActivityModalProps> = ({ isOpen, onClose
           ? { ...act, status: 'error' as const, details: `❌ Error: ${error.message}` }
           : act
       ));
-      toast({
-        title: 'Screening Failed',
-        description: error.message || 'Failed to run daily screening',
-        variant: 'destructive'
-      });
     }
   });
 
