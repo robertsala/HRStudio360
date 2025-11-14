@@ -58,6 +58,7 @@ import KnowledgeBaseModal from './modals/KnowledgeBaseModal';
 import CollaboratorModal from './modals/CollaboratorModal';
 import JobManagementModal from './modals/JobManagementModal';
 import StudioAIChatModal from './modals/StudioAIChatModal';
+import AgentActivityModal from './modals/AgentActivityModal';
 
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((props, ref) => {
   const { t } = useTranslation();
@@ -95,7 +96,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     knowledgeBase: false,
     collaborator: false,
     jobManagement: false,
-    studioAIChat: false
+    studioAIChat: false,
+    agentActivity: false
   });
 
   // Chat-specific state
@@ -1265,9 +1267,29 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-center bg-white/10 rounded-lg py-3">
-                  <Bot className="h-5 w-5 mr-2" />
-                  <span className="font-medium">Click to start chatting with Studio AI →</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModal('studioAIChat');
+                    }}
+                    className="flex items-center justify-center bg-white/10 rounded-lg py-3 hover:bg-white/20 transition-colors"
+                    data-testid="button-open-studio-chat"
+                  >
+                    <Bot className="h-5 w-5 mr-2" />
+                    <span className="font-medium">Start Chat</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModal('agentActivity');
+                    }}
+                    className="flex items-center justify-center bg-white/10 rounded-lg py-3 hover:bg-white/20 transition-colors"
+                    data-testid="button-open-agent-activity"
+                  >
+                    <History className="h-5 w-5 mr-2" />
+                    <span className="font-medium">View Activity</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1361,6 +1383,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
           <StudioAIChatModal
             isOpen={modals.studioAIChat}
             onClose={() => closeModal('studioAIChat')}
+          />
+        )}
+        {modals.agentActivity && (
+          <AgentActivityModal
+            isOpen={modals.agentActivity}
+            onClose={() => closeModal('agentActivity')}
           />
         )}
 
