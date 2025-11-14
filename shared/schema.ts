@@ -170,13 +170,15 @@ export const leaveBalances = pgTable('leave_balances', {
 });
 
 // Candidates table (for hiring/recruitment)
+// NOTE: position and department are optional here since candidates can apply to multiple jobs
+// Job-specific details are stored in the applications table
 export const candidates = pgTable('candidates', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   name: text('name').notNull(),
   email: text('email').unique().notNull(),
   phone: text('phone'),
-  position: text('position').notNull(),
-  department: text('department').notNull(),
+  position: text('position'), // Optional - for backward compatibility
+  department: text('department'), // Optional - for backward compatibility
   experience: text('experience'),
   location: text('location'),
   salaryExpectation: numeric('salary_expectation', { precision: 10, scale: 2 }),
@@ -688,6 +690,238 @@ export const reviewAuditLog = pgTable('review_audit_log', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// ================================
+// APPLICANT TRACKING SYSTEM (ATS)
+// ================================
+
+// Job posting status enum
+export const jobPostingStatusEnum = pgEnum('job_posting_status', [
+  'draft',
+  'active',
+  'on_hold',
+  'closed',
+  'filled'
+]);
+
+// Employment type enum
+export const jobEmploymentTypeEnum = pgEnum('job_employment_type', [
+  'full_time',
+  'part_time',
+  'contract',
+  'temporary',
+  'internship'
+]);
+
+// Application status enum
+export const applicationStatusEnum = pgEnum('application_status', [
+  'applied',
+  'screening',
+  'phone_screen',
+  'interview',
+  'assessment',
+  'offer',
+  'hired',
+  'rejected',
+  'withdrawn'
+]);
+
+// Job postings table
+export const jobPostings = pgTable('job_postings', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  requirements: text('requirements').notNull(),
+  responsibilities: text('responsibilities').notNull(),
+  qualifications: text('qualifications'),
+  departmentId: uuid('department_id').references(() => departments.id).notNull(),
+  jobTitleId: uuid('job_title_id').references(() => jobTitles.id),
+  location: text('location').notNull(),
+  workMode: text('work_mode').notNull(), // 'remote' | 'hybrid' | 'onsite'
+  employmentType: jobEmploymentTypeEnum('employment_type').notNull(),
+  salaryMin: numeric('salary_min', { precision: 10, scale: 2 }),
+  salaryMax: numeric('salary_max', { precision: 10, scale: 2 }),
+  salaryCurrency: text('salary_currency').default('USD'),
+  skills: text('skills').array(),
+  experience: text('experience'),
+  educationLevel: text('education_level'),
+  benefits: text('benefits').array(),
+  applicationDeadline: date('application_deadline'),
+  status: jobPostingStatusEnum('status').default('draft'),
+  postedBy: uuid('posted_by').references(() => profiles.id).notNull(),
+  hiringManagerId: uuid('hiring_manager_id').references(() => profiles.id),
+  openings: integer('openings').default(1),
+  isPublic: boolean('is_public').default(false),
+  isRemoteAllowed: boolean('is_remote_allowed').default(false),
+  applicationCount: integer('application_count').default(0),
+  viewCount: integer('view_count').default(0),
+  publishedAt: timestamp('published_at'),
+  closedAt: timestamp('closed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Applications table - links candidates to job postings
+export const applications = pgTable('applications', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  jobPostingId: uuid('job_posting_id').references(() => jobPostings.id).notNull(),
+  candidateId: uuid('candidate_id').references(() => candidates.id).notNull(),
+  status: applicationStatusEnum('status').default('applied'),
+  sourceId: uuid('source_id').references(() => jobSources.id),
+  referredBy: uuid('referred_by').references(() => profiles.id),
+  currentStageId: uuid('current_stage_id').references(() => interviewStages.id),
+  coverLetter: text('cover_letter'),
+  resumeUrl: text('resume_url'),
+  portfolioUrl: text('portfolio_url'),
+  linkedinUrl: text('linkedin_url'),
+  availableStartDate: date('available_start_date'),
+  willingToRelocate: boolean('willing_to_relocate').default(false),
+  salaryExpectation: numeric('salary_expectation', { precision: 10, scale: 2 }),
+  applicationAnswers: json('application_answers'),
+  screeningAnswers: json('screening_answers'),
+  rating: integer('rating').default(0),
+  aiMatchScore: integer('ai_match_score').default(0),
+  notes: text('notes'),
+  appliedAt: timestamp('applied_at').defaultNow(),
+  lastActivityAt: timestamp('last_activity_at').defaultNow(),
+  rejectedAt: timestamp('rejected_at'),
+  rejectionReason: text('rejection_reason'),
+  offeredAt: timestamp('offered_at'),
+  hiredAt: timestamp('hired_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  uniqueJobCandidate: sql`CONSTRAINT unique_job_candidate UNIQUE (${table.jobPostingId}, ${table.candidateId})`
+}));
+
+// Resume data - AI-parsed resume information
+export const resumeData = pgTable('resume_data', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: uuid('application_id').references(() => applications.id).notNull(),
+  candidateId: uuid('candidate_id').references(() => candidates.id).notNull(),
+  parsedName: text('parsed_name'),
+  parsedEmail: text('parsed_email'),
+  parsedPhone: text('parsed_phone'),
+  parsedLocation: text('parsed_location'),
+  parsedSkills: text('parsed_skills').array(),
+  parsedExperience: json('parsed_experience'), // Array of { company, title, startDate, endDate, description }
+  parsedEducation: json('parsed_education'), // Array of { school, degree, field, startDate, endDate }
+  parsedCertifications: text('parsed_certifications').array(),
+  parsedLanguages: text('parsed_languages').array(),
+  totalYearsExperience: integer('total_years_experience'),
+  rawResumeText: text('raw_resume_text'),
+  parsingConfidence: numeric('parsing_confidence', { precision: 5, scale: 2 }),
+  parsedAt: timestamp('parsed_at').defaultNow(),
+  parsingService: text('parsing_service'), // 'openai' | 'rchilli' | 'affinda' | etc
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Interview stages - custom pipeline stages per job
+export const interviewStages = pgTable('interview_stages', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  jobPostingId: uuid('job_posting_id').references(() => jobPostings.id).notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  order: integer('order').notNull(),
+  stageType: text('stage_type').notNull(), // 'screening' | 'phone' | 'technical' | 'behavioral' | 'final' | 'offer'
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Interview schedule
+export const interviews = pgTable('interviews', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: uuid('application_id').references(() => applications.id).notNull(),
+  interviewStageId: uuid('interview_stage_id').references(() => interviewStages.id),
+  interviewType: text('interview_type').notNull(), // 'phone' | 'video' | 'in_person' | 'technical'
+  scheduledAt: timestamp('scheduled_at').notNull(),
+  duration: integer('duration').default(60), // minutes
+  location: text('location'),
+  meetingLink: text('meeting_link'),
+  interviewerIds: uuid('interviewer_ids').array(),
+  status: text('status').default('scheduled'), // 'scheduled' | 'completed' | 'cancelled' | 'rescheduled'
+  feedback: text('feedback'),
+  rating: integer('rating'),
+  recommendation: text('recommendation'), // 'strong_yes' | 'yes' | 'maybe' | 'no' | 'strong_no'
+  notes: text('notes'),
+  completedAt: timestamp('completed_at'),
+  cancelledAt: timestamp('cancelled_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Team assignments - assign recruiters/hiring managers to jobs
+export const teamAssignments = pgTable('team_assignments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  jobPostingId: uuid('job_posting_id').references(() => jobPostings.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  role: text('role').notNull(), // 'recruiter' | 'hiring_manager' | 'interviewer' | 'coordinator'
+  permissions: text('permissions').array(), // ['view', 'edit', 'interview', 'hire', 'reject']
+  assignedBy: uuid('assigned_by').references(() => profiles.id).notNull(),
+  assignedAt: timestamp('assigned_at').defaultNow(),
+  removedAt: timestamp('removed_at')
+});
+
+// Job sources - track application sources
+export const jobSources = pgTable('job_sources', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull().unique(),
+  category: text('category').notNull(), // 'job_board' | 'social_media' | 'referral' | 'career_page' | 'agency'
+  url: text('url'),
+  apiIntegrationEnabled: boolean('api_integration_enabled').default(false),
+  isActive: boolean('is_active').default(true),
+  applicationCount: integer('application_count').default(0),
+  hireCount: integer('hire_count').default(0),
+  costPerHire: numeric('cost_per_hire', { precision: 10, scale: 2 }),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Application stage transitions - tracks pipeline movement
+export const applicationStageTransitions = pgTable('application_stage_transitions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: uuid('application_id').references(() => applications.id).notNull(),
+  fromStageId: uuid('from_stage_id').references(() => interviewStages.id),
+  toStageId: uuid('to_stage_id').references(() => interviewStages.id).notNull(),
+  movedBy: uuid('moved_by').references(() => profiles.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Application activity log
+export const applicationActivityLog = pgTable('application_activity_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: uuid('application_id').references(() => applications.id).notNull(),
+  userId: uuid('user_id').references(() => profiles.id),
+  activityType: text('activity_type').notNull(), // 'status_change' | 'stage_change' | 'note_added' | 'interview_scheduled' | etc
+  description: text('description').notNull(),
+  oldValue: text('old_value'),
+  newValue: text('new_value'),
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Offer letters
+export const offerLetters = pgTable('offer_letters', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: uuid('application_id').references(() => applications.id).notNull(),
+  jobPostingId: uuid('job_posting_id').references(() => jobPostings.id).notNull(),
+  candidateId: uuid('candidate_id').references(() => candidates.id).notNull(),
+  jobTitle: text('job_title').notNull(),
+  department: text('department').notNull(),
+  salary: numeric('salary', { precision: 10, scale: 2 }).notNull(),
+  startDate: date('start_date').notNull(),
+  benefits: text('benefits').array(),
+  terms: text('terms'),
+  letterContent: text('letter_content').notNull(),
+  status: text('status').default('pending'), // 'pending' | 'sent' | 'accepted' | 'declined' | 'expired'
+  sentAt: timestamp('sent_at'),
+  respondedAt: timestamp('responded_at'),
+  expiresAt: timestamp('expires_at'),
+  signatureUrl: text('signature_url'),
+  createdBy: uuid('created_by').references(() => profiles.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
 // Insert schemas
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAuthCredentialSchema = createInsertSchema(authCredentials).omit({ passwordUpdatedAt: true });
@@ -731,6 +965,18 @@ export const insertCompensationHistorySchema = createInsertSchema(compensationHi
 export const insertPerformanceReviewHistorySchema = createInsertSchema(performanceReviewHistory).omit({ id: true, createdAt: true });
 export const insertReviewAuditLogSchema = createInsertSchema(reviewAuditLog).omit({ id: true, createdAt: true });
 export const insertWeatherCacheSchema = createInsertSchema(weatherCache).omit({ id: true, lastUpdated: true, cacheExpiresAt: true });
+
+// ATS Insert Schemas
+export const insertJobPostingSchema = createInsertSchema(jobPostings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertApplicationSchema = createInsertSchema(applications).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertResumeDataSchema = createInsertSchema(resumeData).omit({ id: true, createdAt: true, parsedAt: true });
+export const insertInterviewStageSchema = createInsertSchema(interviewStages).omit({ id: true, createdAt: true });
+export const insertInterviewSchema = createInsertSchema(interviews).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTeamAssignmentSchema = createInsertSchema(teamAssignments).omit({ id: true, assignedAt: true });
+export const insertJobSourceSchema = createInsertSchema(jobSources).omit({ id: true, createdAt: true });
+export const insertApplicationStageTransitionSchema = createInsertSchema(applicationStageTransitions).omit({ id: true, createdAt: true });
+export const insertApplicationActivityLogSchema = createInsertSchema(applicationActivityLog).omit({ id: true, createdAt: true });
+export const insertOfferLetterSchema = createInsertSchema(offerLetters).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type Profile = typeof profiles.$inferSelect;
@@ -817,6 +1063,28 @@ export type ReviewAuditLog = typeof reviewAuditLog.$inferSelect;
 export type InsertReviewAuditLog = z.infer<typeof insertReviewAuditLogSchema>;
 export type WeatherCache = typeof weatherCache.$inferSelect;
 export type InsertWeatherCache = z.infer<typeof insertWeatherCacheSchema>;
+
+// ATS Types
+export type JobPosting = typeof jobPostings.$inferSelect;
+export type InsertJobPosting = z.infer<typeof insertJobPostingSchema>;
+export type Application = typeof applications.$inferSelect;
+export type InsertApplication = z.infer<typeof insertApplicationSchema>;
+export type ResumeData = typeof resumeData.$inferSelect;
+export type InsertResumeData = z.infer<typeof insertResumeDataSchema>;
+export type InterviewStage = typeof interviewStages.$inferSelect;
+export type InsertInterviewStage = z.infer<typeof insertInterviewStageSchema>;
+export type Interview = typeof interviews.$inferSelect;
+export type InsertInterview = z.infer<typeof insertInterviewSchema>;
+export type TeamAssignment = typeof teamAssignments.$inferSelect;
+export type InsertTeamAssignment = z.infer<typeof insertTeamAssignmentSchema>;
+export type JobSource = typeof jobSources.$inferSelect;
+export type InsertJobSource = z.infer<typeof insertJobSourceSchema>;
+export type ApplicationStageTransition = typeof applicationStageTransitions.$inferSelect;
+export type InsertApplicationStageTransition = z.infer<typeof insertApplicationStageTransitionSchema>;
+export type ApplicationActivityLog = typeof applicationActivityLog.$inferSelect;
+export type InsertApplicationActivityLog = z.infer<typeof insertApplicationActivityLogSchema>;
+export type OfferLetter = typeof offerLetters.$inferSelect;
+export type InsertOfferLetter = z.infer<typeof insertOfferLetterSchema>;
 
 // Dashboard Stats type
 export interface DashboardStats {
