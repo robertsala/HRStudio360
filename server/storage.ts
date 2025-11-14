@@ -102,6 +102,7 @@ export interface IStorage {
   
   // ATS - Resume Data
   createResumeData(data: any): Promise<any>;
+  getResumeDataById(id: string): Promise<any | undefined>;
   
   // ATS - Interview Stages
   getInterviewStagesByJob(jobId: string): Promise<any[]>;
@@ -543,6 +544,11 @@ export class DbStorage implements IStorage {
   // ATS - Resume Data
   async createResumeData(data: any): Promise<any> {
     const result = await db.insert(resumeData).values(data).returning();
+    return result[0];
+  }
+
+  async getResumeDataById(id: string): Promise<any | undefined> {
+    const result = await db.select().from(resumeData).where(eq(resumeData.id, id));
     return result[0];
   }
 

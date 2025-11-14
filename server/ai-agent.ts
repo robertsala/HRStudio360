@@ -12,11 +12,11 @@
 
 import OpenAI from 'openai';
 import type { 
-  SelectCandidate, 
-  SelectApplication, 
-  SelectResumeData,
-  SelectJobPosting 
-} from '../shared/schema';
+  Candidate, 
+  Application, 
+  ResumeData,
+  JobPosting 
+} from '../shared/schema.js';
 
 // Initialize OpenAI with Replit AI Integrations
 const openai = new OpenAI({
@@ -60,10 +60,10 @@ Provide concise, actionable recommendations.`;
  * Screen a single candidate application autonomously
  */
 export async function screenCandidate(
-  candidate: SelectCandidate,
-  application: SelectApplication,
-  resumeData: SelectResumeData | null,
-  jobPosting: SelectJobPosting
+  candidate: Candidate,
+  _application: Application,
+  resumeData: ResumeData | null,
+  jobPosting: JobPosting
 ): Promise<{
   score: number; // 0-100
   recommendation: 'strong_yes' | 'yes' | 'maybe' | 'no';
@@ -88,8 +88,8 @@ Phone: ${candidate.phoneNumber || 'Not provided'}
 
 RESUME DATA:
 Skills: ${resumeData?.skills?.join(', ') || 'Not extracted'}
-Experience: ${resumeData?.experience?.map(exp => `${exp.title} at ${exp.company} (${exp.duration})`).join('; ') || 'Not extracted'}
-Education: ${resumeData?.education?.map(edu => `${edu.degree} in ${edu.field} from ${edu.institution}`).join('; ') || 'Not extracted'}
+Experience: ${resumeData?.experience?.map((exp: any) => `${exp.title} at ${exp.company} (${exp.duration})`).join('; ') || 'Not extracted'}
+Education: ${resumeData?.education?.map((edu: any) => `${edu.degree} in ${edu.field} from ${edu.institution}`).join('; ') || 'Not extracted'}
 
 Provide a comprehensive screening assessment as a JSON object with:
 - score (0-100)
@@ -141,10 +141,10 @@ Respond ONLY with valid JSON, no additional text.`;
  */
 export async function batchScreenCandidates(
   applications: Array<{
-    candidate: SelectCandidate;
-    application: SelectApplication;
-    resumeData: SelectResumeData | null;
-    jobPosting: SelectJobPosting;
+    candidate: Candidate;
+    application: Application;
+    resumeData: ResumeData | null;
+    jobPosting: JobPosting;
   }>
 ): Promise<Array<{
   applicationId: string;
@@ -220,7 +220,7 @@ export async function chatWithStudioAI(
  */
 export async function generateHiringInsights(
   jobPostingId: string,
-  applications: SelectApplication[]
+  applications: Application[]
 ): Promise<{
   summary: string;
   topCandidates: number;

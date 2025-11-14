@@ -2799,8 +2799,8 @@ export function registerRoutes(app: Express) {
       const profile = await storage.getProfileById(userId);
       
       const response = await chatWithStudioAI(message, {
-        userRole: profile?.role,
-        department: profile?.department,
+        userRole: profile?.role || undefined,
+        department: profile?.department || undefined,
         conversationHistory: conversationHistory || []
       });
 
@@ -2832,7 +2832,7 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Candidate not found' });
       }
 
-      const jobPosting = await storage.getJobById(application.jobPostingId);
+      const jobPosting = await storage.getJobPostingById(application.jobPostingId);
       if (!jobPosting) {
         return res.status(404).json({ error: 'Job posting not found' });
       }
@@ -2845,7 +2845,7 @@ export function registerRoutes(app: Express) {
       const screening = await screenCandidate(candidate, application, resumeData, jobPosting);
 
       // Store screening results (you can extend storage to save these)
-      console.log(`[AI Agent] Screened candidate ${candidate.fullName}:`, screening);
+      console.log(`[AI Agent] Screened candidate ${candidate.name}:`, screening);
 
       res.json({
         success: true,
@@ -2868,7 +2868,7 @@ export function registerRoutes(app: Express) {
       const { jobId } = req.params;
       
       // Get all applications for this job
-      const applications = await storage.getApplicationsByJobId(jobId);
+      const applications = await storage.getApplicationsByJob(jobId);
       
       if (applications.length === 0) {
         return res.json({ 
@@ -2880,9 +2880,9 @@ export function registerRoutes(app: Express) {
 
       // Prepare data for batch screening
       const batchData = await Promise.all(
-        applications.map(async (app) => {
+        applications.map(async (app: any) => {
           const candidate = await storage.getCandidateById(app.candidateId);
-          const jobPosting = await storage.getJobById(app.jobPostingId);
+          const jobPosting = await storage.getJobPostingById(app.jobPostingId);
           const resumeData = app.resumeDataId 
             ? await storage.getResumeDataById(app.resumeDataId)
             : null;
@@ -2892,7 +2892,7 @@ export function registerRoutes(app: Express) {
       );
 
       // Run autonomous batch screening
-      const screenings = await batchScreenCandidates(batchData.filter(d => d.candidate && d.jobPosting));
+      const screenings = await batchScreenCandidates(batchData.filter((d: any) => d.candidate && d.jobPosting));
 
       console.log(`[AI Agent] Batch screened ${screenings.length} candidates for job ${jobId}`);
 
@@ -2924,7 +2924,7 @@ export function registerRoutes(app: Express) {
     try {
       const { jobId } = req.params;
       
-      const applications = await storage.getApplicationsByJobId(jobId);
+      const applications = await storage.getApplicationsByJob(jobId);
       
       const insights = await generateHiringInsights(jobId, applications);
 
