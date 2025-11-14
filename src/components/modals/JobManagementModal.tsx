@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Eye, EyeOff, Search, X, Save, Briefcase, Users, MapPin, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Search, X, Save, Briefcase, Users, MapPin, DollarSign, Bot } from 'lucide-react';
 import { apiRequest, queryClient } from '../../lib/queryClient';
 
 interface JobPosting {
@@ -26,9 +26,10 @@ interface JobPosting {
 
 interface JobManagementModalProps {
   onClose: () => void;
+  onOpenStudioAI?: () => void;
 }
 
-export default function JobManagementModal({ onClose }: JobManagementModalProps) {
+export default function JobManagementModal({ onClose, onOpenStudioAI }: JobManagementModalProps) {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -241,6 +242,16 @@ export default function JobManagementModal({ onClose }: JobManagementModalProps)
                     data-testid="input-search-jobs"
                   />
                 </div>
+                {onOpenStudioAI && (
+                  <button
+                    onClick={onOpenStudioAI}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all font-medium flex items-center gap-2 shadow-md hover:shadow-lg"
+                    data-testid="button-open-studio-ai-recruitment"
+                  >
+                    <Bot className="h-5 w-5" />
+                    Ask Studio AI
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     resetForm();

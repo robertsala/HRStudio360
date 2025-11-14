@@ -637,7 +637,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
           }
         />;
       case 'hiring':
-        return <HiringModal onNavigateToOnboarding={() => setActiveContent('onboarding')} onClose={closeInlineContent} />;
+        return <HiringModal onNavigateToOnboarding={() => setActiveContent('onboarding')} onClose={closeInlineContent} onOpenStudioAI={() => openModal('studioAIChat')} />;
       case 'hrDataReporting':
         return <HRDataReportingModal isOpen={true} onClose={closeInlineContent} />;
       case 'comprehensiveProfile':
@@ -1377,6 +1377,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         {modals.jobManagement && (
           <JobManagementModal
             onClose={() => closeModal('jobManagement')}
+            onOpenStudioAI={() => openModal('studioAIChat')}
           />
         )}
         {modals.studioAIChat && (
