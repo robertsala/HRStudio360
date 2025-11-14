@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { ObjectUploader } from '../ObjectUploader';
 import type { UploadResult } from '@uppy/core';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '../../lib/queryClient';
 
 interface Candidate {
   id: string;
@@ -50,6 +52,27 @@ interface CandidateComment {
   isPrivate: boolean;
 }
 
+interface JobPosting {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  employmentType: string;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  description: string;
+  requirements: string[];
+  responsibilities: string[];
+  benefits: string[];
+  experienceLevel: string;
+  educationLevel: string;
+  isPublic: boolean;
+  status: string;
+  totalApplications: number;
+  totalViews: number;
+  applicationDeadline: string | null;
+}
+
 interface HiringStage {
   id: string;
   title: string;
@@ -70,6 +93,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
   const { user } = useAuth();
   useEscapeKey(() => onClose?.(), !!onClose);
 
+  const [activeTab, setActiveTab] = useState<'jobs' | 'pipeline'>('jobs');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('All');
   const [filterPosition, setFilterPosition] = useState('All');
