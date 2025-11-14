@@ -57,6 +57,7 @@ import KnowledgeBaseWidget from './KnowledgeBaseWidget';
 import KnowledgeBaseModal from './modals/KnowledgeBaseModal';
 import CollaboratorModal from './modals/CollaboratorModal';
 import JobManagementModal from './modals/JobManagementModal';
+import StudioAIChatModal from './modals/StudioAIChatModal';
 
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((props, ref) => {
   const { t } = useTranslation();
@@ -93,7 +94,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     enterpriseChat: false,
     knowledgeBase: false,
     collaborator: false,
-    jobManagement: false
+    jobManagement: false,
+    studioAIChat: false
   });
 
   // Chat-specific state
@@ -1211,6 +1213,65 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
               </div>
             </div>
 
+            {/* Studio AI Chat - Autonomous Recruitment Assistant */}
+            <div className="mt-8 mb-8">
+              <div className="bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-700 rounded-xl p-6 text-white shadow-lg border-2 border-purple-400/30 cursor-pointer hover:shadow-2xl transition-all transform hover:scale-[1.02]"
+                   onClick={() => openModal('studioAIChat')}
+                   data-testid="card-studio-ai-chat">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <div className="bg-white/20 rounded-full p-3 mr-3 relative">
+                      <Bot className="h-7 w-7" />
+                      <Sparkles className="h-4 w-4 absolute -top-1 -right-1 text-yellow-300 animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">Studio AI Chat</h3>
+                      <p className="text-purple-100 text-sm">Autonomous HR & Recruitment Assistant</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-yellow-400/20 rounded-full px-4 py-2 border border-yellow-300/30">
+                    <Sparkles className="h-4 w-4 mr-2 text-yellow-300" />
+                    <span className="text-sm font-semibold">GPT-4o Powered</span>
+                  </div>
+                </div>
+                
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <div className="bg-white/10 rounded-lg p-4">
+                    <h4 className="font-semibold mb-2 flex items-center">
+                      <Users className="h-4 w-4 mr-2" />
+                      Autonomous Screening
+                    </h4>
+                    <p className="text-purple-100 text-sm">
+                      AI automatically screens candidates based on job requirements
+                    </p>
+                  </div>
+                  <div className="bg-white/10 rounded-lg p-4">
+                    <h4 className="font-semibold mb-2 flex items-center">
+                      <Target className="h-4 w-4 mr-2" />
+                      Smart Insights
+                    </h4>
+                    <p className="text-purple-100 text-sm">
+                      Get instant hiring pipeline analysis and candidate recommendations
+                    </p>
+                  </div>
+                  <div className="bg-white/10 rounded-lg p-4">
+                    <h4 className="font-semibold mb-2 flex items-center">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Real Conversations
+                    </h4>
+                    <p className="text-purple-100 text-sm">
+                      Chat naturally about candidates, jobs, and HR processes
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-center bg-white/10 rounded-lg py-3">
+                  <Bot className="h-5 w-5 mr-2" />
+                  <span className="font-medium">Click to start chatting with Studio AI →</span>
+                </div>
+              </div>
+            </div>
+
             {/* System Updates Notice */}
             <div className="bg-gradient-to-br from-purple-50 via-blue-50 to-emerald-50 dark:from-purple-900/20 dark:via-blue-900/20 dark:to-emerald-900/20 rounded-xl p-6 shadow-sm border border-purple-200 dark:border-purple-800 mb-8">
               <div className="flex items-center justify-between">
@@ -1294,6 +1355,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         {modals.jobManagement && (
           <JobManagementModal
             onClose={() => closeModal('jobManagement')}
+          />
+        )}
+        {modals.studioAIChat && (
+          <StudioAIChatModal
+            isOpen={modals.studioAIChat}
+            onClose={() => closeModal('studioAIChat')}
           />
         )}
 
