@@ -1254,7 +1254,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Verify current password
-      const isCurrentPasswordValid = await verifyPassword(currentPassword, authCredential.passwordHash);
+      const isCurrentPasswordValid = await verifyPassword(authCredential.passwordHash, currentPassword);
       if (!isCurrentPasswordValid) {
         return res.status(401).json({ error: 'Current password is incorrect' });
       }
@@ -1269,7 +1269,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Check if new password is same as current
-      const isSamePassword = await verifyPassword(newPassword, authCredential.passwordHash);
+      const isSamePassword = await verifyPassword(authCredential.passwordHash, newPassword);
       if (isSamePassword) {
         return res.status(400).json({ error: 'New password must be different from current password' });
       }
