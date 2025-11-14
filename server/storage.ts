@@ -34,7 +34,8 @@ import {
   userNotifications, collaboratorInvitations,
   changeLog, historicalChanges, changeNotifications,
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
-  reviewCycles
+  reviewCycles,
+  jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, like, sql as drizzleSql, isNull, isNotNull, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -77,8 +78,43 @@ export interface IStorage {
   // Candidates
   getCandidates(): Promise<Candidate[]>;
   getCandidateById(id: string): Promise<Candidate | undefined>;
+  getCandidateByEmail(email: string): Promise<Candidate | undefined>;
   createCandidate(candidate: InsertCandidate): Promise<Candidate>;
   updateCandidate(id: string, candidate: Partial<InsertCandidate>): Promise<Candidate | undefined>;
+  
+  // ATS - Job Postings
+  getActiveJobPostings(): Promise<any[]>;
+  getAllJobPostings(): Promise<any[]>;
+  getJobPostingById(id: string): Promise<any | undefined>;
+  createJobPosting(job: any): Promise<any>;
+  updateJobPosting(id: string, job: any): Promise<any | undefined>;
+  incrementJobPostingViews(id: string): Promise<void>;
+  incrementJobPostingApplications(id: string): Promise<void>;
+  createDefaultInterviewStages(jobId: string): Promise<void>;
+  
+  // ATS - Applications
+  getAllApplications(): Promise<any[]>;
+  getApplicationsByJob(jobId: string): Promise<any[]>;
+  getApplicationById(id: string): Promise<any | undefined>;
+  getApplicationByJobAndCandidate(jobId: string, candidateId: string): Promise<any | undefined>;
+  createApplication(application: any): Promise<any>;
+  updateApplication(id: string, application: any): Promise<any | undefined>;
+  
+  // ATS - Resume Data
+  createResumeData(data: any): Promise<any>;
+  
+  // ATS - Interview Stages
+  getInterviewStagesByJob(jobId: string): Promise<any[]>;
+  getDefaultInterviewStage(jobId: string): Promise<any | undefined>;
+  createInterviewStage(stage: any): Promise<any>;
+  
+  // ATS - Activity Logging
+  createApplicationActivityLog(log: any): Promise<any>;
+  createApplicationStageTransition(transition: any): Promise<any>;
+  
+  // ATS - Team Assignments
+  getTeamAssignmentsByJob(jobId: string): Promise<any[]>;
+  createTeamAssignment(assignment: any): Promise<any>;
 
   // Expense Categories
   getExpenseCategories(): Promise<ExpenseCategory[]>;
@@ -412,6 +448,145 @@ export class DbStorage implements IStorage {
 
   async updateCandidate(id: string, candidate: Partial<InsertCandidate>): Promise<Candidate | undefined> {
     const result = await db.update(candidates).set(candidate).where(eq(candidates.id, id)).returning();
+    return result[0];
+  }
+
+  async getCandidateByEmail(email: string): Promise<Candidate | undefined> {
+    const result = await db.select().from(candidates).where(eq(candidates.email, email));
+    return result[0];
+  }
+
+  // ATS - Job Postings
+  async getActiveJobPostings(): Promise<any[]> {
+    return db.select().from(jobPostings)
+      .where(and(eq(jobPostings.isPublic, true), eq(jobPostings.status, 'active')))
+      .orderBy(desc(jobPostings.publishedAt));
+  }
+
+  async getAllJobPostings(): Promise<any[]> {
+    return db.select().from(jobPostings).orderBy(desc(jobPostings.createdAt));
+  }
+
+  async getJobPostingById(id: string): Promise<any | undefined> {
+    const result = await db.select().from(jobPostings).where(eq(jobPostings.id, id));
+    return result[0];
+  }
+
+  async createJobPosting(job: any): Promise<any> {
+    const result = await db.insert(jobPostings).values(job).returning();
+    return result[0];
+  }
+
+  async updateJobPosting(id: string, job: any): Promise<any | undefined> {
+    const result = await db.update(jobPostings).set(job).where(eq(jobPostings.id, id)).returning();
+    return result[0];
+  }
+
+  async incrementJobPostingViews(id: string): Promise<void> {
+    await db.update(jobPostings)
+      .set({ viewCount: drizzleSql`${jobPostings.viewCount} + 1` })
+      .where(eq(jobPostings.id, id));
+  }
+
+  async incrementJobPostingApplications(id: string): Promise<void> {
+    await db.update(jobPostings)
+      .set({ applicationCount: drizzleSql`${jobPostings.applicationCount} + 1` })
+      .where(eq(jobPostings.id, id));
+  }
+
+  async createDefaultInterviewStages(jobId: string): Promise<void> {
+    const defaultStages = [
+      { jobPostingId: jobId, name: 'Applied', order: 1, stageType: 'screening', isActive: true },
+      { jobPostingId: jobId, name: 'Phone Screen', order: 2, stageType: 'phone', isActive: true },
+      { jobPostingId: jobId, name: 'Interview', order: 3, stageType: 'technical', isActive: true },
+      { jobPostingId: jobId, name: 'Final Round', order: 4, stageType: 'final', isActive: true },
+      { jobPostingId: jobId, name: 'Offer', order: 5, stageType: 'offer', isActive: true }
+    ];
+    await db.insert(interviewStages).values(defaultStages);
+  }
+
+  // ATS - Applications
+  async getAllApplications(): Promise<any[]> {
+    return db.select().from(applications).orderBy(desc(applications.appliedAt));
+  }
+
+  async getApplicationsByJob(jobId: string): Promise<any[]> {
+    return db.select().from(applications)
+      .where(eq(applications.jobPostingId, jobId))
+      .orderBy(desc(applications.appliedAt));
+  }
+
+  async getApplicationById(id: string): Promise<any | undefined> {
+    const result = await db.select().from(applications).where(eq(applications.id, id));
+    return result[0];
+  }
+
+  async getApplicationByJobAndCandidate(jobId: string, candidateId: string): Promise<any | undefined> {
+    const result = await db.select().from(applications)
+      .where(and(
+        eq(applications.jobPostingId, jobId),
+        eq(applications.candidateId, candidateId)
+      ));
+    return result[0];
+  }
+
+  async createApplication(application: any): Promise<any> {
+    const result = await db.insert(applications).values(application).returning();
+    return result[0];
+  }
+
+  async updateApplication(id: string, application: any): Promise<any | undefined> {
+    const result = await db.update(applications).set(application).where(eq(applications.id, id)).returning();
+    return result[0];
+  }
+
+  // ATS - Resume Data
+  async createResumeData(data: any): Promise<any> {
+    const result = await db.insert(resumeData).values(data).returning();
+    return result[0];
+  }
+
+  // ATS - Interview Stages
+  async getInterviewStagesByJob(jobId: string): Promise<any[]> {
+    return db.select().from(interviewStages)
+      .where(and(eq(interviewStages.jobPostingId, jobId), eq(interviewStages.isActive, true)))
+      .orderBy(interviewStages.order);
+  }
+
+  async getDefaultInterviewStage(jobId: string): Promise<any | undefined> {
+    const result = await db.select().from(interviewStages)
+      .where(and(
+        eq(interviewStages.jobPostingId, jobId),
+        eq(interviewStages.order, 1),
+        eq(interviewStages.isActive, true)
+      ));
+    return result[0];
+  }
+
+  async createInterviewStage(stage: any): Promise<any> {
+    const result = await db.insert(interviewStages).values(stage).returning();
+    return result[0];
+  }
+
+  // ATS - Activity Logging
+  async createApplicationActivityLog(log: any): Promise<any> {
+    const result = await db.insert(applicationActivityLog).values(log).returning();
+    return result[0];
+  }
+
+  async createApplicationStageTransition(transition: any): Promise<any> {
+    const result = await db.insert(applicationStageTransitions).values(transition).returning();
+    return result[0];
+  }
+
+  // ATS - Team Assignments
+  async getTeamAssignmentsByJob(jobId: string): Promise<any[]> {
+    return db.select().from(teamAssignments)
+      .where(and(eq(teamAssignments.jobPostingId, jobId), isNull(teamAssignments.removedAt)));
+  }
+
+  async createTeamAssignment(assignment: any): Promise<any> {
+    const result = await db.insert(teamAssignments).values(assignment).returning();
     return result[0];
   }
 

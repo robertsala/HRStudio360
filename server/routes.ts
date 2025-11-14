@@ -47,6 +47,15 @@ export function registerRoutes(app: Express) {
     }
   }
 
+  // Auth helper - validates session and returns userId as string
+  function requireAuth(req: any): string | null {
+    const userId = req.session?.userId;
+    if (typeof userId !== 'string') {
+      return null;
+    }
+    return userId;
+  }
+
   // Object Storage Routes - For profile pictures and file uploads
   // Based on javascript_object_storage blueprint
 
@@ -476,6 +485,398 @@ export function registerRoutes(app: Express) {
       }
       res.json(candidate);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ================================
+  // ATS (APPLICANT TRACKING SYSTEM)
+  // ================================
+
+  // Job Postings - PUBLIC endpoints (no authentication required)
+  app.get('/api/public/careers', async (req, res) => {
+    try {
+      const activeJobs = await storage.getActiveJobPostings();
+      res.json(activeJobs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/public/careers/:id', async (req, res) => {
+    try {
+      const job = await storage.getJobPostingById(req.params.id);
+      if (!job || !job.isPublic || job.status !== 'active') {
+        return res.status(404).json({ error: 'Job posting not found' });
+      }
+      
+      // Increment view count
+      await storage.incrementJobPostingViews(req.params.id);
+      
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public Application Submission (no authentication required)
+  app.post('/api/public/careers/:jobId/apply', async (req, res) => {
+    try {
+      const { insertApplicationSchema, insertCandidateSchema, insertResumeDataSchema } = await import('../shared/schema.js');
+      
+      const { candidate, application, resumeData } = req.body;
+      
+      // Verify job exists and is active
+      const job = await storage.getJobPostingById(req.params.jobId);
+      if (!job || !job.isPublic || job.status !== 'active') {
+        return res.status(404).json({ error: 'Job posting not found or no longer accepting applications' });
+      }
+      
+      // Check if candidate already applied to this job
+      const existingCandidate = await storage.getCandidateByEmail(candidate.email);
+      let candidateRecord;
+      
+      if (existingCandidate) {
+        candidateRecord = existingCandidate;
+        
+        // Check for duplicate application
+        const existingApplication = await storage.getApplicationByJobAndCandidate(
+          req.params.jobId,
+          existingCandidate.id
+        );
+        
+        if (existingApplication) {
+          return res.status(409).json({ 
+            error: 'You have already applied to this position',
+            applicationId: existingApplication.id
+          });
+        }
+      } else {
+        // Create new candidate
+        const validatedCandidate = insertCandidateSchema.parse(candidate);
+        candidateRecord = await storage.createCandidate(validatedCandidate);
+      }
+      
+      // Get default interview stage for this job
+      const defaultStage = await storage.getDefaultInterviewStage(req.params.jobId);
+      
+      // Create application
+      const validatedApplication = insertApplicationSchema.parse({
+        ...application,
+        jobPostingId: req.params.jobId,
+        candidateId: candidateRecord.id,
+        currentStageId: defaultStage?.id || null,
+        status: 'applied'
+      });
+      
+      const applicationRecord = await storage.createApplication(validatedApplication);
+      
+      // Store parsed resume data if provided
+      if (resumeData) {
+        const validatedResumeData = insertResumeDataSchema.parse({
+          ...resumeData,
+          applicationId: applicationRecord.id,
+          candidateId: candidateRecord.id
+        });
+        await storage.createResumeData(validatedResumeData);
+      }
+      
+      // Increment application count
+      await storage.incrementJobPostingApplications(req.params.jobId);
+      
+      // Log activity
+      await storage.createApplicationActivityLog({
+        applicationId: applicationRecord.id,
+        userId: null,
+        activityType: 'application_submitted',
+        description: 'Application submitted',
+        metadata: { source: application.sourceId }
+      });
+      
+      res.status(201).json({
+        message: 'Application submitted successfully',
+        applicationId: applicationRecord.id,
+        candidateId: candidateRecord.id
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid application data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Job Postings - AUTHENTICATED endpoints
+  app.get('/api/jobs', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const jobs = await storage.getAllJobPostings();
+      res.json(jobs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/jobs/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const job = await storage.getJobPostingById(req.params.id);
+      if (!job) {
+        return res.status(404).json({ error: 'Job posting not found' });
+      }
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/jobs', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const { insertJobPostingSchema } = await import('../shared/schema.js');
+      const validated = insertJobPostingSchema.parse({
+        ...req.body,
+        postedBy: userId
+      });
+      
+      const job = await storage.createJobPosting(validated);
+      
+      // Create default interview stages for the job
+      await storage.createDefaultInterviewStages(job.id);
+      
+      res.status(201).json(job);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid job posting data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/jobs/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const job = await storage.updateJobPosting(req.params.id, req.body);
+      if (!job) {
+        return res.status(404).json({ error: 'Job posting not found' });
+      }
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Applications
+  app.get('/api/applications', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const { jobId } = req.query;
+      
+      if (jobId) {
+        const applications = await storage.getApplicationsByJob(jobId as string);
+        res.json(applications);
+      } else {
+        const applications = await storage.getAllApplications();
+        res.json(applications);
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/applications/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const application = await storage.getApplicationById(req.params.id);
+      if (!application) {
+        return res.status(404).json({ error: 'Application not found' });
+      }
+      res.json(application);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/applications/:id/stage', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const { stageId } = req.body;
+      const application = await storage.getApplicationById(req.params.id);
+      
+      if (!application) {
+        return res.status(404).json({ error: 'Application not found' });
+      }
+      
+      // Record stage transition
+      await storage.createApplicationStageTransition({
+        applicationId: req.params.id,
+        fromStageId: application.currentStageId,
+        toStageId: stageId,
+        movedBy: req.session.userId
+      });
+      
+      // Update application
+      const updated = await storage.updateApplication(req.params.id, {
+        currentStageId: stageId,
+        lastActivityAt: new Date()
+      });
+      
+      // Log activity
+      await storage.createApplicationActivityLog({
+        applicationId: req.params.id,
+        userId: userId,
+        activityType: 'stage_change',
+        description: 'Application stage changed',
+        oldValue: application.currentStageId,
+        newValue: stageId
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Resume parsing with AI
+  app.post('/api/applications/:id/parse-resume', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const { resumeText } = req.body;
+      
+      if (!resumeText) {
+        return res.status(400).json({ error: 'Resume text is required' });
+      }
+      
+      // Call AI resume parser (to be implemented)
+      const { parseResumeWithAI } = await import('./ai-resume-parser');
+      const parsedData = await parseResumeWithAI(resumeText);
+      
+      // Store parsed data
+      const application = await storage.getApplicationById(req.params.id);
+      if (!application) {
+        return res.status(404).json({ error: 'Application not found' });
+      }
+      
+      const { insertResumeDataSchema } = await import('../shared/schema.js');
+      const resumeData = insertResumeDataSchema.parse({
+        ...parsedData,
+        applicationId: req.params.id,
+        candidateId: application.candidateId
+      });
+      
+      const stored = await storage.createResumeData(resumeData);
+      
+      res.json(stored);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Interview Stages
+  app.get('/api/jobs/:jobId/stages', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const stages = await storage.getInterviewStagesByJob(req.params.jobId);
+      res.json(stages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/jobs/:jobId/stages', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const { insertInterviewStageSchema } = await import('../shared/schema.js');
+      const validated = insertInterviewStageSchema.parse({
+        ...req.body,
+        jobPostingId: req.params.jobId
+      });
+      
+      const stage = await storage.createInterviewStage(validated);
+      res.status(201).json(stage);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid stage data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Team Assignments
+  app.get('/api/jobs/:jobId/team', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const team = await storage.getTeamAssignmentsByJob(req.params.jobId);
+      res.json(team);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/jobs/:jobId/team', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      const { insertTeamAssignmentSchema } = await import('../shared/schema.js');
+      const validated = insertTeamAssignmentSchema.parse({
+        ...req.body,
+        jobPostingId: req.params.jobId,
+        assignedBy: userId
+      });
+      
+      const assignment = await storage.createTeamAssignment(validated);
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid assignment data', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
