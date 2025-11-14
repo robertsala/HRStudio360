@@ -22,6 +22,13 @@ import { db } from './db.js';
 import { eq } from 'drizzle-orm';
 import { ObjectStorageService, ObjectNotFoundError } from './objectStorage.js';
 import { ObjectPermission } from './objectAcl.js';
+import {
+  screenCandidate,
+  batchScreenCandidates,
+  chatWithStudioAI,
+  generateHiringInsights,
+  runDailyScreeningWorkflow
+} from './ai-agent.js';
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -2768,5 +2775,217 @@ export function registerRoutes(app: Express) {
         details: error.message 
       });
     }
+  });
+
+  // ====================================================================
+  // AI AGENT ENDPOINTS - Autonomous AI capabilities
+  // ====================================================================
+
+  // Chat with Studio AI (real GPT-4, not canned responses)
+  app.post('/api/ai-agent/chat', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const { message, conversationHistory } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      // Get user context
+      const profile = await storage.getProfileById(userId);
+      
+      const response = await chatWithStudioAI(message, {
+        userRole: profile?.role,
+        department: profile?.department,
+        conversationHistory: conversationHistory || []
+      });
+
+      res.json({ response });
+    } catch (error: any) {
+      console.error('[AI Agent] Chat error:', error);
+      res.status(500).json({ error: 'Failed to process chat request', details: error.message });
+    }
+  });
+
+  // Screen a single candidate (autonomous screening)
+  app.post('/api/ai-agent/screen-candidate/:applicationId', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const { applicationId } = req.params;
+      
+      // Get application with related data
+      const application = await storage.getApplicationById(applicationId);
+      if (!application) {
+        return res.status(404).json({ error: 'Application not found' });
+      }
+
+      const candidate = await storage.getCandidateById(application.candidateId);
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidate not found' });
+      }
+
+      const jobPosting = await storage.getJobById(application.jobPostingId);
+      if (!jobPosting) {
+        return res.status(404).json({ error: 'Job posting not found' });
+      }
+
+      const resumeData = application.resumeDataId 
+        ? await storage.getResumeDataById(application.resumeDataId)
+        : null;
+
+      // Run autonomous AI screening
+      const screening = await screenCandidate(candidate, application, resumeData, jobPosting);
+
+      // Store screening results (you can extend storage to save these)
+      console.log(`[AI Agent] Screened candidate ${candidate.fullName}:`, screening);
+
+      res.json({
+        success: true,
+        screening
+      });
+    } catch (error: any) {
+      console.error('[AI Agent] Screening error:', error);
+      res.status(500).json({ error: 'Failed to screen candidate', details: error.message });
+    }
+  });
+
+  // Batch screen all applications for a job (autonomous bulk screening)
+  app.post('/api/ai-agent/screen-job/:jobId', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const { jobId } = req.params;
+      
+      // Get all applications for this job
+      const applications = await storage.getApplicationsByJobId(jobId);
+      
+      if (applications.length === 0) {
+        return res.json({ 
+          success: true, 
+          message: 'No applications to screen',
+          screenings: []
+        });
+      }
+
+      // Prepare data for batch screening
+      const batchData = await Promise.all(
+        applications.map(async (app) => {
+          const candidate = await storage.getCandidateById(app.candidateId);
+          const jobPosting = await storage.getJobById(app.jobPostingId);
+          const resumeData = app.resumeDataId 
+            ? await storage.getResumeDataById(app.resumeDataId)
+            : null;
+
+          return { candidate, application: app, resumeData, jobPosting };
+        })
+      );
+
+      // Run autonomous batch screening
+      const screenings = await batchScreenCandidates(batchData.filter(d => d.candidate && d.jobPosting));
+
+      console.log(`[AI Agent] Batch screened ${screenings.length} candidates for job ${jobId}`);
+
+      res.json({
+        success: true,
+        screenings,
+        summary: {
+          total: screenings.length,
+          strongYes: screenings.filter(s => s.recommendation === 'strong_yes').length,
+          yes: screenings.filter(s => s.recommendation === 'yes').length,
+          maybe: screenings.filter(s => s.recommendation === 'maybe').length,
+          no: screenings.filter(s => s.recommendation === 'no').length,
+          averageScore: screenings.reduce((sum, s) => sum + s.score, 0) / screenings.length
+        }
+      });
+    } catch (error: any) {
+      console.error('[AI Agent] Batch screening error:', error);
+      res.status(500).json({ error: 'Failed to screen applications', details: error.message });
+    }
+  });
+
+  // Generate hiring insights for a job (autonomous analytics)
+  app.get('/api/ai-agent/insights/:jobId', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const { jobId } = req.params;
+      
+      const applications = await storage.getApplicationsByJobId(jobId);
+      
+      const insights = await generateHiringInsights(jobId, applications);
+
+      res.json({
+        success: true,
+        insights
+      });
+    } catch (error: any) {
+      console.error('[AI Agent] Insights error:', error);
+      res.status(500).json({ error: 'Failed to generate insights', details: error.message });
+    }
+  });
+
+  // Trigger autonomous daily screening workflow (manual trigger for testing)
+  app.post('/api/ai-agent/run-daily-screening', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      // Check if user has permission (HR only)
+      const profile = await storage.getProfileById(userId);
+      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
+        return res.status(403).json({ error: 'Only HR can trigger autonomous workflows' });
+      }
+
+      console.log(`[AI Agent] Manual trigger of daily screening workflow by ${userId}`);
+      
+      const result = await runDailyScreeningWorkflow(storage);
+
+      res.json({
+        success: true,
+        result,
+        message: `Processed ${result.processed} applications, found ${result.topCandidates.length} top candidates`
+      });
+    } catch (error: any) {
+      console.error('[AI Agent] Daily screening workflow error:', error);
+      res.status(500).json({ error: 'Workflow failed', details: error.message });
+    }
+  });
+
+  // Get AI agent status and capabilities
+  app.get('/api/ai-agent/status', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    res.json({
+      status: 'active',
+      capabilities: [
+        'Screen candidates automatically',
+        'Rank applications by quality',
+        'Generate hiring insights',
+        'Answer HR questions in real-time',
+        'Run scheduled workflows',
+        'Send smart notifications'
+      ],
+      model: 'GPT-4o (via Replit AI Integrations)',
+      version: '1.0.0-autonomous'
+    });
   });
 }
