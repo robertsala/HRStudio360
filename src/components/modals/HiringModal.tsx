@@ -1033,17 +1033,6 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
               <Plus className="h-4 w-4 mr-1" />
               Add candidate
             </button>
-            
-            {onOpenStudioAI && (
-              <button
-                onClick={onOpenStudioAI}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium"
-                data-testid="button-open-studio-ai-hiring"
-              >
-                <Bot className="h-4 w-4 mr-1" />
-                Ask Studio AI
-              </button>
-            )}
           </div>
         </div>
 
