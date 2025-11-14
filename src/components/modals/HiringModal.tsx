@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Search, Filter, Plus, UserPlus, Eye, Heart, MessageCircle, Star, Calendar, DollarSign, MapPin, Mail, Phone, Award, TrendingUp, Users, CheckCircle, AlertTriangle, Send, FileText, Download, User, Building, Briefcase, Clock, Target, Brain, Sparkles, ChevronRight, Upload, Bot } from 'lucide-react';
+import { X, Filter, Plus, UserPlus, Eye, Heart, MessageCircle, Star, DollarSign, MapPin, Mail, Phone, Award, TrendingUp, Users, CheckCircle, AlertTriangle, Send, FileText, User, Building, Briefcase, Brain, Sparkles, ChevronRight, Upload, Bot } from 'lucide-react';
 import OfferManagementModal from './OfferManagementModal';
 import WorkerClassificationModal from './WorkerClassificationModal';
 import ConfettiAnimation from '../ConfettiAnimation';
@@ -9,9 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { ObjectUploader } from '../ObjectUploader';
-import type { UploadResult } from '@uppy/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '../../lib/queryClient';
 
 interface Candidate {
   id: string;
@@ -2395,7 +2393,6 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
           </div>
         </div>
       )}
-      </div>
 
       {/* Confetti Animation */}
       <ConfettiAnimation
