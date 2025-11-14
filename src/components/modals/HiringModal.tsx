@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Filter, Plus, UserPlus, Eye, Heart, MessageCircle, Star, DollarSign, MapPin, Mail, Phone, Award, TrendingUp, Users, CheckCircle, AlertTriangle, Send, FileText, User, Building, Briefcase, Brain, Sparkles, ChevronRight, Upload, Bot } from 'lucide-react';
+import { X, Filter, Plus, UserPlus, Eye, Heart, MessageCircle, Star, DollarSign, MapPin, Mail, Phone, Award, TrendingUp, Users, CheckCircle, AlertTriangle, Send, FileText, User, Building, Briefcase, Brain, Sparkles, ChevronRight, Bot } from 'lucide-react';
 import OfferManagementModal from './OfferManagementModal';
 import WorkerClassificationModal from './WorkerClassificationModal';
 import ConfettiAnimation from '../ConfettiAnimation';
@@ -8,8 +8,6 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
-import { ObjectUploader } from '../ObjectUploader';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface Candidate {
   id: string;
@@ -50,27 +48,6 @@ interface CandidateComment {
   isPrivate: boolean;
 }
 
-interface JobPosting {
-  id: string;
-  title: string;
-  department: string;
-  location: string;
-  employmentType: string;
-  salaryMin: number | null;
-  salaryMax: number | null;
-  description: string;
-  requirements: string[];
-  responsibilities: string[];
-  benefits: string[];
-  experienceLevel: string;
-  educationLevel: string;
-  isPublic: boolean;
-  status: string;
-  totalApplications: number;
-  totalViews: number;
-  applicationDeadline: string | null;
-}
-
 interface HiringStage {
   id: string;
   title: string;
@@ -98,7 +75,6 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
   const [showAddCandidate, setShowAddCandidate] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showDisqualifyModal, setShowDisqualifyModal] = useState(false);
   const [disqualifyReason, setDisqualifyReason] = useState('');
   const [customReason, setCustomReason] = useState('');
@@ -125,7 +101,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     }
   };
 
-  const loadCollaborators = async (candidateId: string) => {
+  const loadCollaborators = async (_candidateId: string) => {
     try {
       // TODO: Add backend endpoint for collaborators
       setCollaborators([]);
@@ -153,7 +129,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     }
   };
 
-  const handleRemoveCollaborator = async (collaboratorId: string) => {
+  const handleRemoveCollaborator = async (_collaboratorId: string) => {
     if (!selectedCandidate) return;
 
     try {
@@ -170,7 +146,6 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
 
   const loadCandidates = async () => {
     try {
-      setIsLoading(true);
       const data = await apiClient.getCandidates();
 
       if (data) {
@@ -206,8 +181,6 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
       }
     } catch (error) {
       console.error('Error loading candidates:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -508,7 +481,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
       // TODO: Add backend endpoint for candidate comments
       const newCommentObj: CandidateComment = {
         id: crypto.randomUUID(),
-        author: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'Current User',
+        author: user.name || 'Current User',
         authorRole: user.role || 'HR Manager',
         message: newComment.trim(),
         timestamp: new Date().toISOString(),
@@ -551,17 +524,17 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     }
   };
 
-  const handleRateCandidate = async (candidateId: string, rating: number) => {
+  const handleRateCandidate = async (_candidateId: string, rating: number) => {
     if (!user) return;
 
     try {
       // TODO: Add backend endpoint for candidate ratings
       // Update local state for now
       setCandidates(prev => prev.map(c =>
-        c.id === candidateId ? { ...c, rating } : c
+        c.id === _candidateId ? { ...c, rating } : c
       ));
 
-      const candidate = candidates.find(c => c.id === candidateId);
+      const candidate = candidates.find(c => c.id === _candidateId);
       setNotification({
         type: 'success',
         message: `Rated ${candidate?.name} ${rating} star${rating !== 1 ? 's' : ''}`
@@ -1745,22 +1718,16 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
                 rows={3}
               />
               
-              {/* Profile Picture Upload */}
-              <div className="space-y-2">
+              {/* Profile Picture Upload - Feature temporarily disabled */}
+              {/* <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Profile Picture (Optional)
                 </label>
                 <div className="flex items-center space-x-4">
-                  <ObjectUploader
-                    maxNumberOfFiles={1}
-                    maxFileSize={5242880}
-                    onGetUploadParameters={handleGetUploadURL}
-                    onComplete={handleUploadComplete}
-                    buttonClassName="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  >
+                  <button className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 px-4 py-2 rounded-lg flex items-center">
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Picture
-                  </ObjectUploader>
+                  </button>
                   {newCandidateForm.profilePictureURL && (
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="h-5 w-5 text-green-500" />
@@ -1768,7 +1735,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
                     </div>
                   )}
                 </div>
-              </div>
+              </div> */}
             </div>
             
             <div className="flex justify-end space-x-3 mt-6">
