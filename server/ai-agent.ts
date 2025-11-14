@@ -76,20 +76,20 @@ export async function screenCandidate(
 
 JOB POSTING:
 Title: ${jobPosting.title}
-Department: ${jobPosting.department}
-Requirements: ${jobPosting.requirements.join(', ')}
-Experience Level: ${jobPosting.experienceLevel}
+Department ID: ${jobPosting.departmentId}
+Requirements: ${jobPosting.requirements}
+Experience Level: ${jobPosting.experience}
 Education: ${jobPosting.educationLevel}
 
 CANDIDATE:
-Name: ${candidate.fullName}
+Name: ${candidate.name}
 Email: ${candidate.email}
-Phone: ${candidate.phoneNumber || 'Not provided'}
+Phone: ${candidate.phone || 'Not provided'}
 
 RESUME DATA:
-Skills: ${resumeData?.skills?.join(', ') || 'Not extracted'}
-Experience: ${resumeData?.experience?.map((exp: any) => `${exp.title} at ${exp.company} (${exp.duration})`).join('; ') || 'Not extracted'}
-Education: ${resumeData?.education?.map((edu: any) => `${edu.degree} in ${edu.field} from ${edu.institution}`).join('; ') || 'Not extracted'}
+Skills: ${resumeData?.parsedSkills?.join(', ') || 'Not extracted'}
+Experience: ${resumeData?.parsedExperience ? JSON.stringify(resumeData.parsedExperience) : 'Not extracted'}
+Education: ${resumeData?.parsedEducation ? JSON.stringify(resumeData.parsedEducation) : 'Not extracted'}
 
 Provide a comprehensive screening assessment as a JSON object with:
 - score (0-100)
@@ -232,9 +232,10 @@ export async function generateHiringInsights(
 
 Job Posting ID: ${jobPostingId}
 Total Applications: ${applications.length}
-Applications by Stage: ${JSON.stringify(
+Applications by Status: ${JSON.stringify(
     applications.reduce((acc, app) => {
-      acc[app.stage] = (acc[app.stage] || 0) + 1;
+      const status = app.status || 'applied';
+      acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
   )}
