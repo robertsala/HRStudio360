@@ -50,12 +50,12 @@ export function registerRoutes(app: Express) {
   // Object Storage Routes - For profile pictures and file uploads
   // Based on javascript_object_storage blueprint
 
-  // Track issued upload tokens with structured metadata for security
-  // Maps uploadToken -> { userId, uploadURL, objectPath, expiresAt }
+  // Track issued upload tokens with server-generated object keys for security
+  // Maps uploadToken -> { userId, objectKey, uploadURL, expiresAt }
   const issuedUploadTokens = new Map<string, { 
     userId: string; 
+    objectKey: string; // Server-generated canonical key
     uploadURL: string;
-    objectPath: string;
     expiresAt: number;
   }>();
 
@@ -99,17 +99,19 @@ export function registerRoutes(app: Express) {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       
-      // Extract the object path from the upload URL (before query params)
-      const objectPath = uploadURL.split('?')[0];
+      // SECURITY: Extract canonical object path in `/objects/...` format
+      // Parse the presigned URL to get only the path component
+      const url = new URL(uploadURL);
+      const objectKey = url.pathname; // This gives us `/objects/uploads/...` format
       
       // Generate a secure upload token
       const uploadToken = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Track this upload token with structured metadata (expires in 1 hour)
+      // Track this upload token with server-owned canonical key (expires in 1 hour)
       issuedUploadTokens.set(uploadToken, {
         userId,
+        objectKey, // Server-generated canonical key - never trust client input
         uploadURL,
-        objectPath,
         expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
       });
       
@@ -150,15 +152,24 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: 'Upload token has expired' });
       }
 
-      // Remove the token after successful validation (one-time use)
+      // Remove the token immediately after validation (one-time use)
       issuedUploadTokens.delete(uploadToken);
 
       const objectStorageService = new ObjectStorageService();
       
-      // Use the server-tracked object path (not client-provided URL)
-      // This prevents ACL tampering attacks
+      // SECURITY: Verify object exists before setting ACL
+      // This prevents setting ACL on non-existent or unauthorized objects
+      try {
+        await objectStorageService.getObjectEntityFile(tokenData.objectKey);
+      } catch (error) {
+        console.error('Object does not exist:', tokenData.objectKey);
+        return res.status(404).json({ error: 'Uploaded object not found' });
+      }
+      
+      // Use ONLY the server-tracked canonical objectKey (never trust client input)
+      // This prevents ACL tampering attacks via URL manipulation
       const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        tokenData.objectPath,
+        tokenData.objectKey,
         {
           owner: userId,
           visibility: 'public', // Profile pictures are public
@@ -200,47 +211,9 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update candidate profile picture (authenticated)
-  app.put('/api/candidates/:id/profile-picture', async (req, res) => {
-    try {
-      const userId = (req.session as any).userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Not authenticated' });
-      }
-
-      if (!req.body.profilePictureURL) {
-        return res.status(400).json({ error: 'profilePictureURL is required' });
-      }
-
-      const objectStorageService = new ObjectStorageService();
-      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        req.body.profilePictureURL,
-        {
-          owner: userId,
-          visibility: 'public', // Profile pictures are public
-        }
-      );
-
-      // Update the candidate's profile picture in the database
-      const candidate = await storage.getCandidateById(req.params.id);
-      if (!candidate) {
-        return res.status(404).json({ error: 'Candidate not found' });
-      }
-
-      const updatedCandidate = await storage.updateCandidate(req.params.id, {
-        ...candidate,
-        profilePicture: objectPath,
-      });
-
-      res.status(200).json({
-        objectPath,
-        candidate: updatedCandidate,
-      });
-    } catch (error: any) {
-      console.error('Error updating candidate profile picture:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
+  // NOTE: Profile picture update endpoint removed to prevent ACL bypass vulnerability
+  // When implementing candidate edit functionality, use the same secure token flow
+  // as the upload/normalize endpoints above
 
   // Profile routes
   app.get('/api/profiles', async (req, res) => {
