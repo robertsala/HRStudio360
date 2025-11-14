@@ -1214,6 +1214,100 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Password change - authenticated users changing their own password
+  app.post('/api/auth/password/change', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+      
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ error: 'Current password, new password, and confirm password are required' });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: 'New password and confirm password do not match' });
+      }
+
+      // Get user profile
+      const profile = await storage.getProfileById(userId);
+      if (!profile) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+
+      // Get auth credentials
+      const authCredential = await storage.getAuthCredentialByProfileId(userId);
+      if (!authCredential) {
+        return res.status(404).json({ error: 'Authentication credentials not found' });
+      }
+
+      // Check if account is locked
+      if (authCredential.lockedUntil && new Date(authCredential.lockedUntil) > new Date()) {
+        const remainingMinutes = Math.ceil((new Date(authCredential.lockedUntil).getTime() - Date.now()) / 60000);
+        return res.status(423).json({ 
+          error: `Account is locked. Please try again in ${remainingMinutes} minutes.` 
+        });
+      }
+
+      // Verify current password
+      const isCurrentPasswordValid = await verifyPassword(currentPassword, authCredential.passwordHash);
+      if (!isCurrentPasswordValid) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      // Validate new password
+      const passwordValidation = validatePassword(newPassword, profile.email);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ 
+          error: 'New password does not meet requirements', 
+          details: passwordValidation.errors 
+        });
+      }
+
+      // Check if new password is same as current
+      const isSamePassword = await verifyPassword(newPassword, authCredential.passwordHash);
+      if (isSamePassword) {
+        return res.status(400).json({ error: 'New password must be different from current password' });
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Update password and reset failed attempts
+      await db.update(authCredentials)
+        .set({ 
+          passwordHash: hashedPassword,
+          passwordUpdatedAt: new Date(),
+          failedAttempts: 0,
+          lockedUntil: null
+        })
+        .where(eq(authCredentials.profileId, userId));
+
+      // Log the password change
+      const ipAddress = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+
+      await db.insert(passwordAuditLog).values({
+        profileId: userId,
+        action: 'password_change',
+        method: 'user_initiated',
+        adminId: null,
+        ipAddress,
+        userAgent,
+        success: true
+      });
+
+      res.json({ success: true, message: 'Password changed successfully' });
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      res.status(500).json({ error: 'Failed to change password' });
+    }
+  });
+
   // Weather API proxy endpoint
   app.get('/api/weather/:lat/:lon', async (req, res) => {
     try {
