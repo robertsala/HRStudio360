@@ -990,11 +990,17 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
                       >
                         {/* Profile and Name */}
                         <div className="flex items-center space-x-2 mb-2">
-                          <img
-                            src={candidate.profilePicture}
-                            alt={candidate.name}
-                            className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                          />
+                          {candidate.profilePicture ? (
+                            <img
+                              src={candidate.profilePicture}
+                              alt={candidate.name}
+                              className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                              <User className="h-3 w-3 text-white" />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{candidate.name}</p>
                             <p className="text-xs text-gray-600 dark:text-gray-400">{new Date(candidate.appliedDate).toLocaleDateString()}</p>
@@ -1081,11 +1087,17 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
           selectedCandidate ? (
             <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-t-xl">
               <div className="flex items-center space-x-4">
-                <img
-                  src={selectedCandidate.profilePicture}
-                  alt={selectedCandidate.name}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                />
+                {selectedCandidate.profilePicture ? (
+                  <img
+                    src={selectedCandidate.profilePicture}
+                    alt={selectedCandidate.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-2 border-white">
+                    <User className="h-6 w-6 text-white" />
+                  </div>
+                )}
                 <div>
                   <h3 className="text-xl font-bold">{selectedCandidate.name}</h3>
                   <p className="text-blue-100">{selectedCandidate.position}</p>
@@ -1426,11 +1438,17 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
           <div className="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white">
               <div className="flex items-center space-x-3">
-                <img
-                  src={selectedCandidate.profilePicture}
-                  alt={selectedCandidate.name}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-white"
-                />
+                {selectedCandidate.profilePicture ? (
+                  <img
+                    src={selectedCandidate.profilePicture}
+                    alt={selectedCandidate.name}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center border-2 border-white">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                )}
                 <div>
                   <h3 className="text-lg font-bold">Team Collaboration</h3>
                   <p className="text-purple-100">{selectedCandidate.name} • {selectedCandidate.position}</p>
