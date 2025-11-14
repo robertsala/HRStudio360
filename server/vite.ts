@@ -13,13 +13,21 @@ export async function setupVite(app: Express, server: any) {
     const distPath = path.resolve(__dirname, '../dist');
     const clientPath = path.join(distPath, 'public');
     
-    // Serve static assets
+    // Serve static assets (JS/CSS with hashed names can be cached long-term)
     app.use(express.static(clientPath, {
       maxAge: '1y',
       etag: true,
+      setHeaders: (res, filePath) => {
+        // Don't cache index.html so browser always fetches latest version after redeploy
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
     }));
 
-    // Serve index.html for all non-API routes
+    // Serve index.html for all non-API routes (with no-cache headers)
     app.use((req, res, next) => {
       if (req.path.startsWith('/api')) {
         return next();
@@ -27,6 +35,9 @@ export async function setupVite(app: Express, server: any) {
 
       const indexPath = path.join(clientPath, 'index.html');
       if (fs.existsSync(indexPath)) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.sendFile(indexPath);
       } else {
         next();
