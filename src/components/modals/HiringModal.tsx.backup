@@ -12,6 +12,7 @@ import { ObjectUploader } from '../ObjectUploader';
 import type { UploadResult } from '@uppy/core';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/queryClient';
+import JobPostingsPanel from '../JobPostingsPanel';
 
 interface Candidate {
   id: string;
@@ -93,6 +94,7 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
   const { user } = useAuth();
   useEscapeKey(() => onClose?.(), !!onClose);
 
+  const [activeTab, setActiveTab] = useState<'jobs' | 'pipeline'>('jobs');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('All');
   const [filterPosition, setFilterPosition] = useState('All');
@@ -975,32 +977,81 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     <>
       <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg w-full h-full overflow-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-emerald-600 text-white">
-          <div className="flex items-center">
-            <UserPlus className="h-8 w-8 mr-3" />
-            <div>
-              <h2 className="text-2xl font-bold">Recruitment Pipeline</h2>
-              <p className="text-blue-100">Manage candidates through the hiring process</p>
+        <div className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white">
+          <div className="flex items-center justify-between p-6">
+            <div className="flex items-center">
+              <Briefcase className="h-8 w-8 mr-3" />
+              <div>
+                <h2 className="text-2xl font-bold">Recruitment</h2>
+                <p className="text-blue-100">Complete hiring lifecycle management</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              {onOpenStudioAI && (
+                <button
+                  onClick={onOpenStudioAI}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium"
+                  data-testid="button-open-studio-ai-recruitment"
+                >
+                  <Bot className="h-4 w-4 mr-1" />
+                  Ask Studio AI
+                </button>
+              )}
+              {activeTab === 'pipeline' && (
+                <span className="text-blue-100 text-sm">
+                  {candidates.filter(c => c.status !== 'Rejected').length} active candidates
+                </span>
+              )}
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            {onOpenStudioAI && (
-              <button
-                onClick={onOpenStudioAI}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium"
-                data-testid="button-open-studio-ai-hiring"
-              >
-                <Bot className="h-4 w-4 mr-1" />
-                Ask Studio AI
-              </button>
-            )}
-            <span className="text-blue-100 text-sm">
-              {candidates.filter(c => c.status !== 'Rejected').length} active candidates
-            </span>
+
+          {/* Tab Navigation */}
+          <div className="flex border-t border-white/20">
+            <button
+              onClick={() => setActiveTab('jobs')}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'jobs'
+                  ? 'bg-white/20 border-b-2 border-white'
+                  : 'hover:bg-white/10'
+              }`}
+              data-testid="tab-job-postings"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Briefcase className="h-4 w-4" />
+                Job Postings
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('pipeline')}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'pipeline'
+                  ? 'bg-white/20 border-b-2 border-white'
+                  : 'hover:bg-white/10'
+              }`}
+              data-testid="tab-candidate-pipeline"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Candidate Pipeline
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* AI Search and Filters */}
+        {/* Tab Content */}
+        {activeTab === 'jobs' ? (
+          <div className="p-6">
+            <JobPostingsPanel 
+              onOpenStudioAI={onOpenStudioAI}
+              onNotification={(notif) => {
+                setNotification(notif);
+                setTimeout(() => setNotification(null), notif.type === 'success' ? 3000 : 5000);
+              }}
+            />
+          </div>
+        ) : (
+          <>
+            {/* AI Search and Filters */}
         <div className="p-4 border-b bg-gray-50 dark:bg-gray-900">
           <div className="flex items-center gap-4">
             <div className="relative flex-1 max-w-md">
@@ -2394,6 +2445,8 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
       </div>
 
