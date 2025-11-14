@@ -7,8 +7,7 @@ import type {
   LeaveRequest, InsertLeaveRequest,
   LeaveBalance, InsertLeaveBalance,
   Candidate, InsertCandidate,
-  NewHire, InsertNewHire,
-  ExpenseCategory, InsertExpenseCategory,
+  ExpenseCategory,
   Expense, InsertExpense,
   ChatChannel, InsertChatChannel,
   ChannelMember, InsertChannelMember,
@@ -21,7 +20,7 @@ import type {
   ChangeLog, InsertChangeLog,
   HistoricalChange, InsertHistoricalChange,
   ChangeNotification, InsertChangeNotification,
-  CelebrationBadge, InsertCelebrationBadge,
+  CelebrationBadge,
   EarnedBadge, InsertEarnedBadge,
   CelebrationHistory, InsertCelebrationHistory,
   CelebrationNotification, InsertCelebrationNotification,
@@ -37,7 +36,7 @@ import {
   reviewCycles,
   jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments
 } from '../shared/schema.js';
-import { eq, gte, and, desc, or, like, sql as drizzleSql, isNull, isNotNull, lte } from 'drizzle-orm';
+import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 export interface IStorage {
@@ -855,7 +854,7 @@ export class DbStorage implements IStorage {
       conditions.push(gte(changeLog.createdAt, new Date(filters.startDate)));
     }
     if (filters?.endDate) {
-      conditions.push(gte(new Date(filters.endDate), changeLog.createdAt));
+      conditions.push(lte(changeLog.createdAt, new Date(filters.endDate)));
     }
     
     if (conditions.length > 0) {
@@ -921,7 +920,7 @@ export class DbStorage implements IStorage {
   }
 
   async getCelebrationBadgeByYears(years: number): Promise<CelebrationBadge | undefined> {
-    const result = await db.select().from(celebrationBadges).where(eq(celebrationBadges.years, years));
+    const result = await db.select().from(celebrationBadges).where(eq(celebrationBadges.yearNumber, years));
     return result[0];
   }
 
@@ -954,7 +953,7 @@ export class DbStorage implements IStorage {
       .where(and(
         eq(celebrationHistory.userId, userId),
         eq(celebrationHistory.type, type),
-        eq(celebrationHistory.celebrationDate, new Date(date))
+        eq(celebrationHistory.celebrationDate, date)
       ));
   }
 
@@ -1215,7 +1214,10 @@ export class DbStorage implements IStorage {
       };
     }
     
-    return result[0];
+    return {
+      ...result[0],
+      canAccessOrgChart: result[0].canAccessOrgChart ?? false
+    };
   }
 
   // New Hires
@@ -1440,7 +1442,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getFinancialMetrics(timeRange: string): Promise<import('../shared/schema.js').FinancialMetrics> {
+  async getFinancialMetrics(_timeRange: string): Promise<import('../shared/schema.js').FinancialMetrics> {
     // Get department-level salary aggregations
     const departmentCosts = await db.select({
       department: profiles.department,
