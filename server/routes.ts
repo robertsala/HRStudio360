@@ -20,6 +20,8 @@ import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from 
 import rateLimit from 'express-rate-limit';
 import { db } from './db.js';
 import { eq } from 'drizzle-orm';
+import { ObjectStorageService, ObjectNotFoundError } from './objectStorage.js';
+import { ObjectPermission } from './objectAcl.js';
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -44,6 +46,201 @@ export function registerRoutes(app: Express) {
       return false;
     }
   }
+
+  // Object Storage Routes - For profile pictures and file uploads
+  // Based on javascript_object_storage blueprint
+
+  // Track issued upload tokens with structured metadata for security
+  // Maps uploadToken -> { userId, uploadURL, objectPath, expiresAt }
+  const issuedUploadTokens = new Map<string, { 
+    userId: string; 
+    uploadURL: string;
+    objectPath: string;
+    expiresAt: number;
+  }>();
+
+  // Cleanup expired upload tokens every 5 minutes
+  setInterval(() => {
+    const now = Date.now();
+    for (const [token, data] of issuedUploadTokens.entries()) {
+      if (data.expiresAt < now) {
+        issuedUploadTokens.delete(token);
+      }
+    }
+  }, 5 * 60 * 1000);
+
+  // Get presigned URL for uploading objects (authenticated)
+  app.post('/api/objects/upload', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Server-side validation for file uploads
+      const { fileName, fileSize, fileType } = req.body;
+      
+      // Validate required fields
+      if (!fileName || !fileSize || !fileType) {
+        return res.status(400).json({ error: 'fileName, fileSize, and fileType are required' });
+      }
+
+      // Validate file size (max 5MB for profile pictures)
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      if (fileSize > MAX_FILE_SIZE) {
+        return res.status(400).json({ error: 'File size exceeds 5MB limit' });
+      }
+
+      // Validate file type (images only)
+      if (!fileType.startsWith('image/')) {
+        return res.status(400).json({ error: 'Only image files are allowed' });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      
+      // Extract the object path from the upload URL (before query params)
+      const objectPath = uploadURL.split('?')[0];
+      
+      // Generate a secure upload token
+      const uploadToken = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Track this upload token with structured metadata (expires in 1 hour)
+      issuedUploadTokens.set(uploadToken, {
+        userId,
+        uploadURL,
+        objectPath,
+        expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
+      });
+      
+      res.json({ uploadURL, uploadToken });
+    } catch (error: any) {
+      console.error('Error getting upload URL:', error);
+      res.status(500).json({ error: 'Failed to get upload URL' });
+    }
+  });
+
+  // Normalize and set ACL for uploaded object using secure token (authenticated)
+  app.post('/api/objects/normalize', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { uploadToken } = req.body;
+      if (!uploadToken) {
+        return res.status(400).json({ error: 'uploadToken is required' });
+      }
+
+      // SECURITY: Validate the upload token
+      const tokenData = issuedUploadTokens.get(uploadToken);
+      if (!tokenData) {
+        return res.status(403).json({ error: 'Invalid or expired upload token' });
+      }
+
+      // Verify the token belongs to the current user
+      if (tokenData.userId !== userId) {
+        return res.status(403).json({ error: 'Unauthorized: Token was not issued to you' });
+      }
+
+      // Check token hasn't expired
+      if (tokenData.expiresAt < Date.now()) {
+        issuedUploadTokens.delete(uploadToken);
+        return res.status(403).json({ error: 'Upload token has expired' });
+      }
+
+      // Remove the token after successful validation (one-time use)
+      issuedUploadTokens.delete(uploadToken);
+
+      const objectStorageService = new ObjectStorageService();
+      
+      // Use the server-tracked object path (not client-provided URL)
+      // This prevents ACL tampering attacks
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        tokenData.objectPath,
+        {
+          owner: userId,
+          visibility: 'public', // Profile pictures are public
+        }
+      );
+
+      res.json({ objectPath: normalizedPath });
+    } catch (error: any) {
+      console.error('Error normalizing object:', error);
+      res.status(500).json({ error: 'Failed to normalize object' });
+    }
+  });
+
+  // Serve uploaded objects with ACL enforcement
+  app.use('/objects', async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      // req.originalUrl will include the full path like /objects/uploads/123
+      const objectFile = await objectStorageService.getObjectEntityFile(req.originalUrl);
+      
+      // Enforce ACL checks for security
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        objectFile,
+        requestedPermission: ObjectPermission.READ,
+      });
+      
+      if (!canAccess) {
+        // Return 404 instead of 403 to avoid leaking information about object existence
+        return res.sendStatus(404);
+      }
+      
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error('Error serving object:', error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Update candidate profile picture (authenticated)
+  app.put('/api/candidates/:id/profile-picture', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      if (!req.body.profilePictureURL) {
+        return res.status(400).json({ error: 'profilePictureURL is required' });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.profilePictureURL,
+        {
+          owner: userId,
+          visibility: 'public', // Profile pictures are public
+        }
+      );
+
+      // Update the candidate's profile picture in the database
+      const candidate = await storage.getCandidateById(req.params.id);
+      if (!candidate) {
+        return res.status(404).json({ error: 'Candidate not found' });
+      }
+
+      const updatedCandidate = await storage.updateCandidate(req.params.id, {
+        ...candidate,
+        profilePicture: objectPath,
+      });
+
+      res.status(200).json({
+        objectPath,
+        candidate: updatedCandidate,
+      });
+    } catch (error: any) {
+      console.error('Error updating candidate profile picture:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
 
   // Profile routes
   app.get('/api/profiles', async (req, res) => {

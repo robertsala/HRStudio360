@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Search, Filter, Plus, UserPlus, Eye, Heart, MessageCircle, Star, Calendar, DollarSign, MapPin, Mail, Phone, Award, TrendingUp, Users, CheckCircle, AlertTriangle, Send, FileText, Download, User, Building, Briefcase, Clock, Target, Brain, Sparkles, ChevronRight } from 'lucide-react';
+import { X, Search, Filter, Plus, UserPlus, Eye, Heart, MessageCircle, Star, Calendar, DollarSign, MapPin, Mail, Phone, Award, TrendingUp, Users, CheckCircle, AlertTriangle, Send, FileText, Download, User, Building, Briefcase, Clock, Target, Brain, Sparkles, ChevronRight, Upload } from 'lucide-react';
 import OfferManagementModal from './OfferManagementModal';
 import WorkerClassificationModal from './WorkerClassificationModal';
 import ConfettiAnimation from '../ConfettiAnimation';
@@ -8,6 +8,8 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { ObjectUploader } from '../ObjectUploader';
+import type { UploadResult } from '@uppy/core';
 
 interface Candidate {
   id: string;
@@ -238,7 +240,8 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     department: '',
     location: '',
     salary_expectation: '',
-    skills: ''
+    skills: '',
+    profilePictureURL: ''
   });
   const [isAddingCandidate, setIsAddingCandidate] = useState(false);
 
@@ -649,6 +652,78 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
     }
   };
 
+  // Store upload token for normalization after upload completes
+  const [uploadToken, setUploadToken] = useState<string | null>(null);
+
+  const handleGetUploadURL = async (file: File) => {
+    try {
+      // Request presigned URL with server-side validation
+      const response = await fetch('/api/objects/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to get upload URL');
+      }
+      
+      const data = await response.json();
+      
+      // Store the upload token for later normalization
+      setUploadToken(data.uploadToken);
+      
+      return { method: 'PUT' as const, url: data.uploadURL };
+    } catch (error) {
+      console.error('Error getting upload URL:', error);
+      throw error;
+    }
+  };
+
+  const handleUploadComplete = async (result: { successful: Array<{ uploadURL: string }> }) => {
+    if (result.successful && result.successful.length > 0 && uploadToken) {
+      try {
+        // Normalize the uploaded object and set ACL using secure token
+        const response = await fetch('/api/objects/normalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ uploadToken }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to normalize uploaded object');
+        }
+
+        const data = await response.json();
+        
+        // Store the normalized object path in the form state
+        setNewCandidateForm({ ...newCandidateForm, profilePictureURL: data.objectPath });
+        setNotification({
+          type: 'success',
+          message: 'Profile picture uploaded successfully!'
+        });
+        setTimeout(() => setNotification(null), 3000);
+        
+        // Clear the upload token
+        setUploadToken(null);
+      } catch (error) {
+        console.error('Error normalizing upload:', error);
+        setNotification({
+          type: 'error',
+          message: 'Upload succeeded but failed to process. Please try again.'
+        });
+        setTimeout(() => setNotification(null), 3000);
+      }
+    }
+  };
+
   const handleAddCandidate = async () => {
     if (!newCandidateForm.name.trim() || !newCandidateForm.email.trim() || !newCandidateForm.position.trim() || !newCandidateForm.department) {
       setNotification({
@@ -666,18 +741,13 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
         .map(s => s.trim())
         .filter(s => s.length > 0);
 
-      const profilePictures = [
-        'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-        'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-        'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-        'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop',
-        'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=100&h=100&fit=crop'
-      ];
-      const randomProfilePic = profilePictures[Math.floor(Math.random() * profilePictures.length)];
+      // Use uploaded profile picture or generate a default avatar with user's initials
+      const profilePicture = newCandidateForm.profilePictureURL || 
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(newCandidateForm.name)}&background=3b82f6&color=fff`;
 
       const aiScore = Math.floor(Math.random() * 30) + 70;
 
-      await apiClient.createCandidate({
+      const createdCandidate = await apiClient.createCandidate({
         name: newCandidateForm.name,
         email: newCandidateForm.email,
         phone: newCandidateForm.phone || '',
@@ -687,12 +757,22 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
         salaryExpectation: newCandidateForm.salary_expectation,
         skills: skillsArray,
         status: 'New Candidate',
-        profilePicture: randomProfilePic,
+        profilePicture: profilePicture,
         aiMatchScore: aiScore,
         experience: '',
         education: '',
         previousCompany: ''
       });
+
+      // If a profile picture was uploaded, set the ACL policy
+      if (newCandidateForm.profilePictureURL && createdCandidate.id) {
+        await fetch(`/api/candidates/${createdCandidate.id}/profile-picture`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ profilePictureURL: newCandidateForm.profilePictureURL })
+        });
+      }
 
       await loadCandidates();
 
@@ -704,7 +784,8 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
         department: '',
         location: '',
         salary_expectation: '',
-        skills: ''
+        skills: '',
+        profilePictureURL: ''
       });
 
       setShowAddCandidate(false);
@@ -1620,6 +1701,31 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
                 className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={3}
               />
+              
+              {/* Profile Picture Upload */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Profile Picture (Optional)
+                </label>
+                <div className="flex items-center space-x-4">
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={5242880}
+                    onGetUploadParameters={handleGetUploadURL}
+                    onComplete={handleUploadComplete}
+                    buttonClassName="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Picture
+                  </ObjectUploader>
+                  {newCandidateForm.profilePictureURL && (
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Picture uploaded</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div className="flex justify-end space-x-3 mt-6">
@@ -1634,7 +1740,8 @@ const HiringModal: React.FC<HiringModalProps> = ({ onNavigateToOnboarding, onClo
                     department: '',
                     location: '',
                     salary_expectation: '',
-                    skills: ''
+                    skills: '',
+                    profilePictureURL: ''
                   });
                 }}
                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 transition-colors"
