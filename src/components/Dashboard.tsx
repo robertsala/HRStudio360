@@ -56,6 +56,7 @@ import DigitalClock from './DigitalClock';
 import KnowledgeBaseWidget from './KnowledgeBaseWidget';
 import KnowledgeBaseModal from './modals/KnowledgeBaseModal';
 import CollaboratorModal from './modals/CollaboratorModal';
+import JobManagementModal from './modals/JobManagementModal';
 
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((props, ref) => {
   const { t } = useTranslation();
@@ -91,7 +92,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     locationOverride: false,
     enterpriseChat: false,
     knowledgeBase: false,
-    collaborator: false
+    collaborator: false,
+    jobManagement: false
   });
 
   // Chat-specific state
@@ -464,6 +466,14 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
       icon: Shield,
       color: 'bg-red-600',
       action: () => openModal('workersCompensation')
+    });
+    quickAccessModules.push({
+      id: 'jobManagement',
+      title: 'Job Postings',
+      description: 'Create and manage job postings for recruitment',
+      icon: Briefcase,
+      color: 'bg-gradient-to-r from-blue-600 to-indigo-600',
+      action: () => openModal('jobManagement')
     });
   }
 
@@ -1279,6 +1289,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
           <CollaboratorModal
             isOpen={modals.collaborator}
             onClose={() => closeModal('collaborator')}
+          />
+        )}
+        {modals.jobManagement && (
+          <JobManagementModal
+            onClose={() => closeModal('jobManagement')}
           />
         )}
 

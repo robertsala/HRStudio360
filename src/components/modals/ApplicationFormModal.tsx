@@ -31,13 +31,25 @@ interface FormData {
   skills: string;
   resumeUrl: string;
   profilePictureUrl: string;
-  sourceId: string;
+}
+
+interface ParsedResumeData {
+  parsedName?: string;
+  parsedEmail?: string;
+  parsedPhone?: string;
+  parsedLocation?: string;
+  parsedSkills?: string[];
+  parsedExperience?: any[];
+  parsedEducation?: any[];
+  totalYearsExperience?: number;
+  rawResumeText?: string;
 }
 
 export default function ApplicationFormModal({ job, onClose }: ApplicationFormModalProps) {
   const queryClient = useQueryClient();
   const [isParsingResume, setIsParsingResume] = useState(false);
   const [resumeParsed, setResumeParsed] = useState(false);
+  const [parsedResumeData, setParsedResumeData] = useState<ParsedResumeData | null>(null);
   const [currentStep, setCurrentStep] = useState<'upload' | 'details'>('upload');
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [formData, setFormData] = useState<FormData>({
@@ -54,8 +66,7 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
     coverLetter: '',
     skills: '',
     resumeUrl: '',
-    profilePictureUrl: '',
-    sourceId: 'career_page'
+    profilePictureUrl: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -77,19 +88,20 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
         throw new Error('Failed to parse resume');
       }
 
-      const parsedData = await response.json();
+      const parsed = await response.json();
+      setParsedResumeData(parsed);
 
       // Auto-fill form fields with parsed data
       const updates: Partial<FormData> = {};
-      if (parsedData.parsedName) updates.fullName = parsedData.parsedName;
-      if (parsedData.parsedEmail) updates.email = parsedData.parsedEmail;
-      if (parsedData.parsedPhone) updates.phone = parsedData.parsedPhone;
-      if (parsedData.parsedLocation) updates.location = parsedData.parsedLocation;
-      if (parsedData.parsedSkills?.length > 0) updates.skills = parsedData.parsedSkills.join(', ');
-      if (parsedData.totalYearsExperience) updates.yearsOfExperience = parsedData.totalYearsExperience;
-      if (parsedData.parsedEducation?.length > 0) updates.educationLevel = parsedData.parsedEducation[0].degree;
-      if (parsedData.parsedExperience?.length > 0) {
-        const currentJob = parsedData.parsedExperience[0];
+      if (parsed.parsedName) updates.fullName = parsed.parsedName;
+      if (parsed.parsedEmail) updates.email = parsed.parsedEmail;
+      if (parsed.parsedPhone) updates.phone = parsed.parsedPhone;
+      if (parsed.parsedLocation) updates.location = parsed.parsedLocation;
+      if (parsed.parsedSkills?.length > 0) updates.skills = parsed.parsedSkills.join(', ');
+      if (parsed.totalYearsExperience) updates.yearsOfExperience = parsed.totalYearsExperience;
+      if (parsed.parsedEducation?.length > 0) updates.educationLevel = parsed.parsedEducation[0].degree || '';
+      if (parsed.parsedExperience?.length > 0) {
+        const currentJob = parsed.parsedExperience[0];
         if (currentJob.company) updates.currentCompany = currentJob.company;
         if (currentJob.title) updates.currentJobTitle = currentJob.title;
       }
@@ -147,13 +159,34 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
     return Object.keys(newErrors).length === 0;
   };
 
-  // Submit application
+  // Submit application - align with backend contract
   const submitMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await fetch(`/api/careers/jobs/${job.id}/apply`, {
+      // Structure payload to match backend contract: { candidate, application, resumeData }
+      const payload = {
+        candidate: {
+          name: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          location: data.location,
+          skills: data.skills ? data.skills.split(',').map(s => s.trim()) : [],
+          education: data.educationLevel,
+          profilePicture: data.profilePictureUrl || null
+        },
+        application: {
+          coverLetter: data.coverLetter,
+          resumeUrl: data.resumeUrl,
+          portfolioUrl: data.linkedinUrl || null,
+          linkedinUrl: data.linkedinUrl || null,
+          sourceId: null // Career page source
+        },
+        resumeData: parsedResumeData || null
+      };
+
+      const response = await fetch(`/api/public/careers/${job.id}/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
       
       if (!response.ok) {
@@ -191,7 +224,6 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
 
   const updateField = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -423,51 +455,6 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Current Company
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.currentCompany}
-                      onChange={(e) => updateField('currentCompany', e.target.value)}
-                      placeholder="Acme Corp"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      data-testid="input-current-company"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Current Job Title
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.currentJobTitle}
-                      onChange={(e) => updateField('currentJobTitle', e.target.value)}
-                      placeholder="Software Engineer"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      data-testid="input-current-job-title"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Years of Experience *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="50"
-                      value={formData.yearsOfExperience}
-                      onChange={(e) => updateField('yearsOfExperience', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      data-testid="input-years-experience"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Education Level *
                     </label>
                     <select
@@ -486,6 +473,20 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
                     </select>
                     {errors.educationLevel && <p className="mt-1 text-sm text-red-600">{errors.educationLevel}</p>}
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      LinkedIn Profile
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.linkedinUrl}
+                      onChange={(e) => updateField('linkedinUrl', e.target.value)}
+                      placeholder="https://linkedin.com/in/yourprofile"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      data-testid="input-linkedin"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -501,36 +502,6 @@ export default function ApplicationFormModal({ job, onClose }: ApplicationFormMo
                     data-testid="input-skills"
                   />
                   {errors.skills && <p className="mt-1 text-sm text-red-600">{errors.skills}</p>}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      LinkedIn Profile
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.linkedinUrl}
-                      onChange={(e) => updateField('linkedinUrl', e.target.value)}
-                      placeholder="https://linkedin.com/in/yourprofile"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      data-testid="input-linkedin"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Portfolio / Website
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.portfolioUrl}
-                      onChange={(e) => updateField('portfolioUrl', e.target.value)}
-                      placeholder="https://yourportfolio.com"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      data-testid="input-portfolio"
-                    />
-                  </div>
                 </div>
               </div>
 
