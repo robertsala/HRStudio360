@@ -23,7 +23,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, and presence tracking. Celebration badges and notifications are in migration.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
 -   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search. The "Studio AI" agent operates autonomously, performing actions like candidate screening and generating insights.
--   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries.
+-   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries. Component extraction pattern used for reusability (e.g., `JobPostingsPanel` extracted from `JobManagementModal`).
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.
 -   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized `logger` utility, `apiErrors` for parsing and user-friendly messages, and TanStack Query's smart retry logic.
 -   **Production Monitoring**: Sentry integration for error tracking and performance monitoring.
@@ -31,9 +31,11 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 ### Feature Specifications
 
 -   **ATS Module**: Public career portal for job browsing and application, including resume upload, AI-powered auto-fill, and object storage for files. Backend supports job postings, applications, candidates, interview stages, and offer letters across 11 new database tables and 20+ REST API endpoints.
+    -   **Job Posting Management**: Extracted reusable `JobPostingsPanel` component for unified job posting management. Used in both `JobManagementModal` (legacy) and available for future integration into `HiringModal` via tab navigation.
+    -   **Recruitment Interface**: `HiringModal` provides candidate pipeline management with kanban-style interface. Studio AI button provides contextual access to AI assistant for recruitment insights.
 -   **Studio AI Agent**:
     -   **Capabilities**: Autonomous candidate screening (scoring, strengths/gaps), batch pipeline processing, hiring insights, natural language conversations about HR/recruitment, and manually triggered daily autonomous screening workflows.
-    -   **User Interface**: Dedicated chat modal, agent activity dashboard, and prominent dashboard integration.
+    -   **User Interface**: Dedicated chat modal accessible from Dashboard, Job Management modal, and Hiring Pipeline modal via purple gradient "Ask Studio AI" buttons. Agent activity dashboard and prominent dashboard integration.
 
 ## External Dependencies
 
