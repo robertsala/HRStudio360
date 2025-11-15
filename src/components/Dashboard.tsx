@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import type { DashboardStats } from '../../shared/schema';
+import { useDashboardWidgets } from '../hooks/useDashboardWidgets';
 import Calendar from './Calendar';
 import { mockEmployees } from './modals/EmployeeListModal';
 import EmployeeListModal from './modals/EmployeeListModal';
@@ -103,6 +104,32 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   // Chat-specific state
   const [initialChatChannelId, setInitialChatChannelId] = React.useState<string | undefined>(undefined);
 
+  // User role - use database role with fallback for special emails
+  const getDatabaseRole = () => {
+    if (!user) return 'Employee';
+
+    // FIRST: Check for special email overrides (for demo/product owner accounts)
+    if (user.email === 'robertsala@gmail.com') return 'Product Owner';
+    if (user.email === 'demo@hrstudio360.com') return 'HR';
+    if (user.email?.includes('productowner') || user.email?.includes('product-owner') ||
+        user.email?.includes('product_owner')) return 'Product Owner';
+    if (user.email?.includes('manager')) return 'Manager';
+    if (user.email?.includes('hr')) return 'HR';
+
+    // THEN: Use database role if available
+    if (user.role) {
+      // Map database roles (lowercase: employee, hr, admin) to display roles
+      if (user.role === 'hr' || user.role === 'HR') return 'HR';
+      if (user.role === 'admin' || user.role === 'Admin') return 'Product Owner';
+      if (user.role === 'employee' || user.role === 'Employee') return 'Employee';
+    }
+
+    // Default: Employee
+    return 'Employee';
+  };
+
+  const userRole = getDatabaseRole();
+
   // Fetch dashboard stats from API
   const { data: dashboardStats, isLoading: isStatsLoading, error: statsError} = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats', user?.id],
@@ -119,29 +146,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     refetchOnWindowFocus: false
   });
 
-  // Fetch dashboard widgets configuration based on role
-  const { data: widgetsData, isLoading: isWidgetsLoading } = useQuery<{
-    widgets: Array<{ widgetId: string; widgetName: string; isVisible: boolean; displayOrder: number }>;
-  }>({
-    queryKey: ['/api/dashboard/widgets', user?.id, userRole],
-    queryFn: async () => {
-      if (!user?.id || !userRole) throw new Error('User ID and role are required');
-      const response = await fetch(`/api/dashboard/widgets?userId=${user.id}&role=${userRole}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dashboard widgets: ${response.statusText}`);
-      }
-      return response.json();
-    },
-    enabled: !!user?.id && !!userRole,
-    staleTime: 1000 * 60 * 10, // Cache for 10 minutes
-    refetchOnWindowFocus: false
-  });
-
-  // Helper: Check if a widget should be visible
-  const isWidgetVisible = (widgetId: string): boolean => {
-    if (isWidgetsLoading || !widgetsData) return true; // Show all while loading
-    return widgetsData.widgets.some(w => w.widgetId === widgetId && w.isVisible);
-  };
+  // Fetch dashboard widgets configuration and helpers
+  const { widgets, isLoading: isWidgetsLoading, isWidgetVisible, renderWidget } = useDashboardWidgets(user?.id, userRole);
 
   // Fetch announcements from API
   const { data: apiAnnouncements, isLoading: isAnnouncementsLoading } = useQuery<any[]>({
@@ -219,39 +225,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     }
     return 'Inbox';
   };
-
-  // User role - use database role with fallback for special emails
-  const getDatabaseRole = () => {
-    if (!user) return 'Employee';
-
-    // FIRST: Check for special email overrides (for demo/product owner accounts)
-    if (user.email === 'robertsala@gmail.com') return 'Product Owner';
-    if (user.email === 'demo@hrstudio360.com') return 'HR';
-    if (user.email?.includes('productowner') || user.email?.includes('product-owner') ||
-        user.email?.includes('product_owner')) return 'Product Owner';
-    if (user.email?.includes('manager')) return 'Manager';
-    if (user.email?.includes('hr')) return 'HR';
-
-    // THEN: Use database role if available
-    if (user.role) {
-      // Map database roles (lowercase: employee, hr, admin) to display roles
-      if (user.role === 'hr' || user.role === 'HR') return 'HR';
-      if (user.role === 'admin' || user.role === 'Admin') return 'Product Owner';
-      if (user.role === 'employee' || user.role === 'Employee') return 'Employee';
-    }
-
-    // Default: Employee
-    return 'Employee';
-  };
-
-  const userRole = getDatabaseRole();
-
-  console.log('Dashboard - User Email:', user?.email);
-  console.log('Dashboard - User DB Role:', user?.role);
-  console.log('Dashboard - Display Role:', userRole);
-
-  // Legacy loading functions removed - now using TanStack Query
-  // See useQuery hooks for apiAnnouncements and userPermissions above
 
   const openModal = (modalName: string) => {
     console.log(`Opening modal: ${modalName}`);
@@ -726,11 +699,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                   </p>
                 </div>
                 <div className="flex items-start gap-6">
-                  {isWidgetVisible('weather') && (
+                  {renderWidget('weather', () => (
                     <div className="hidden lg:block flex-1">
                       <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
                     </div>
-                  )}
+                  ))}
                   <div className="text-right hidden xl:block">
                     <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.todayIs')}</p>
                     <p className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -748,11 +721,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                 </div>
               </div>
               {/* Mobile weather widget */}
-              {isWidgetVisible('weather') && (
+              {renderWidget('weather', () => (
                 <div className="lg:hidden mt-4">
                   <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
                 </div>
-              )}
+              ))}
             </div>
 
             {/* Personalized Stats Grid */}
@@ -808,7 +781,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
             </div>
 
             {/* Manager/HR Specific Stats */}
-            {(userRole === 'Manager' || userRole === 'HR') && personalizedData.teamStats && isWidgetVisible('team-overview') && (
+            {renderWidget('team-overview', () => 
+              (userRole === 'Manager' || userRole === 'HR') && personalizedData.teamStats ? (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4">Team Overview</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -874,39 +848,42 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                   </button>
                 </div>
               </div>
+            ) : null
             )}
 
             <div className="grid lg:grid-cols-3 gap-8">
               {/* Left Column - Quick Access & Notifications */}
               <div className="lg:col-span-1 space-y-6">
                 {/* Quick Access Modules */}
-                <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-6 flex items-center">
-                    <Zap className="h-5 w-5 mr-2 text-blue-500" />
-                    {t('dashboard.quickAccess')}
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    {quickAccessModules.map((module) => {
-                      const Icon = module.icon;
-                      return (
-                        <button
-                          key={module.id}
-                          className="bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg p-4 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          onClick={module.action}
-                        >
-                          <div className={`p-2 rounded-lg mb-2 inline-block ${module.color} shadow-md`}>
-                            <Icon className="h-5 w-5 text-white" />
-                          </div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white text-sm mb-1">{module.title}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 dark:text-gray-400">{module.description}</p>
-                        </button>
-                      );
-                    })}
+                {renderWidget('quick-actions', () => (
+                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-6 flex items-center">
+                      <Zap className="h-5 w-5 mr-2 text-blue-500" />
+                      {t('dashboard.quickAccess')}
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {quickAccessModules.map((module) => {
+                        const Icon = module.icon;
+                        return (
+                          <button
+                            key={module.id}
+                            className="bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg p-4 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onClick={module.action}
+                          >
+                            <div className={`p-2 rounded-lg mb-2 inline-block ${module.color} shadow-md`}>
+                              <Icon className="h-5 w-5 text-white" />
+                            </div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white text-sm mb-1">{module.title}</h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 dark:text-gray-400">{module.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ))}
 
-                {/* Pending Tasks */}
+                {/* Pending Tasks - not a configurable widget, always shown */}
                 <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
                     <Clock className="h-5 w-5 mr-2 text-purple-500" />
@@ -938,11 +915,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                 </div>
 
                 {/* Recent Notifications */}
-                <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
-                    <Bell className="h-5 w-5 mr-2 text-yellow-500" />
-                    {t('dashboard.recentNotifications')}
-                  </h3>
+                {renderWidget('recent-activity', () => (
+                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
+                      <Bell className="h-5 w-5 mr-2 text-yellow-500" />
+                      {t('dashboard.recentNotifications')}
+                    </h3>
                   <div className="space-y-3">
                     {personalizedData.recentNotifications.map((notification) => (
                       <div key={notification.id} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
@@ -973,6 +951,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                     {t('dashboard.viewAllNotifications')} →
                   </button>
                 </div>
+                ))}
 
                 {/* KPI Dashboard - Visible to All Users */}
                 <div className="bg-gradient-to-br from-blue-50 via-emerald-50 to-blue-50 dark:from-blue-900/30 dark:via-emerald-900/30 dark:to-blue-900/30 rounded-xl p-6 shadow-sm border border-blue-100 dark:border-blue-800">
