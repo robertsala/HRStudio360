@@ -426,16 +426,9 @@ const BenefitsPayModal: React.FC<BenefitsPayModalProps> = ({ isOpen, onClose }) 
                         <span className="font-medium text-amber-900 dark:text-amber-300">
                           Fun Facts Today: {dailyUsage.currentCount}/{dailyUsage.dailyLimit}
                         </span>
-                        {dailyUsage.hasReachedLimit ? (
-                          <span className="ml-2 text-amber-700 dark:text-amber-400 flex items-center">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Resets tomorrow
-                          </span>
-                        ) : (
-                          <span className="ml-2 text-amber-400 dark:text-amber-400">
-                            ({dailyUsage.remainingGenerations} left)
-                          </span>
-                        )}
+                        <span className="ml-2 text-amber-600 dark:text-amber-400">
+                          ({dailyUsage.remainingGenerations} left)
+                        </span>
                       </div>
                       <div className="relative group">
                         <Info className="h-4 w-4 text-amber-600 cursor-help" />

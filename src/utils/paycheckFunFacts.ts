@@ -216,10 +216,10 @@ export const getDailyUsageInfo = async (employeeId: string): Promise<DailyUsageI
     const data = await response.json();
     
     return {
-      currentCount: data.currentCount,
-      dailyLimit: data.dailyLimit,
-      hasReachedLimit: data.hasReachedLimit,
-      remainingGenerations: data.remainingGenerations
+      currentCount: data.count,
+      dailyLimit: data.limit,
+      hasReachedLimit: data.remaining === 0,
+      remainingGenerations: data.remaining
     };
   } catch (error) {
     console.error('Error getting daily usage info:', error);
@@ -277,10 +277,17 @@ export const getManualFunFact = async (
 
     const data = await response.json();
     
+    const usageInfo: DailyUsageInfo = {
+      currentCount: data.usageInfo.count,
+      dailyLimit: data.usageInfo.limit,
+      hasReachedLimit: data.usageInfo.remaining === 0,
+      remainingGenerations: data.usageInfo.remaining
+    };
+    
     if (!data.funFact) {
       return {
         funFact: null,
-        usageInfo: data.usageInfo
+        usageInfo
       };
     }
 
@@ -292,7 +299,7 @@ export const getManualFunFact = async (
         category: data.funFact.category,
         funFactId: data.funFact.id
       },
-      usageInfo: data.usageInfo
+      usageInfo
     };
   } catch (error) {
     console.error('Error generating manual fun fact:', error);
