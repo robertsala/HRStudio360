@@ -3409,19 +3409,22 @@ export function registerRoutes(app: Express) {
       }
 
       const userRole = userProfile.role || 'Employee';
+      console.log(`[Tutorials] User role: ${userRole}`);
 
       // Fetch all published tutorials that the user has access to
       const allTutorials = await db.query.tutorials.findMany({
-        where: and(
-          eq(tutorials.isPublished, true)
-        ),
+        where: eq(tutorials.isPublished, true),
         orderBy: [asc(tutorials.sortOrder), asc(tutorials.createdAt)]
       });
+      console.log(`[Tutorials] Fetched ${allTutorials.length} published tutorials from database`);
 
       // Filter tutorials by role access
-      const accessibleTutorials = allTutorials.filter(tutorial => 
-        tutorial.roleAccess.includes(userRole)
-      );
+      const accessibleTutorials = allTutorials.filter(tutorial => {
+        const hasAccess = tutorial.roleAccess.includes(userRole);
+        console.log(`[Tutorials] Tutorial "${tutorial.title}" roleAccess: [${tutorial.roleAccess.join(', ')}], user has access: ${hasAccess}`);
+        return hasAccess;
+      });
+      console.log(`[Tutorials] ${accessibleTutorials.length} tutorials accessible to role: ${userRole}`);
 
       // Get user's progress for these tutorials
       const tutorialIds = accessibleTutorials.map(t => t.id);
