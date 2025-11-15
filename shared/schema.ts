@@ -1116,6 +1116,60 @@ export interface DashboardStats {
   };
 }
 
+// Paycheck fun facts tables
+export const paycheckFunFacts = pgTable('paycheck_fun_facts', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  category: text('category').notNull(),
+  minAmount: numeric('min_amount', { precision: 10, scale: 2 }).notNull(),
+  maxAmount: numeric('max_amount', { precision: 10, scale: 2 }).notNull(),
+  factTemplate: text('fact_template').notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const employeeFunFactHistory = pgTable('employee_fun_fact_history', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  payStubId: uuid('pay_stub_id'),
+  funFactId: uuid('fun_fact_id').references(() => paycheckFunFacts.id, { onDelete: 'cascade' }).notNull(),
+  funFactText: text('fun_fact_text').notNull(),
+  shownAt: timestamp('shown_at').defaultNow()
+});
+
+export const dailyFunFactUsage = pgTable('daily_fun_fact_usage', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  funFactId: uuid('fun_fact_id').references(() => paycheckFunFacts.id, { onDelete: 'cascade' }).notNull(),
+  isManualGeneration: boolean('is_manual_generation').default(true).notNull(),
+  generatedAt: timestamp('generated_at').defaultNow()
+});
+
+// Insert schemas for fun facts
+export const insertPaycheckFunFactSchema = createInsertSchema(paycheckFunFacts).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertEmployeeFunFactHistorySchema = createInsertSchema(employeeFunFactHistory).omit({
+  id: true,
+  shownAt: true
+});
+
+export const insertDailyFunFactUsageSchema = createInsertSchema(dailyFunFactUsage).omit({
+  id: true,
+  generatedAt: true
+});
+
+// Select types for fun facts
+export type PaycheckFunFact = typeof paycheckFunFacts.$inferSelect;
+export type InsertPaycheckFunFact = z.infer<typeof insertPaycheckFunFactSchema>;
+
+export type EmployeeFunFactHistory = typeof employeeFunFactHistory.$inferSelect;
+export type InsertEmployeeFunFactHistory = z.infer<typeof insertEmployeeFunFactHistorySchema>;
+
+export type DailyFunFactUsage = typeof dailyFunFactUsage.$inferSelect;
+export type InsertDailyFunFactUsage = z.infer<typeof insertDailyFunFactUsageSchema>;
+
 // User Permissions type
 export interface UserPermissions {
   department: string | null;

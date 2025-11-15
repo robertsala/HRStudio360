@@ -2094,6 +2094,101 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Fun Facts routes
+  app.get('/api/fun-facts/random', async (req, res) => {
+    try {
+      const { amount, employeeId } = req.query;
+      
+      if (!amount || !employeeId) {
+        return res.status(400).json({ error: 'amount and employeeId are required' });
+      }
+
+      const netPayAmount = parseFloat(amount as string);
+      if (isNaN(netPayAmount)) {
+        return res.status(400).json({ error: 'Invalid amount value' });
+      }
+
+      const funFact = await storage.getRandomFunFact(
+        netPayAmount,
+        employeeId as string,
+        []
+      );
+
+      if (!funFact) {
+        return res.status(404).json({ error: 'No fun fact found for the given amount' });
+      }
+
+      res.json({ funFact });
+    } catch (error: any) {
+      console.error('Error getting random fun fact:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/fun-facts/manual', async (req, res) => {
+    try {
+      const { employeeId, amount } = req.body;
+
+      if (!employeeId || !amount) {
+        return res.status(400).json({ error: 'employeeId and amount are required' });
+      }
+
+      const netPayAmount = parseFloat(amount);
+      if (isNaN(netPayAmount)) {
+        return res.status(400).json({ error: 'Invalid amount value' });
+      }
+
+      const usageInfo = await storage.getDailyUsageInfo(employeeId);
+      
+      if (usageInfo.remaining <= 0) {
+        return res.status(429).json({ 
+          error: 'Daily limit reached',
+          message: 'You have reached your daily limit of 3 manual fun fact generations',
+          ...usageInfo
+        });
+      }
+
+      const funFact = await storage.getRandomFunFact(netPayAmount, employeeId, []);
+      
+      if (!funFact) {
+        return res.status(404).json({ error: 'No fun fact found for the given amount' });
+      }
+
+      await db.transaction(async () => {
+        await storage.saveFunFactHistory(
+          employeeId,
+          funFact.id,
+          funFact.factTemplate
+        );
+        
+        await storage.trackManualFunFactGeneration(employeeId, funFact.id);
+      });
+
+      const updatedUsageInfo = await storage.getDailyUsageInfo(employeeId);
+
+      res.json({
+        funFact,
+        usageInfo: updatedUsageInfo
+      });
+    } catch (error: any) {
+      console.error('Error generating manual fun fact:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/fun-facts/daily-usage/:employeeId', async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      
+      const usageInfo = await storage.getDailyUsageInfo(employeeId);
+      
+      res.json(usageInfo);
+    } catch (error: any) {
+      console.error('Error getting daily usage info:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Performance Review Cycle routes
   app.get('/api/performance/review-cycles', async (req, res) => {
     try {

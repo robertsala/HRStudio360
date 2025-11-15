@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Heart, FileText, Download, Eye, Calendar, TrendingUp, Award, Bell, CheckCircle, Sparkles, RefreshCw, Clock, Info } from 'lucide-react';
 import { generatePayStubPDF, generateW2PDF, generateBenefitsSummaryPDF } from '../../utils/pdfGenerator';
 import { getRandomFunFact, getCategoryIcon, getCategoryColor, getManualFunFact, getDailyUsageInfo, type FunFactResult, type DailyUsageInfo } from '../../utils/paycheckFunFacts';
-import { supabase } from '../../utils/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface BenefitsPayModalProps {
@@ -27,25 +26,10 @@ const BenefitsPayModal: React.FC<BenefitsPayModalProps> = ({ isOpen, onClose }) 
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchEmployeeId = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (employee) {
-          setCurrentEmployeeId(employee.id);
-        }
-      }
-    };
-
-    if (isOpen) {
-      fetchEmployeeId();
+    if (isOpen && user?.id) {
+      setCurrentEmployeeId(user.id);
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   useEffect(() => {
     const loadDailyUsage = async () => {
@@ -62,18 +46,20 @@ const BenefitsPayModal: React.FC<BenefitsPayModalProps> = ({ isOpen, onClose }) 
 
   useEffect(() => {
     const loadFunFacts = async () => {
+      if (!currentEmployeeId) return;
+      
       for (const payStub of mockPayStubs) {
         if (!funFacts[payStub.id]) {
-          const funFact = await getRandomFunFact(payStub.netPay);
+          const funFact = await getRandomFunFact(payStub.netPay, currentEmployeeId);
           setFunFacts(prev => ({ ...prev, [payStub.id]: funFact }));
         }
       }
     };
 
-    if (isOpen && activeTab === 'paystubs') {
+    if (isOpen && activeTab === 'paystubs' && currentEmployeeId) {
       loadFunFacts();
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, currentEmployeeId]);
 
   const refreshFunFact = async (payStubId: string, netPay: number) => {
     if (!currentEmployeeId) {

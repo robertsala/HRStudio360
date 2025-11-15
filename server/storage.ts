@@ -24,7 +24,10 @@ import type {
   EarnedBadge, InsertEarnedBadge,
   CelebrationHistory, InsertCelebrationHistory,
   CelebrationNotification, InsertCelebrationNotification,
-  ReviewCycle, InsertReviewCycle
+  ReviewCycle, InsertReviewCycle,
+  PaycheckFunFact, InsertPaycheckFunFact,
+  EmployeeFunFactHistory, InsertEmployeeFunFactHistory,
+  DailyFunFactUsage, InsertDailyFunFactUsage
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -34,9 +37,10 @@ import {
   changeLog, historicalChanges, changeNotifications,
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
   reviewCycles,
-  jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments
+  jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments,
+  paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage
 } from '../shared/schema.js';
-import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte } from 'drizzle-orm';
+import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 export interface IStorage {
@@ -233,6 +237,12 @@ export interface IStorage {
   getLeaveMetrics(timeRange: string): Promise<import('../shared/schema.js').LeaveMetrics>;
   getFinancialMetrics(timeRange: string): Promise<import('../shared/schema.js').FinancialMetrics>;
   getAnalyticsSummary(timeRange: string): Promise<import('../shared/schema.js').AnalyticsSummary>;
+
+  // Fun Facts
+  getRandomFunFact(netPayAmount: number, employeeId: string, excludeFactIds?: string[]): Promise<PaycheckFunFact | undefined>;
+  saveFunFactHistory(employeeId: string, funFactId: string, funFactText: string, payStubId?: string): Promise<EmployeeFunFactHistory>;
+  getDailyUsageInfo(employeeId: string): Promise<{ count: number; limit: number; remaining: number }>;
+  trackManualFunFactGeneration(employeeId: string, funFactId: string): Promise<void>;
 }
 
 // Database storage implementation
@@ -1520,6 +1530,72 @@ export class DbStorage implements IStorage {
     }
     
     return { startDate: start.toISOString(), endDate };
+  }
+
+  // Fun Facts
+  async getRandomFunFact(netPayAmount: number, _employeeId: string, excludeFactIds?: string[]): Promise<PaycheckFunFact | undefined> {
+    const whereConditions = [
+      eq(paycheckFunFacts.enabled, true),
+      lte(paycheckFunFacts.minAmount, netPayAmount.toString()),
+      gte(paycheckFunFacts.maxAmount, netPayAmount.toString())
+    ];
+
+    if (excludeFactIds && excludeFactIds.length > 0) {
+      whereConditions.push(notInArray(paycheckFunFacts.id, excludeFactIds));
+    }
+
+    const facts = await db.select()
+      .from(paycheckFunFacts)
+      .where(and(...whereConditions));
+    
+    if (facts.length === 0) {
+      return undefined;
+    }
+
+    const randomIndex = Math.floor(Math.random() * facts.length);
+    return facts[randomIndex];
+  }
+
+  async saveFunFactHistory(employeeId: string, funFactId: string, funFactText: string, payStubId?: string): Promise<EmployeeFunFactHistory> {
+    const result = await db.insert(employeeFunFactHistory).values({
+      employeeId,
+      funFactId,
+      funFactText,
+      payStubId: payStubId || null
+    }).returning();
+    return result[0];
+  }
+
+  async getDailyUsageInfo(employeeId: string): Promise<{ count: number; limit: number; remaining: number }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const usageRecords = await db.select()
+      .from(dailyFunFactUsage)
+      .where(
+        and(
+          eq(dailyFunFactUsage.employeeId, employeeId),
+          eq(dailyFunFactUsage.isManualGeneration, true),
+          gte(dailyFunFactUsage.generatedAt, today),
+          lte(dailyFunFactUsage.generatedAt, tomorrow)
+        )
+      );
+
+    const count = usageRecords.length;
+    const limit = 3;
+    const remaining = Math.max(0, limit - count);
+
+    return { count, limit, remaining };
+  }
+
+  async trackManualFunFactGeneration(employeeId: string, funFactId: string): Promise<void> {
+    await db.insert(dailyFunFactUsage).values({
+      employeeId,
+      funFactId,
+      isManualGeneration: true
+    });
   }
 }
 

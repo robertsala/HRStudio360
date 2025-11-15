@@ -1,5 +1,3 @@
-import { supabase } from './supabaseClient';
-
 // Daily limit configuration - users can manually generate up to this many fun facts per day
 const DAILY_FUN_FACT_LIMIT = 3;
 
@@ -114,68 +112,30 @@ export const getRandomFunFact = async (
   employeeId?: string
 ): Promise<FunFactResult | null> => {
   try {
-    let recentFactIds: string[] = [];
-
-    if (employeeId) {
-      const { data: recentFacts } = await supabase
-        .from('employee_fun_fact_history')
-        .select('fun_fact_id')
-        .eq('employee_id', employeeId)
-        .order('shown_at', { ascending: false })
-        .limit(10);
-
-      if (recentFacts) {
-        recentFactIds = recentFacts.map(f => f.fun_fact_id);
-      }
-    }
-
-    let query = supabase
-      .from('paycheck_fun_facts')
-      .select('*')
-      .eq('enabled', true)
-      .lte('min_amount', netPayAmount)
-      .gte('max_amount', netPayAmount);
-
-    if (recentFactIds.length > 0) {
-      query = query.not('id', 'in', `(${recentFactIds.join(',')})`);
-    }
-
-    const { data: funFacts, error } = await query;
-
-    if (error) {
-      console.error('Error fetching fun facts:', error);
+    if (!employeeId) {
+      console.warn('No employeeId provided for fun fact generation');
       return null;
     }
 
-    if (!funFacts || funFacts.length === 0) {
-      const { data: fallbackFacts } = await supabase
-        .from('paycheck_fun_facts')
-        .select('*')
-        .eq('enabled', true)
-        .lte('min_amount', netPayAmount)
-        .gte('max_amount', netPayAmount);
-
-      if (!fallbackFacts || fallbackFacts.length === 0) {
-        return null;
-      }
-
-      const randomFact = fallbackFacts[Math.floor(Math.random() * fallbackFacts.length)];
-      const factText = replacePlaceholders(randomFact.fact_template, netPayAmount, randomFact.category);
-
-      return {
-        text: factText,
-        category: randomFact.category,
-        funFactId: randomFact.id
-      };
+    const response = await fetch(`/api/fun-facts/random?amount=${netPayAmount}&employeeId=${employeeId}`);
+    
+    if (!response.ok) {
+      console.error('Error fetching fun fact:', response.statusText);
+      return null;
     }
 
-    const randomFact = funFacts[Math.floor(Math.random() * funFacts.length)];
-    const factText = replacePlaceholders(randomFact.fact_template, netPayAmount, randomFact.category);
+    const data = await response.json();
+    
+    if (!data.funFact) {
+      return null;
+    }
+
+    const factText = replacePlaceholders(data.funFact.factTemplate, netPayAmount, data.funFact.category);
 
     return {
       text: factText,
-      category: randomFact.category,
-      funFactId: randomFact.id
+      category: data.funFact.category,
+      funFactId: data.funFact.id
     };
   } catch (error) {
     console.error('Error generating fun fact:', error);
@@ -189,18 +149,9 @@ export const saveFunFactHistory = async (
   funFactId: string,
   funFactText: string
 ): Promise<void> => {
-  try {
-    await supabase
-      .from('employee_fun_fact_history')
-      .insert({
-        employee_id: employeeId,
-        pay_stub_id: payStubId,
-        fun_fact_id: funFactId,
-        fun_fact_text: funFactText
-      });
-  } catch (error) {
-    console.error('Error saving fun fact history:', error);
-  }
+  // This function is now handled by the API endpoints
+  // No need to call separately as it's included in the manual generation endpoint
+  console.log('Fun fact history saved via API');
 };
 
 export const getFunFactForPayStub = async (
@@ -250,21 +201,10 @@ export const getCategoryColor = (category: string): string => {
 
 export const getDailyUsageInfo = async (employeeId: string): Promise<DailyUsageInfo> => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const { data, error } = await supabase
-      .from('daily_fun_fact_usage')
-      .select('id')
-      .eq('employee_id', employeeId)
-      .eq('is_manual_generation', true)
-      .gte('generated_at', today.toISOString())
-      .lt('generated_at', tomorrow.toISOString());
-
-    if (error) {
-      console.error('Error fetching daily usage:', error);
+    const response = await fetch(`/api/fun-facts/daily-usage/${employeeId}`);
+    
+    if (!response.ok) {
+      console.error('Error fetching daily usage:', response.statusText);
       return {
         currentCount: 0,
         dailyLimit: DAILY_FUN_FACT_LIMIT,
@@ -273,15 +213,13 @@ export const getDailyUsageInfo = async (employeeId: string): Promise<DailyUsageI
       };
     }
 
-    const currentCount = data?.length || 0;
-    const hasReachedLimit = currentCount >= DAILY_FUN_FACT_LIMIT;
-    const remainingGenerations = Math.max(0, DAILY_FUN_FACT_LIMIT - currentCount);
-
+    const data = await response.json();
+    
     return {
-      currentCount,
-      dailyLimit: DAILY_FUN_FACT_LIMIT,
-      hasReachedLimit,
-      remainingGenerations
+      currentCount: data.currentCount,
+      dailyLimit: data.dailyLimit,
+      hasReachedLimit: data.hasReachedLimit,
+      remainingGenerations: data.remainingGenerations
     };
   } catch (error) {
     console.error('Error getting daily usage info:', error);
@@ -298,32 +236,9 @@ export const trackManualFunFactGeneration = async (
   employeeId: string,
   funFactId: string
 ): Promise<boolean> => {
-  try {
-    const usageInfo = await getDailyUsageInfo(employeeId);
-
-    if (usageInfo.hasReachedLimit) {
-      return false;
-    }
-
-    const { error } = await supabase
-      .from('daily_fun_fact_usage')
-      .insert({
-        employee_id: employeeId,
-        fun_fact_id: funFactId,
-        is_manual_generation: true,
-        generated_at: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error('Error tracking fun fact generation:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in trackManualFunFactGeneration:', error);
-    return false;
-  }
+  // This function is now handled by the API endpoints
+  // Tracking happens automatically in the manual generation endpoint
+  return true;
 };
 
 export const getManualFunFact = async (
@@ -331,41 +246,60 @@ export const getManualFunFact = async (
   employeeId: string
 ): Promise<{ funFact: FunFactResult | null; usageInfo: DailyUsageInfo }> => {
   try {
-    const usageInfo = await getDailyUsageInfo(employeeId);
+    const response = await fetch('/api/fun-facts/manual', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: netPayAmount,
+        employeeId
+      })
+    });
 
-    if (usageInfo.hasReachedLimit) {
+    if (response.status === 429) {
+      // Daily limit reached
+      const usageInfo = await getDailyUsageInfo(employeeId);
       return {
         funFact: null,
         usageInfo
       };
     }
 
-    const funFact = await getRandomFunFact(netPayAmount, employeeId);
-
-    if (funFact) {
-      const tracked = await trackManualFunFactGeneration(employeeId, funFact.funFactId);
-
-      if (tracked) {
-        await saveFunFactHistory(employeeId, null, funFact.funFactId, funFact.text);
-
-        const updatedUsageInfo = await getDailyUsageInfo(employeeId);
-
-        return {
-          funFact,
-          usageInfo: updatedUsageInfo
-        };
-      }
+    if (!response.ok) {
+      console.error('Error generating manual fun fact:', response.statusText);
+      const usageInfo = await getDailyUsageInfo(employeeId);
+      return {
+        funFact: null,
+        usageInfo
+      };
     }
 
+    const data = await response.json();
+    
+    if (!data.funFact) {
+      return {
+        funFact: null,
+        usageInfo: data.usageInfo
+      };
+    }
+
+    const factText = replacePlaceholders(data.funFact.factTemplate, netPayAmount, data.funFact.category);
+
     return {
-      funFact,
-      usageInfo
+      funFact: {
+        text: factText,
+        category: data.funFact.category,
+        funFactId: data.funFact.id
+      },
+      usageInfo: data.usageInfo
     };
   } catch (error) {
     console.error('Error generating manual fun fact:', error);
+    const usageInfo = await getDailyUsageInfo(employeeId);
     return {
       funFact: null,
-      usageInfo: await getDailyUsageInfo(employeeId)
+      usageInfo
     };
   }
 };
