@@ -3288,12 +3288,12 @@ export function registerRoutes(app: Express) {
 
     try {
       // Check if user has payroll permissions (HR or Product Owner)
-      const profile = await storage.getProfileById(userId);
-      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
-        return res.status(403).json({ error: 'Only HR can access payroll AI features' });
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Only HR and Product Owners can access payroll AI features' });
       }
 
-      const { employees, payrollPeriod } = req.body;
+      const { employees, payrollPeriod} = req.body;
       
       if (!employees || !Array.isArray(employees) || employees.length === 0) {
         return res.status(400).json({ error: 'Employees array is required' });
@@ -3326,9 +3326,9 @@ export function registerRoutes(app: Express) {
 
     try {
       // Check if user has payroll permissions
-      const profile = await storage.getProfileById(userId);
-      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
-        return res.status(403).json({ error: 'Only HR can access payroll AI features' });
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Only HR and Product Owners can access payroll AI features' });
       }
 
       const { expenses, budgetLimits } = req.body;
@@ -3360,9 +3360,9 @@ export function registerRoutes(app: Express) {
 
     try {
       // Check if user has payroll permissions (HR or Product Owner)
-      const profile = await storage.getProfileById(userId);
-      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
-        return res.status(403).json({ error: 'Only HR can access payroll AI features' });
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Only HR and Product Owners can access payroll AI features' });
       }
 
       const { message, conversationHistory, payrollPeriod, employeeCount } = req.body;
