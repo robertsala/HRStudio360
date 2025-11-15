@@ -104,7 +104,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   const [initialChatChannelId, setInitialChatChannelId] = React.useState<string | undefined>(undefined);
 
   // Fetch dashboard stats from API
-  const { data: dashboardStats, isLoading: isStatsLoading, error: statsError } = useQuery<DashboardStats>({
+  const { data: dashboardStats, isLoading: isStatsLoading, error: statsError} = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error('User ID is required');
@@ -118,6 +118,30 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     refetchOnWindowFocus: false
   });
+
+  // Fetch dashboard widgets configuration based on role
+  const { data: widgetsData, isLoading: isWidgetsLoading } = useQuery<{
+    widgets: Array<{ widgetId: string; widgetName: string; isVisible: boolean; displayOrder: number }>;
+  }>({
+    queryKey: ['/api/dashboard/widgets', user?.id, userRole],
+    queryFn: async () => {
+      if (!user?.id || !userRole) throw new Error('User ID and role are required');
+      const response = await fetch(`/api/dashboard/widgets?userId=${user.id}&role=${userRole}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dashboard widgets: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    enabled: !!user?.id && !!userRole,
+    staleTime: 1000 * 60 * 10, // Cache for 10 minutes
+    refetchOnWindowFocus: false
+  });
+
+  // Helper: Check if a widget should be visible
+  const isWidgetVisible = (widgetId: string): boolean => {
+    if (isWidgetsLoading || !widgetsData) return true; // Show all while loading
+    return widgetsData.widgets.some(w => w.widgetId === widgetId && w.isVisible);
+  };
 
   // Fetch announcements from API
   const { data: apiAnnouncements, isLoading: isAnnouncementsLoading } = useQuery<any[]>({
@@ -702,9 +726,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                   </p>
                 </div>
                 <div className="flex items-start gap-6">
-                  <div className="hidden lg:block flex-1">
-                    <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
-                  </div>
+                  {isWidgetVisible('weather') && (
+                    <div className="hidden lg:block flex-1">
+                      <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
+                    </div>
+                  )}
                   <div className="text-right hidden xl:block">
                     <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.todayIs')}</p>
                     <p className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -722,9 +748,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                 </div>
               </div>
               {/* Mobile weather widget */}
-              <div className="lg:hidden mt-4">
-                <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
-              </div>
+              {isWidgetVisible('weather') && (
+                <div className="lg:hidden mt-4">
+                  <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
+                </div>
+              )}
             </div>
 
             {/* Personalized Stats Grid */}
@@ -780,7 +808,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
             </div>
 
             {/* Manager/HR Specific Stats */}
-            {(userRole === 'Manager' || userRole === 'HR') && personalizedData.teamStats && (
+            {(userRole === 'Manager' || userRole === 'HR') && personalizedData.teamStats && isWidgetVisible('team-overview') && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4">Team Overview</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
