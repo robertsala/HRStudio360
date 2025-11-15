@@ -123,6 +123,9 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
   const [showWizard, setShowWizard] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [editingEntryIndex, setEditingEntryIndex] = useState<number | null>(null);
+  const [editedEntry, setEditedEntry] = useState<TimesheetEntry | null>(null);
+  const [isSavingTimesheet, setIsSavingTimesheet] = useState(false);
   const [isSavingTimesheets, setIsSavingTimesheets] = useState(false);
   const [timesheetsSaved, setTimesheetsSaved] = useState(false);
   
@@ -684,6 +687,62 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
       emp.id === updatedEmployee.id ? updatedEmployee : emp
     ));
     showNotification('success', `Updated payroll for ${updatedEmployee.name}`);
+  };
+
+  const handleEditEntry = (index: number, entry: TimesheetEntry) => {
+    setEditingEntryIndex(index);
+    setEditedEntry({ ...entry });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEntryIndex(null);
+    setEditedEntry(null);
+  };
+
+  const handleSaveEntry = async () => {
+    if (!editedEntry || editingEntryIndex === null || !selectedEmployeeTimesheet) return;
+
+    setIsSavingTimesheet(true);
+    
+    try {
+      // Update the timesheet entry in the local state
+      const updatedEntries = [...(selectedEmployeeTimesheet.timesheetEntries || [])];
+      updatedEntries[editingEntryIndex] = editedEntry;
+
+      // Recalculate totals
+      const newRegularHours = updatedEntries.reduce((sum, e) => sum + e.regularHours, 0);
+      const newOvertimeHours = updatedEntries.reduce((sum, e) => sum + e.overtimeHours, 0);
+      const newPtoHours = updatedEntries.reduce((sum, e) => sum + e.ptoHours, 0);
+      const newSickHours = updatedEntries.reduce((sum, e) => sum + e.sickHours, 0);
+      const newUnpaidHours = updatedEntries.reduce((sum, e) => sum + e.unpaidLeaveHours, 0);
+
+      // Update the selected employee timesheet
+      const updatedTimesheet = {
+        ...selectedEmployeeTimesheet,
+        timesheetEntries: updatedEntries,
+        regularHours: newRegularHours,
+        overtimeHours: newOvertimeHours,
+        ptoHours: newPtoHours,
+        sickHours: newSickHours,
+        unpaidLeaveHours: newUnpaidHours
+      };
+
+      setSelectedEmployeeTimesheet(updatedTimesheet);
+
+      // Update the employee in the main employees list
+      setEmployees(prev => prev.map(emp =>
+        emp.id === selectedEmployeeTimesheet.id ? updatedTimesheet : emp
+      ));
+
+      showNotification('success', 'Timesheet entry updated successfully');
+      setEditingEntryIndex(null);
+      setEditedEntry(null);
+    } catch (error: any) {
+      console.error('Error saving timesheet entry:', error);
+      showNotification('error', 'Failed to save timesheet entry: ' + (error.message || 'Unknown error'));
+    } finally {
+      setIsSavingTimesheet(false);
+    }
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -1492,8 +1551,12 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
               )}
 
               <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 dark:border-gray-700">
+                <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 dark:border-gray-700 flex items-center justify-between">
                   <h3 className="font-semibold text-gray-900 dark:text-white dark:text-white">Daily Hours Breakdown</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" />
+                    Click any row to edit hours
+                  </p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -1508,6 +1571,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Unpaid</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -1519,14 +1583,130 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                           entry.sickHours +
                           entry.unpaidLeaveHours;
                         const isWeekend = entry.day === 'Sat' || entry.day === 'Sun';
+                        const isEditing = editingEntryIndex === idx;
+
+                        if (isEditing && editedEntry) {
+                          const editedTotal =
+                            editedEntry.regularHours +
+                            editedEntry.overtimeHours +
+                            editedEntry.ptoHours +
+                            editedEntry.sickHours +
+                            editedEntry.unpaidLeaveHours;
+
+                          return (
+                            <tr key={idx} className="bg-blue-50 dark:bg-blue-900/20">
+                              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.date}</td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{entry.day}</td>
+                              <td className="px-2 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={editedEntry.regularHours}
+                                  onChange={(e) => setEditedEntry({ ...editedEntry, regularHours: parseFloat(e.target.value) || 0 })}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded text-center text-sm"
+                                  data-testid="input-regular-hours"
+                                />
+                              </td>
+                              <td className="px-2 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={editedEntry.overtimeHours}
+                                  onChange={(e) => setEditedEntry({ ...editedEntry, overtimeHours: parseFloat(e.target.value) || 0 })}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded text-center text-sm"
+                                  data-testid="input-overtime-hours"
+                                />
+                              </td>
+                              <td className="px-2 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={editedEntry.ptoHours}
+                                  onChange={(e) => setEditedEntry({ ...editedEntry, ptoHours: parseFloat(e.target.value) || 0 })}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded text-center text-sm"
+                                  data-testid="input-pto-hours"
+                                />
+                              </td>
+                              <td className="px-2 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={editedEntry.sickHours}
+                                  onChange={(e) => setEditedEntry({ ...editedEntry, sickHours: parseFloat(e.target.value) || 0 })}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded text-center text-sm"
+                                  data-testid="input-sick-hours"
+                                />
+                              </td>
+                              <td className="px-2 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={editedEntry.unpaidLeaveHours}
+                                  onChange={(e) => setEditedEntry({ ...editedEntry, unpaidLeaveHours: parseFloat(e.target.value) || 0 })}
+                                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded text-center text-sm"
+                                  data-testid="input-unpaid-hours"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-center text-sm">
+                                <span className="font-bold text-blue-600">{editedTotal}h</span>
+                              </td>
+                              <td className="px-2 py-3">
+                                <input
+                                  type="text"
+                                  value={editedEntry.notes || ''}
+                                  onChange={(e) => setEditedEntry({ ...editedEntry, notes: e.target.value })}
+                                  placeholder="Add notes..."
+                                  className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded text-sm"
+                                  data-testid="input-notes"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleSaveEntry}
+                                    disabled={isSavingTimesheet}
+                                    className="p-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                                    data-testid="button-save-entry"
+                                    title="Save changes"
+                                  >
+                                    {isSavingTimesheet ? (
+                                      <RefreshCw className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Save className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    disabled={isSavingTimesheet}
+                                    className="p-1 bg-gray-400 text-white rounded hover:bg-gray-500 disabled:opacity-50"
+                                    data-testid="button-cancel-edit"
+                                    title="Cancel"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
 
                         return (
-                          <tr key={idx} className={`${isWeekend ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
-                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white dark:text-white">{entry.date}</td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white dark:text-white">{entry.day}</td>
+                          <tr 
+                            key={idx} 
+                            className={`${isWeekend ? 'bg-gray-50 dark:bg-gray-900' : 'hover:bg-gray-50 dark:hover:bg-gray-700'} cursor-pointer transition-colors group`}
+                            onClick={() => handleEditEntry(idx, entry)}
+                            data-testid={`row-timesheet-${idx}`}
+                          >
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.date}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{entry.day}</td>
                             <td className="px-4 py-3 text-center text-sm">
                               {entry.regularHours > 0 ? (
-                                <span className="font-medium text-gray-900 dark:text-white dark:text-white">{entry.regularHours}h</span>
+                                <span className="font-medium text-gray-900 dark:text-white">{entry.regularHours}h</span>
                               ) : (
                                 <span className="text-gray-400">-</span>
                               )}
@@ -1561,13 +1741,16 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                             </td>
                             <td className="px-4 py-3 text-center text-sm">
                               {dayTotal > 0 ? (
-                                <span className="font-bold text-gray-900 dark:text-white dark:text-white">{dayTotal}h</span>
+                                <span className="font-bold text-gray-900 dark:text-white">{dayTotal}h</span>
                               ) : (
                                 <span className="text-gray-400">0h</span>
                               )}
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 italic">
                               {entry.notes || '-'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Edit2 className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                             </td>
                           </tr>
                         );
@@ -1599,6 +1782,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                             (selectedEmployeeTimesheet.sickHours || 0) +
                             (selectedEmployeeTimesheet.unpaidLeaveHours || 0)}h
                         </td>
+                        <td className="px-4 py-3 text-sm"></td>
                         <td className="px-4 py-3 text-sm"></td>
                       </tr>
                     </tbody>
