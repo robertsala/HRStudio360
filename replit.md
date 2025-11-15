@@ -6,16 +6,22 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes
 
-### v3.8.0 - AI Payroll Assistant (November 15, 2025)
+### v3.8.0 - AI Payroll Assistant with Context-Aware Studio AI (November 15, 2025)
 - ✅ Extended Studio AI capabilities to Payroll module with GPT-4o integration
 - Created 3 AI functions in server/ai-agent.ts: validatePayrollRun, analyzeExpenses, chatWithPayrollAI
 - Added 3 secure API endpoints under /api/ai-payroll/* with HR/Product Owner RBAC
 - PayrollModal enhanced with purple gradient "Ask Studio AI" button matching recruitment UX
 - AI validates payroll calculations, detects errors, analyzes expense compliance, and provides conversational assistance
 - All endpoints protected with role-based authorization (HR and Product Owner only)
+- **Context-Aware AI**: StudioAIChatModal now adapts based on module context (recruitment vs payroll)
+  - Payroll context shows payroll-specific capabilities and routes to /api/ai-payroll/chat
+  - Recruitment context shows hiring capabilities and routes to /api/ai-agent/chat
+  - Welcome messages and placeholders dynamically update based on context
+  - Message history resets when switching between contexts to prevent confusion
+- Dashboard manages studioAIContext state to track current AI mode
+- All 5 entry points (PayrollModal, HiringModal, JobManagementModal, dashboard widgets) properly set context before opening AI chat
 - Advisory recommendations only - manual approval required for all actions
 - Audit logging for all AI interactions to ensure compliance
-- Reuses existing OpenAI client and EnterpriseChatModal for consistent experience
 
 ### v3.7.0 - Knowledge Base Relocation to Training Module (November 15, 2025)
 - ✅ Moved Knowledge Base from dashboard to Training section as dedicated tab
