@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, BookOpen, Award, Users, Calendar, Clock, CheckCircle, AlertTriangle, Plus, Play } from 'lucide-react';
+import KnowledgeBaseWidget from '../KnowledgeBaseWidget';
 
 interface TrainingProgram {
   id: string;
@@ -31,9 +32,10 @@ interface SkillAssessment {
 
 interface TrainingModalProps {
   onClose?: () => void;
+  onOpenKnowledgeBase?: () => void;
 }
 
-const TrainingModal: React.FC<TrainingModalProps> = ({ onClose }) => {
+const TrainingModal: React.FC<TrainingModalProps> = ({ onClose, onOpenKnowledgeBase }) => {
   const [activeTab, setActiveTab] = useState('programs');
   const [showCreateProgram, setShowCreateProgram] = useState(false);
   const [newProgram, setNewProgram] = useState({
@@ -177,7 +179,8 @@ const TrainingModal: React.FC<TrainingModalProps> = ({ onClose }) => {
     { id: 'programs', label: 'Training Programs' },
     { id: 'assessments', label: 'Skill Assessments' },
     { id: 'certifications', label: 'Certifications' },
-    { id: 'analytics', label: 'Analytics' }
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'knowledgebase', label: 'Knowledge Base' }
   ];
 
   return (
@@ -464,6 +467,15 @@ const TrainingModal: React.FC<TrainingModalProps> = ({ onClose }) => {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Knowledge Base Tab */}
+          {activeTab === 'knowledgebase' && (
+            <div className="space-y-6">
+              <KnowledgeBaseWidget 
+                onOpenModal={onOpenKnowledgeBase || (() => {})} 
+              />
             </div>
           )}
         </div>

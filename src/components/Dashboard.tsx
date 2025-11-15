@@ -54,7 +54,6 @@ import LocationOverrideModal from './modals/LocationOverrideModal';
 import EnterpriseChatModal from './modals/EnterpriseChatModal';
 import ChatNotificationBubble from './ChatNotificationBubble';
 import DigitalClock from './DigitalClock';
-import KnowledgeBaseWidget from './KnowledgeBaseWidget';
 import KnowledgeBaseModal from './modals/KnowledgeBaseModal';
 import CollaboratorModal from './modals/CollaboratorModal';
 import JobManagementModal from './modals/JobManagementModal';
@@ -581,7 +580,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
       case 'employeeProfile':
         return <EmployeeProfileModal isOpen={true} onClose={closeInlineContent} />;
       case 'training':
-        return <TrainingModal onClose={closeInlineContent} />;
+        return <TrainingModal onClose={closeInlineContent} onOpenKnowledgeBase={() => setModals({ ...modals, knowledgeBase: true })} />;
       case 'security':
         return <SecurityModal isOpen={true} onClose={closeInlineContent} />;
       case 'analytics':
@@ -1171,13 +1170,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                         onAddEvent={() => openModal('events')}
                       />
                     </div>
-
-                    {/* Knowledge Base Widget */}
-                    {renderWidget('knowledge-base', () => (
-                      <div className="mt-6">
-                        <KnowledgeBaseWidget onOpenModal={() => setModals({ ...modals, knowledgeBase: true })} />
-                      </div>
-                    ))}
                   </div>
                 ))}
               </div>

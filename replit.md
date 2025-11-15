@@ -6,6 +6,14 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes
 
+### v3.7.0 - Knowledge Base Relocation to Training Module (November 15, 2025)
+- ✅ Moved Knowledge Base from dashboard to Training section as dedicated tab
+- Knowledge Base now accessible via Training modal → Knowledge Base tab
+- Cleaner dashboard interface with reduced widget clutter
+- Updated widget counts: Employee (6), Manager (9), HR (10), Product Owner (11)
+- Knowledge Base features fully preserved in new location (search, featured/popular/recent articles)
+- Training modal enhanced with 5 tabs: Programs, Assessments, Certifications, Analytics, Knowledge Base
+
 ### v3.6.0 - Phase 2: Dashboard Widget Frontend Integration (November 15, 2025)
 - ✅ Complete frontend integration of role-based customizable dashboard widgets
 - Created `useDashboardWidgets` hook with centralized `renderWidget()` helper for unified widget visibility control
@@ -46,7 +54,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Paycheck Fun Facts**: Creative purchase comparison feature showing what paychecks could buy (e.g., "7 arcade sessions" or "12 craft coffees"). Migrated from Supabase to PostgreSQL with 3-per-day manual refresh limit. Database tracks templates, history, and daily usage. Smart rotation system prevents repeats by tracking last 10 shown facts per employee. Production seeding endpoint available at `/api/fun-facts/seed`.
 -   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation. Fully populated with 20 historical entries documenting all major features from v1.0.0 to v3.2.0. Production seeding endpoint available at `/api/changelog/seed`.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
--   **Dashboard Customization (v3.6.0)**: Fully integrated role-based customizable dashboard widgets system. Widget registry defines 12 widgets with role-based visibility (Employee: 7, Manager: 10, HR: 11, Product Owner: 12). Frontend uses `useDashboardWidgets` hook with centralized `renderWidget()` for backend-controlled visibility. API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Compliance Alerts stub added for future implementation. All widgets wrapped and integrated with role-based access control. Seeding endpoint at `/api/dashboard/widgets/seed`.
+-   **Dashboard Customization (v3.7.0)**: Fully integrated role-based customizable dashboard widgets system. Widget registry defines 11 widgets with role-based visibility (Employee: 6, Manager: 9, HR: 10, Product Owner: 11). Knowledge Base relocated to Training module as dedicated tab for cleaner dashboard. Frontend uses `useDashboardWidgets` hook with centralized `renderWidget()` for backend-controlled visibility. API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Compliance Alerts stub added for future implementation. All widgets wrapped and integrated with role-based access control. Seeding endpoint at `/api/dashboard/widgets/seed`.
 -   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search. The "Studio AI" agent operates autonomously, performing actions like candidate screening and generating insights.
 -   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries. Component extraction pattern used for reusability (e.g., `JobPostingsPanel` extracted from `JobManagementModal`).
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.

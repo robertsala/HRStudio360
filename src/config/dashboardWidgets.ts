@@ -142,15 +142,6 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     defaultVisibleForRoles: ['HR', 'Manager', 'Employee', 'Product Owner'],
     defaultDisplayOrder: 41,
     isActive: true
-  },
-  {
-    widgetId: 'knowledge-base',
-    widgetName: 'Knowledge Base',
-    widgetDescription: 'Quick access to help articles and documentation',
-    category: 'quick-actions',
-    defaultVisibleForRoles: ['HR', 'Manager', 'Employee', 'Product Owner'],
-    defaultDisplayOrder: 42,
-    isActive: true
   }
 ];
 
