@@ -2108,15 +2108,23 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: 'Invalid amount value' });
       }
 
+      const recentFactIds = await storage.getRecentFunFactIds(employeeId as string, 10);
+
       const funFact = await storage.getRandomFunFact(
         netPayAmount,
         employeeId as string,
-        []
+        recentFactIds
       );
 
       if (!funFact) {
         return res.status(404).json({ error: 'No fun fact found for the given amount' });
       }
+
+      await storage.saveFunFactHistory(
+        employeeId as string,
+        funFact.id,
+        funFact.factTemplate
+      );
 
       res.json({ funFact });
     } catch (error: any) {
@@ -2148,7 +2156,8 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const funFact = await storage.getRandomFunFact(netPayAmount, employeeId, []);
+      const recentFactIds = await storage.getRecentFunFactIds(employeeId, 10);
+      const funFact = await storage.getRandomFunFact(netPayAmount, employeeId, recentFactIds);
       
       if (!funFact) {
         return res.status(404).json({ error: 'No fun fact found for the given amount' });

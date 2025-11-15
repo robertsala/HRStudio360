@@ -1590,6 +1590,21 @@ export class DbStorage implements IStorage {
     return { count, limit, remaining };
   }
 
+  async getRecentFunFactIds(employeeId: string, limit: number = 10): Promise<string[]> {
+    const recentHistory = await db.select({ funFactId: employeeFunFactHistory.funFactId })
+      .from(employeeFunFactHistory)
+      .where(
+        and(
+          eq(employeeFunFactHistory.employeeId, employeeId),
+          isNotNull(employeeFunFactHistory.shownAt)
+        )
+      )
+      .orderBy(desc(employeeFunFactHistory.shownAt))
+      .limit(limit);
+    
+    return recentHistory.map(h => h.funFactId);
+  }
+
   async trackManualFunFactGeneration(employeeId: string, funFactId: string): Promise<void> {
     await db.insert(dailyFunFactUsage).values({
       employeeId,
