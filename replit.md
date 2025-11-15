@@ -6,6 +6,31 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes
 
+### v3.9.0 - Enhanced Payroll Review & Guided Wizard (November 15, 2025)
+- ✅ Created EmployeePayrollDetailModal with 3-tab interface (Overview, Timesheet, Calculations)
+- Review/Edit buttons in PayrollModal now fully functional with modal-based editing workflow
+- Employees can be reviewed and edited individually before proceeding to AI analysis
+- Built comprehensive PayrollWizardModal with 5-step guided workflow:
+  1. Review Timesheets - Verify hours, overtime, and manager approvals
+  2. Process Expenses - Review expense claims and documentation
+  3. Handle Leave Requests - Process PTO, sick leave, and unpaid leave
+  4. Review Calculations - Validate gross pay, taxes, deductions, net pay
+  5. Finalize & Submit - Final checks and payroll submission
+- Wizard integrated into PayrollModal with "Start Guided Payroll" launcher button
+- Each wizard step includes:
+  - Contextual checklists and guidance
+  - Key metrics and statistics
+  - Studio AI assistance button for AI-powered help
+  - Progress tracking with visual indicators
+- Employee detail modal features:
+  - Editable hourly rates and hours with automatic payroll recalculation
+  - Comprehensive timesheet detail view with daily breakdown
+  - Full payroll calculations breakdown showing gross pay formula
+  - Warning and approval status indicators
+- Both modals properly integrated with Studio AI via onOpenStudioAI callback
+- User can now choose between guided wizard mode or manual payroll processing
+- Improved user experience addresses step-by-step payroll workflow requirements
+
 ### v3.8.0 - AI Payroll Assistant with Context-Aware Studio AI (November 15, 2025)
 - ✅ Extended Studio AI capabilities to Payroll module with GPT-4o integration
 - Created 3 AI functions in server/ai-agent.ts: validatePayrollRun, analyzeExpenses, chatWithPayrollAI
