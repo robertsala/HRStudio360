@@ -36,7 +36,12 @@ import type {
   Permission, InsertPermission,
   RolePermission, InsertRolePermission,
   TimesheetCorrectionRequest, InsertTimesheetCorrectionRequest,
-  TimesheetChangeAudit, InsertTimesheetChangeAudit
+  TimesheetChangeAudit, InsertTimesheetChangeAudit,
+  PermissionTemplate, InsertPermissionTemplate,
+  RoleHierarchy, InsertRoleHierarchy,
+  TimeBasedPermissionGrant, InsertTimeBasedPermissionGrant,
+  PermissionRequest, InsertPermissionRequest,
+  PermissionChangeAudit, InsertPermissionChangeAudit
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -51,7 +56,8 @@ import {
   dashboardWidgetPresets, userDashboardPreferences,
   taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog,
   timesheetEntries, timesheetApprovals, payrollLocks,
-  permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit
+  permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit,
+  permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -334,6 +340,45 @@ export interface IStorage {
   // Timesheet Change Audit Trail
   getTimesheetChangeAudit(timesheetEntryId: string): Promise<import('../shared/schema.js').TimesheetChangeAudit[]>;
   createTimesheetChangeAudit(audit: import('../shared/schema.js').InsertTimesheetChangeAudit): Promise<import('../shared/schema.js').TimesheetChangeAudit>;
+
+  // **PHASE 3: ADVANCED ACCESS CONTROL**
+  
+  // Permission Templates
+  getPermissionTemplates(): Promise<import('../shared/schema.js').PermissionTemplate[]>;
+  getPermissionTemplateById(id: string): Promise<import('../shared/schema.js').PermissionTemplate | undefined>;
+  createPermissionTemplate(template: import('../shared/schema.js').InsertPermissionTemplate): Promise<import('../shared/schema.js').PermissionTemplate>;
+  updatePermissionTemplate(id: string, template: Partial<import('../shared/schema.js').InsertPermissionTemplate>): Promise<import('../shared/schema.js').PermissionTemplate | undefined>;
+  deletePermissionTemplate(id: string): Promise<void>;
+  applyTemplateToRole(templateId: string, role: string, appliedBy: string): Promise<void>;
+  
+  // Role Hierarchy & Inheritance
+  getRoleHierarchy(): Promise<import('../shared/schema.js').RoleHierarchy[]>;
+  getRoleHierarchyByRole(role: string): Promise<import('../shared/schema.js').RoleHierarchy | undefined>;
+  createRoleHierarchy(hierarchy: import('../shared/schema.js').InsertRoleHierarchy): Promise<import('../shared/schema.js').RoleHierarchy>;
+  updateRoleHierarchy(id: string, hierarchy: Partial<import('../shared/schema.js').InsertRoleHierarchy>): Promise<import('../shared/schema.js').RoleHierarchy | undefined>;
+  getInheritedPermissions(role: string): Promise<import('../shared/schema.js').Permission[]>;
+  
+  // Time-Based Permission Grants
+  getActiveTimeBasedGrants(userId: string): Promise<import('../shared/schema.js').TimeBasedPermissionGrant[]>;
+  getAllTimeBasedGrants(userId?: string): Promise<import('../shared/schema.js').TimeBasedPermissionGrant[]>;
+  createTimeBasedGrant(grant: import('../shared/schema.js').InsertTimeBasedPermissionGrant): Promise<import('../shared/schema.js').TimeBasedPermissionGrant>;
+  revokeTimeBasedGrant(id: string, revokedBy: string): Promise<void>;
+  expireOldGrants(): Promise<number>;
+  
+  // Permission Requests
+  getPermissionRequests(filters?: { requestedById?: string; status?: string }): Promise<import('../shared/schema.js').PermissionRequest[]>;
+  getPermissionRequestById(id: string): Promise<import('../shared/schema.js').PermissionRequest | undefined>;
+  createPermissionRequest(request: import('../shared/schema.js').InsertPermissionRequest): Promise<import('../shared/schema.js').PermissionRequest>;
+  approvePermissionRequest(id: string, reviewerId: string, reviewNotes?: string): Promise<import('../shared/schema.js').PermissionRequest>;
+  rejectPermissionRequest(id: string, reviewerId: string, reviewNotes: string): Promise<import('../shared/schema.js').PermissionRequest>;
+  
+  // Permission Change Audit
+  getPermissionChangeAudit(targetType?: string, targetId?: string): Promise<import('../shared/schema.js').PermissionChangeAudit[]>;
+  createPermissionChangeAudit(audit: import('../shared/schema.js').InsertPermissionChangeAudit): Promise<import('../shared/schema.js').PermissionChangeAudit>;
+  
+  // Bulk Operations
+  bulkAssignPermissions(role: string, permissionIds: string[], assignedBy: string, reason?: string): Promise<void>;
+  bulkRevokePermissions(role: string, permissionIds: string[], revokedBy: string, reason?: string): Promise<void>;
 }
 
 // Database storage implementation
@@ -2204,6 +2249,417 @@ export class DbStorage implements IStorage {
         .returning();
 
       return rejectedRequestResult[0];
+    });
+  }
+
+  // ==================== PHASE 3: ADVANCED ACCESS CONTROL ====================
+
+  // Permission Templates
+  async getPermissionTemplates(): Promise<PermissionTemplate[]> {
+    return db.select().from(permissionTemplates).orderBy(permissionTemplates.name);
+  }
+
+  async getPermissionTemplateById(id: string): Promise<PermissionTemplate | undefined> {
+    const result = await db.select().from(permissionTemplates).where(eq(permissionTemplates.id, id));
+    return result[0];
+  }
+
+  async createPermissionTemplate(template: InsertPermissionTemplate): Promise<PermissionTemplate> {
+    const result = await db.insert(permissionTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updatePermissionTemplate(id: string, template: Partial<InsertPermissionTemplate>): Promise<PermissionTemplate | undefined> {
+    const result = await db
+      .update(permissionTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(permissionTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePermissionTemplate(id: string): Promise<void> {
+    await db.delete(permissionTemplates).where(eq(permissionTemplates.id, id));
+  }
+
+  async applyTemplateToRole(templateId: string, role: string, appliedBy: string): Promise<void> {
+    return await db.transaction(async (tx) => {
+      const templateResult = await tx
+        .select()
+        .from(permissionTemplates)
+        .where(eq(permissionTemplates.id, templateId));
+      
+      const template = templateResult[0];
+      if (!template) {
+        throw new Error('Permission template not found');
+      }
+
+      for (const permissionId of template.permissionIds) {
+        const existing = await tx
+          .select()
+          .from(rolePermissions)
+          .where(and(
+            eq(rolePermissions.role, role),
+            eq(rolePermissions.permissionId, permissionId)
+          ));
+
+        if (existing.length === 0) {
+          await tx.insert(rolePermissions).values({
+            role,
+            permissionId
+          });
+        }
+      }
+
+      await tx.insert(permissionChangeAudit).values({
+        targetType: 'role',
+        targetId: role,
+        changeType: 'template_apply',
+        permissionIds: template.permissionIds,
+        changedBy: appliedBy,
+        reason: `Applied template: ${template.name}`,
+        metadata: { templateId, templateName: template.name }
+      });
+    });
+  }
+
+  // Role Hierarchy
+  async getRoleHierarchy(): Promise<RoleHierarchy[]> {
+    return db.select().from(roleHierarchy);
+  }
+
+  async getRoleHierarchyByRole(role: string): Promise<RoleHierarchy | undefined> {
+    const result = await db.select().from(roleHierarchy).where(eq(roleHierarchy.role, role));
+    return result[0];
+  }
+
+  async createRoleHierarchy(hierarchy: InsertRoleHierarchy): Promise<RoleHierarchy> {
+    const result = await db.insert(roleHierarchy).values(hierarchy).returning();
+    return result[0];
+  }
+
+  async updateRoleHierarchy(id: string, hierarchy: Partial<InsertRoleHierarchy>): Promise<RoleHierarchy | undefined> {
+    const result = await db
+      .update(roleHierarchy)
+      .set(hierarchy)
+      .where(eq(roleHierarchy.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getInheritedPermissions(role: string): Promise<Permission[]> {
+    const inheritedPermissions: Permission[] = [];
+    const visitedRoles = new Set<string>();
+    
+    const getPermissionsRecursive = async (currentRole: string): Promise<void> => {
+      if (visitedRoles.has(currentRole)) {
+        return;
+      }
+      visitedRoles.add(currentRole);
+
+      const hierarchyResult = await db
+        .select()
+        .from(roleHierarchy)
+        .where(eq(roleHierarchy.role, currentRole));
+      
+      const hierarchy = hierarchyResult[0];
+      
+      if (hierarchy?.parentRole && hierarchy.inheritsPermissions) {
+        const parentPermissions = await db
+          .select({ permission: permissions })
+          .from(rolePermissions)
+          .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+          .where(eq(rolePermissions.role, hierarchy.parentRole));
+
+        for (const { permission } of parentPermissions) {
+          if (!inheritedPermissions.some(p => p.id === permission.id)) {
+            inheritedPermissions.push(permission);
+          }
+        }
+
+        await getPermissionsRecursive(hierarchy.parentRole);
+      }
+    };
+
+    await getPermissionsRecursive(role);
+    return inheritedPermissions;
+  }
+
+  // Time-Based Permission Grants
+  async getActiveTimeBasedGrants(userId: string): Promise<TimeBasedPermissionGrant[]> {
+    const now = new Date();
+    return db
+      .select()
+      .from(timeBasedPermissionGrants)
+      .where(and(
+        eq(timeBasedPermissionGrants.userId, userId),
+        eq(timeBasedPermissionGrants.isActive, true),
+        gte(timeBasedPermissionGrants.endTime, now)
+      ))
+      .orderBy(desc(timeBasedPermissionGrants.createdAt));
+  }
+
+  async getAllTimeBasedGrants(userId?: string): Promise<TimeBasedPermissionGrant[]> {
+    if (userId) {
+      return db
+        .select()
+        .from(timeBasedPermissionGrants)
+        .where(eq(timeBasedPermissionGrants.userId, userId))
+        .orderBy(desc(timeBasedPermissionGrants.createdAt));
+    }
+    return db.select().from(timeBasedPermissionGrants).orderBy(desc(timeBasedPermissionGrants.createdAt));
+  }
+
+  async createTimeBasedGrant(grant: InsertTimeBasedPermissionGrant): Promise<TimeBasedPermissionGrant> {
+    const result = await db.insert(timeBasedPermissionGrants).values(grant).returning();
+    return result[0];
+  }
+
+  async revokeTimeBasedGrant(id: string, revokedBy: string): Promise<void> {
+    await db
+      .update(timeBasedPermissionGrants)
+      .set({
+        isActive: false,
+        revokedBy,
+        revokedAt: new Date()
+      })
+      .where(eq(timeBasedPermissionGrants.id, id));
+  }
+
+  async expireOldGrants(): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .update(timeBasedPermissionGrants)
+      .set({ isActive: false })
+      .where(and(
+        lte(timeBasedPermissionGrants.endTime, now),
+        eq(timeBasedPermissionGrants.isActive, true)
+      ))
+      .returning();
+    
+    return result.length;
+  }
+
+  // Permission Requests
+  async getPermissionRequests(filters?: { requestedById?: string; status?: string }): Promise<PermissionRequest[]> {
+    let query = db.select().from(permissionRequests);
+
+    const conditions = [];
+    if (filters?.requestedById) {
+      conditions.push(eq(permissionRequests.requestedById, filters.requestedById));
+    }
+    if (filters?.status) {
+      conditions.push(eq(permissionRequests.status, filters.status as any));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(permissionRequests.createdAt));
+  }
+
+  async getPermissionRequestById(id: string): Promise<PermissionRequest | undefined> {
+    const result = await db.select().from(permissionRequests).where(eq(permissionRequests.id, id));
+    return result[0];
+  }
+
+  async createPermissionRequest(request: InsertPermissionRequest): Promise<PermissionRequest> {
+    const result = await db.insert(permissionRequests).values(request).returning();
+    return result[0];
+  }
+
+  async approvePermissionRequest(id: string, reviewerId: string, reviewNotes?: string): Promise<PermissionRequest> {
+    return await db.transaction(async (tx) => {
+      const requestResult = await tx
+        .select()
+        .from(permissionRequests)
+        .where(eq(permissionRequests.id, id));
+      
+      const request = requestResult[0];
+      if (!request) {
+        throw new Error('Permission request not found');
+      }
+
+      if (request.status !== 'Pending') {
+        throw new Error('Permission request has already been reviewed');
+      }
+
+      const reviewerResult = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, reviewerId));
+      
+      const reviewer = reviewerResult[0];
+      if (!reviewer || !reviewer.role) {
+        throw new Error('Reviewer not found or has no role');
+      }
+
+      if (request.requestType === 'permanent') {
+        for (const permissionId of request.permissionIds) {
+          const existing = await tx
+            .select()
+            .from(rolePermissions)
+            .where(and(
+              eq(rolePermissions.role, reviewer.role),
+              eq(rolePermissions.permissionId, permissionId)
+            ));
+
+          if (existing.length === 0) {
+            await tx.insert(rolePermissions).values({
+              role: reviewer.role,
+              permissionId
+            });
+          }
+        }
+
+        await tx.insert(permissionChangeAudit).values({
+          targetType: 'role',
+          targetId: reviewer.role,
+          changeType: 'grant',
+          permissionIds: request.permissionIds,
+          changedBy: reviewerId,
+          reason: `Approved permission request: ${request.justification}`,
+          metadata: { requestId: id }
+        });
+      } else if (request.requestType === 'temporary') {
+        const durationHours = request.duration || 24;
+        const endTime = new Date();
+        endTime.setHours(endTime.getHours() + durationHours);
+
+        for (const permissionId of request.permissionIds) {
+          await tx.insert(timeBasedPermissionGrants).values({
+            userId: request.requestedById,
+            permissionId,
+            grantedBy: reviewerId,
+            reason: `Approved request: ${request.justification}`,
+            endTime
+          });
+        }
+
+        await tx.insert(permissionChangeAudit).values({
+          targetType: 'user',
+          targetId: request.requestedById,
+          changeType: 'grant',
+          permissionIds: request.permissionIds,
+          changedBy: reviewerId,
+          reason: `Approved temporary permission request (${durationHours}h): ${request.justification}`,
+          metadata: { requestId: id, duration: durationHours }
+        });
+      }
+
+      const approvedResult = await tx
+        .update(permissionRequests)
+        .set({
+          status: 'Approved',
+          reviewedBy: reviewerId,
+          reviewedAt: new Date(),
+          reviewNotes,
+          updatedAt: new Date()
+        })
+        .where(eq(permissionRequests.id, id))
+        .returning();
+
+      return approvedResult[0];
+    });
+  }
+
+  async rejectPermissionRequest(id: string, reviewerId: string, reviewNotes: string): Promise<PermissionRequest> {
+    const result = await db
+      .update(permissionRequests)
+      .set({
+        status: 'Rejected',
+        reviewedBy: reviewerId,
+        reviewedAt: new Date(),
+        reviewNotes,
+        updatedAt: new Date()
+      })
+      .where(eq(permissionRequests.id, id))
+      .returning();
+    
+    if (!result[0]) {
+      throw new Error('Permission request not found');
+    }
+    
+    return result[0];
+  }
+
+  // Permission Change Audit
+  async getPermissionChangeAudit(targetType?: string, targetId?: string): Promise<PermissionChangeAudit[]> {
+    let query = db.select().from(permissionChangeAudit);
+
+    const conditions = [];
+    if (targetType) {
+      conditions.push(eq(permissionChangeAudit.targetType, targetType));
+    }
+    if (targetId) {
+      conditions.push(eq(permissionChangeAudit.targetId, targetId));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(permissionChangeAudit.changedAt));
+  }
+
+  async createPermissionChangeAudit(audit: InsertPermissionChangeAudit): Promise<PermissionChangeAudit> {
+    const result = await db.insert(permissionChangeAudit).values(audit).returning();
+    return result[0];
+  }
+
+  // Bulk Operations
+  async bulkAssignPermissions(role: string, permissionIds: string[], assignedBy: string, reason?: string): Promise<void> {
+    return await db.transaction(async (tx) => {
+      for (const permissionId of permissionIds) {
+        const existing = await tx
+          .select()
+          .from(rolePermissions)
+          .where(and(
+            eq(rolePermissions.role, role),
+            eq(rolePermissions.permissionId, permissionId)
+          ));
+
+        if (existing.length === 0) {
+          await tx.insert(rolePermissions).values({
+            role,
+            permissionId
+          });
+        }
+      }
+
+      await tx.insert(permissionChangeAudit).values({
+        targetType: 'role',
+        targetId: role,
+        changeType: 'grant',
+        permissionIds,
+        changedBy: assignedBy,
+        reason: reason || 'Bulk permission assignment',
+        metadata: { bulk: true, count: permissionIds.length }
+      });
+    });
+  }
+
+  async bulkRevokePermissions(role: string, permissionIds: string[], revokedBy: string, reason?: string): Promise<void> {
+    return await db.transaction(async (tx) => {
+      for (const permissionId of permissionIds) {
+        await tx
+          .delete(rolePermissions)
+          .where(and(
+            eq(rolePermissions.role, role),
+            eq(rolePermissions.permissionId, permissionId)
+          ));
+      }
+
+      await tx.insert(permissionChangeAudit).values({
+        targetType: 'role',
+        targetId: role,
+        changeType: 'revoke',
+        permissionIds,
+        changedBy: revokedBy,
+        reason: reason || 'Bulk permission revocation',
+        metadata: { bulk: true, count: permissionIds.length }
+      });
     });
   }
 }
