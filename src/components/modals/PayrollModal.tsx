@@ -8,6 +8,7 @@ import {
 import { supabase } from '../../utils/supabaseClient';
 import { formatCurrency, Currency, sumByCurrency, getCurrencySymbol, getCurrencyFlag } from '../../utils/currencyUtils';
 import { EmployeePayrollDetailModal } from './EmployeePayrollDetailModal';
+import { PayrollWizardModal } from './PayrollWizardModal';
 
 interface TimesheetEntry {
   date: string;
@@ -117,6 +118,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [selectedEmployeeTimesheet, setSelectedEmployeeTimesheet] = useState<Employee | null>(null);
   const [selectedEmployeeDetail, setSelectedEmployeeDetail] = useState<Employee | null>(null);
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([
     {
       id: '1',
@@ -610,11 +612,28 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
               </div>
             )}
 
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => {
+                  if (!payrollType) {
+                    showNotification('error', 'Please select a payroll type');
+                    return;
+                  }
+                  setShowWizard(true);
+                }}
+                disabled={!payrollType}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-lg font-medium shadow-lg"
+                data-testid="button-start-wizard"
+              >
+                <Zap className="h-5 w-5 mr-2" />
+                Start Guided Payroll
+              </button>
+              
               <button
                 onClick={handleProceedToReview}
                 disabled={!payrollType}
                 className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-lg font-medium"
+                data-testid="button-continue-manual"
               >
                 Continue to Review
                 <ArrowRight className="h-5 w-5 ml-2" />
@@ -623,6 +642,14 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
           </div>
         </div>
       </div>
+
+      {/* Payroll Wizard Modal */}
+      {showWizard && (
+        <PayrollWizardModal
+          onClose={() => setShowWizard(false)}
+          onOpenStudioAI={onOpenStudioAI}
+        />
+      )}
 
       {/* Notification Toast */}
       {notification && (
