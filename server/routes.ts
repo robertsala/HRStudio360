@@ -3632,55 +3632,213 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      // Seed tutorial data will be added in next task
-      const tutorialData = [
-        {
-          title: 'Getting Started with HRStudio360',
-          description: 'Learn the basics of navigating HRStudio360 and setting up your profile.',
-          category: 'getting-started' as const,
-          difficulty: 'beginner' as const,
-          estimatedMinutes: 10,
-          roleAccess: ['Employee', 'Manager', 'HR', 'Product Owner'],
-          tags: ['basics', 'onboarding', 'setup'],
-          sortOrder: 1
-        },
-        {
-          title: 'Running Your First Payroll',
-          description: 'Step-by-step guide to processing payroll using the guided wizard.',
-          category: 'payroll' as const,
-          difficulty: 'intermediate' as const,
-          estimatedMinutes: 20,
-          roleAccess: ['HR', 'Product Owner'],
-          tags: ['payroll', 'wizard', 'processing'],
-          sortOrder: 2
-        },
-        {
-          title: 'Managing the Hiring Pipeline',
-          description: 'Learn how to post jobs, review candidates, and manage the recruitment process.',
-          category: 'hiring' as const,
-          difficulty: 'intermediate' as const,
-          estimatedMinutes: 15,
-          roleAccess: ['HR', 'Manager', 'Product Owner'],
-          tags: ['hiring', 'recruitment', 'candidates'],
-          sortOrder: 3
-        },
-        {
-          title: 'Using Studio AI for Recruitment',
-          description: 'Discover how to leverage AI-powered insights for candidate screening and hiring decisions.',
-          category: 'ai-features' as const,
-          difficulty: 'advanced' as const,
-          estimatedMinutes: 25,
-          roleAccess: ['HR', 'Product Owner'],
-          tags: ['ai', 'recruitment', 'automation'],
-          sortOrder: 4
-        }
-      ];
+      // Tutorial 1: Getting Started
+      const tutorial1 = await db.insert(tutorials).values({
+        title: 'Getting Started with HRStudio360',
+        description: 'Learn the basics of navigating HRStudio360, understanding your dashboard, and managing your profile.',
+        category: 'getting-started',
+        difficulty: 'beginner',
+        estimatedMinutes: 10,
+        roleAccess: ['Employee', 'Manager', 'HR', 'Product Owner'],
+        tags: ['basics', 'onboarding', 'navigation'],
+        sortOrder: 1
+      }).returning();
 
-      const createdTutorials = await db.insert(tutorials).values(tutorialData).returning();
+      await db.insert(tutorialSteps).values([
+        {
+          tutorialId: tutorial1[0].id,
+          stepNumber: 1,
+          title: 'Welcome to HRStudio360!',
+          content: '<p>HRStudio360 is your complete HR management platform. In this tutorial, you\'ll learn how to navigate the dashboard and customize your experience.</p><p><strong>What you\'ll learn:</strong></p><ul><li>Dashboard navigation</li><li>Accessing key modules</li><li>Personalizing your profile</li></ul>',
+          checklist: ['Familiarize yourself with the main navigation', 'Identify the Dashboard widgets', 'Understand role-based access']
+        },
+        {
+          tutorialId: tutorial1[0].id,
+          stepNumber: 2,
+          title: 'Understanding Your Dashboard',
+          content: '<p>Your dashboard is personalized based on your role and provides quick access to important information.</p><p><strong>Dashboard Features:</strong></p><ul><li><strong>Widgets:</strong> Customizable cards showing key metrics</li><li><strong>Quick Actions:</strong> Fast access to common tasks</li><li><strong>Notifications:</strong> Stay updated on important events</li></ul>',
+          checklist: ['Explore available widgets', 'Try clicking on different metrics', 'Check your notifications']
+        },
+        {
+          tutorialId: tutorial1[0].id,
+          stepNumber: 3,
+          title: 'Navigating Modules',
+          content: '<p>HRStudio360 organizes features into modules accessible from the sidebar and dashboard:</p><ul><li><strong>Payroll:</strong> Manage employee compensation</li><li><strong>Hiring:</strong> Track recruitment pipeline</li><li><strong>Training:</strong> Access learning resources</li><li><strong>People:</strong> View employee directory</li></ul>',
+          actionType: 'open-modal',
+          actionTarget: 'payroll',
+          actionLabel: 'Open Payroll Module',
+          checklist: ['Navigate to different modules', 'Notice how each module opens', 'Return to dashboard']
+        },
+        {
+          tutorialId: tutorial1[0].id,
+          stepNumber: 4,
+          title: 'Updating Your Profile',
+          content: '<p>Keep your profile information current to ensure accurate records and personalized experience.</p><p><strong>Profile sections:</strong></p><ul><li>Contact information</li><li>Emergency contacts</li><li>Preferences and settings</li></ul><p>Click "Try it now" to update your profile!</p>',
+          actionType: 'navigate',
+          actionTarget: '/profile',
+          actionLabel: 'Go to Profile',
+          checklist: ['Review your profile information', 'Update any outdated details', 'Save your changes']
+        }
+      ]);
+
+      // Tutorial 2: Payroll Wizard
+      const tutorial2 = await db.insert(tutorials).values({
+        title: 'Running Your First Payroll with the Guided Wizard',
+        description: 'Master the step-by-step payroll process using HRStudio360\'s AI-powered wizard for error-free processing.',
+        category: 'payroll',
+        difficulty: 'intermediate',
+        estimatedMinutes: 20,
+        roleAccess: ['HR', 'Product Owner'],
+        tags: ['payroll', 'wizard', 'processing'],
+        sortOrder: 2
+      }).returning();
+
+      await db.insert(tutorialSteps).values([
+        {
+          tutorialId: tutorial2[0].id,
+          stepNumber: 1,
+          title: 'Introduction to Payroll Processing',
+          content: '<p>Processing payroll accurately is critical for employee satisfaction and legal compliance. HRStudio360\'s guided wizard walks you through each step to ensure accuracy.</p><p><strong>The payroll workflow:</strong></p><ol><li>Select payroll type</li><li>Review employee data</li><li>AI error detection</li><li>Submit for processing</li></ol>',
+          checklist: ['Understand the payroll workflow', 'Know your payroll schedule', 'Have employee hours ready']
+        },
+        {
+          tutorialId: tutorial2[0].id,
+          stepNumber: 2,
+          title: 'Launching the Payroll Wizard',
+          content: '<p>The Payroll Wizard guides you through each step with contextual help and AI-powered validation.</p><p><strong>To start:</strong></p><ol><li>Open the Payroll module from your dashboard</li><li>Select your payroll type (Hourly, Salaried, or Both)</li><li>Click "Start Guided Payroll"</li></ol><p>The wizard will show you a 5-step process with progress tracking.</p>',
+          actionType: 'open-modal',
+          actionTarget: 'payroll',
+          actionLabel: 'Open Payroll Module',
+          checklist: ['Navigate to Payroll', 'Select payroll type', 'Click Start Guided Payroll']
+        },
+        {
+          tutorialId: tutorial2[0].id,
+          stepNumber: 3,
+          title: 'Reviewing Timesheets and Hours',
+          content: '<p>Step 1 of the wizard helps you verify employee hours and overtime.</p><p><strong>What to check:</strong></p><ul><li>Regular hours vs. overtime</li><li>Manager approvals</li><li>Time-off deductions</li><li>Unusual hour patterns</li></ul><p>The wizard highlights potential issues automatically.</p>',
+          checklist: ['Review all employee timesheets', 'Verify overtime calculations', 'Check manager approvals', 'Address any warnings']
+        },
+        {
+          tutorialId: tutorial2[0].id,
+          stepNumber: 4,
+          title: 'Processing Expenses and Leave Requests',
+          content: '<p>Steps 2 & 3 guide you through expense claims and leave requests that affect payroll.</p><p><strong>Expenses:</strong> Review expense reports and ensure proper documentation</p><p><strong>Leave Requests:</strong> Process PTO, sick leave, and unpaid leave that impact pay</p><p>Studio AI helps identify compliance issues and missing documentation.</p>',
+          checklist: ['Review pending expense claims', 'Process leave requests', 'Verify documentation', 'Ask Studio AI for help if needed']
+        },
+        {
+          tutorialId: tutorial2[0].id,
+          stepNumber: 5,
+          title: 'Final Review and Submission',
+          content: '<p>The final wizard step shows a comprehensive summary:</p><ul><li>Total gross pay</li><li>Tax withholdings</li><li>Deductions</li><li>Net pay by employee</li></ul><p><strong>Before submitting:</strong></p><ol><li>Review the payroll summary</li><li>Run Studio AI validation</li><li>Confirm all amounts</li><li>Submit for processing</li></ol><p>Congratulations! You\'ve completed your first guided payroll run.</p>',
+          checklist: ['Review payroll summary', 'Verify all calculations', 'Use AI validation', 'Submit payroll']
+        }
+      ]);
+
+      // Tutorial 3: Hiring Pipeline
+      const tutorial3 = await db.insert(tutorials).values({
+        title: 'Managing the Hiring Pipeline',
+        description: 'Learn to post jobs, review candidates, and move them through your recruitment stages efficiently.',
+        category: 'hiring',
+        difficulty: 'intermediate',
+        estimatedMinutes: 15,
+        roleAccess: ['HR', 'Manager', 'Product Owner'],
+        tags: ['hiring', 'recruitment', 'ats'],
+        sortOrder: 3
+      }).returning();
+
+      await db.insert(tutorialSteps).values([
+        {
+          tutorialId: tutorial3[0].id,
+          stepNumber: 1,
+          title: 'Understanding the ATS',
+          content: '<p>HRStudio360 includes a full Applicant Tracking System (ATS) to streamline your hiring process.</p><p><strong>Key features:</strong></p><ul><li>Job posting management</li><li>Candidate pipeline visualization</li><li>Interview scheduling</li><li>Collaborative hiring</li><li>AI-powered candidate screening</li></ul>',
+          checklist: ['Understand ATS capabilities', 'Know your hiring stages', 'Identify stakeholders']
+        },
+        {
+          tutorialId: tutorial3[0].id,
+          stepNumber: 2,
+          title: 'Creating a Job Posting',
+          content: '<p>Start by creating a compelling job posting that attracts top talent.</p><p><strong>Best practices:</strong></p><ul><li>Clear, descriptive job title</li><li>Detailed responsibilities</li><li>Required qualifications</li><li>Salary range (recommended)</li><li>Company culture highlights</li></ul><p>Try creating a job posting now!</p>',
+          actionType: 'open-modal',
+          actionTarget: 'hiring',
+          actionLabel: 'Open Hiring Module',
+          checklist: ['Write clear job description', 'Set salary range', 'Define qualifications', 'Publish posting']
+        },
+        {
+          tutorialId: tutorial3[0].id,
+          stepNumber: 3,
+          title: 'Reviewing Candidates',
+          content: '<p>As applications come in, review candidates in the pipeline view.</p><p><strong>Candidate review workflow:</strong></p><ol><li>Click on a candidate card</li><li>Review resume and application</li><li>Check AI screening scores</li><li>Add notes and ratings</li><li>Move to next stage or reject</li></ol>',
+          checklist: ['Open candidate profiles', 'Review applications', 'Add ratings', 'Update candidate status']
+        },
+        {
+          tutorialId: tutorial3[0].id,
+          stepNumber: 4,
+          title: 'Managing Interview Stages',
+          content: '<p>Move candidates through your hiring pipeline as they progress.</p><p><strong>Pipeline stages:</strong></p><ul><li><strong>Applied:</strong> Initial applications</li><li><strong>Screening:</strong> Phone/video screen</li><li><strong>Interview:</strong> In-person interviews</li><li><strong>Offer:</strong> Extended offers</li><li><strong>Hired:</strong> Accepted offers</li></ul><p>Drag and drop candidates between stages or use the context menu.</p>',
+          checklist: ['Move candidates between stages', 'Schedule interviews', 'Send status updates', 'Track pipeline metrics']
+        }
+      ]);
+
+      // Tutorial 4: Studio AI
+      const tutorial4 = await db.insert(tutorials).values({
+        title: 'Using Studio AI for Smart Recruitment',
+        description: 'Harness AI-powered insights to screen candidates, generate hiring recommendations, and automate repetitive tasks.',
+        category: 'ai-features',
+        difficulty: 'advanced',
+        estimatedMinutes: 25,
+        roleAccess: ['HR', 'Product Owner'],
+        tags: ['ai', 'automation', 'screening'],
+        sortOrder: 4
+      }).returning();
+
+      await db.insert(tutorialSteps).values([
+        {
+          tutorialId: tutorial4[0].id,
+          stepNumber: 1,
+          title: 'Meet Studio AI: Your Intelligent Assistant',
+          content: '<p>Studio AI is your AI-powered assistant that helps with recruitment and payroll tasks.</p><p><strong>AI capabilities:</strong></p><ul><li>Automated candidate screening</li><li>Resume analysis and scoring</li><li>Hiring insights and recommendations</li><li>Payroll validation and error detection</li><li>Natural language queries</li></ul><p>Access Studio AI via the purple "Ask Studio AI" buttons throughout the app.</p>',
+          checklist: ['Locate Studio AI buttons', 'Understand AI capabilities', 'Know when to use AI assistance']
+        },
+        {
+          tutorialId: tutorial4[0].id,
+          stepNumber: 2,
+          title: 'Automated Candidate Screening',
+          content: '<p>Studio AI can automatically screen candidates against job requirements.</p><p><strong>How it works:</strong></p><ol><li>AI analyzes resume content</li><li>Matches skills to job requirements</li><li>Generates screening score (0-100)</li><li>Identifies strengths and gaps</li><li>Provides hiring recommendation</li></ol><p>Review AI scores alongside your own judgment for best results.</p>',
+          actionType: 'open-modal',
+          actionTarget: 'hiring',
+          actionLabel: 'View Candidate Screening',
+          checklist: ['Review AI screening scores', 'Read AI analysis', 'Compare with manual review', 'Make informed decisions']
+        },
+        {
+          tutorialId: tutorial4[0].id,
+          stepNumber: 3,
+          title: 'Getting Hiring Insights',
+          content: '<p>Ask Studio AI for strategic hiring insights and recommendations.</p><p><strong>Example queries:</strong></p><ul><li>"What are the top candidates for the Senior Developer role?"</li><li>"Compare the qualifications of candidates in the Interview stage"</li><li>"What skills are missing from our candidate pipeline?"</li></ul><p>Studio AI provides data-driven answers to help you make better hiring decisions.</p>',
+          checklist: ['Open Studio AI chat', 'Ask strategic questions', 'Review AI insights', 'Apply recommendations']
+        },
+        {
+          tutorialId: tutorial4[0].id,
+          stepNumber: 4,
+          title: 'Batch Processing with AI',
+          content: '<p>Screen multiple candidates at once to save time.</p><p><strong>Batch screening:</strong></p><ol><li>Select multiple unscreened candidates</li><li>Click "Batch Screen with AI"</li><li>AI processes all candidates simultaneously</li><li>Review results and prioritize top matches</li></ol><p>This is especially useful when you have many applications to review quickly.</p>',
+          checklist: ['Select multiple candidates', 'Run batch screening', 'Review AI results', 'Prioritize high scores']
+        },
+        {
+          tutorialId: tutorial4[0].id,
+          stepNumber: 5,
+          title: 'AI-Powered Payroll Validation',
+          content: '<p>Studio AI also assists with payroll processing by detecting errors and anomalies.</p><p><strong>Payroll AI features:</strong></p><ul><li>Automatic error detection</li><li>Expense compliance checking</li><li>Unusual pattern identification</li><li>Calculation verification</li></ul><p>Use AI validation before submitting payroll to catch mistakes early.</p>',
+          checklist: ['Run AI payroll validation', 'Review detected issues', 'Fix errors', 'Confirm with AI again']
+        }
+      ]);
+
+      const tutorialCount = 4;
+      console.log(`[Tutorials] Successfully seeded ${tutorialCount} tutorials with steps`);
 
       res.json({
-        message: `Successfully seeded ${createdTutorials.length} tutorials`,
-        tutorials: createdTutorials
+        message: `Successfully seeded ${tutorialCount} tutorials with comprehensive step-by-step guides`,
+        count: tutorialCount
       });
     } catch (error: any) {
       console.error('[Tutorials] Seed error:', error);

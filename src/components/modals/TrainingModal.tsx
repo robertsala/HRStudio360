@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { X, BookOpen, Award, Users, Calendar, Clock, CheckCircle, AlertTriangle, Plus, Play } from 'lucide-react';
+import { X, BookOpen, Award, Users, Calendar, Clock, CheckCircle, AlertTriangle, Plus, Play, GraduationCap, ChevronRight } from 'lucide-react';
 import KnowledgeBaseWidget from '../KnowledgeBaseWidget';
+import TutorialViewer from './TutorialViewer';
+import { useQuery } from '@tanstack/react-query';
+import { Tutorial } from '@shared/schema';
 
 interface TrainingProgram {
   id: string;
@@ -38,6 +41,8 @@ interface TrainingModalProps {
 const TrainingModal: React.FC<TrainingModalProps> = ({ onClose, onOpenKnowledgeBase }) => {
   const [activeTab, setActiveTab] = useState('programs');
   const [showCreateProgram, setShowCreateProgram] = useState(false);
+  const [knowledgeBaseSection, setKnowledgeBaseSection] = useState<'articles' | 'tutorials'>('articles');
+  const [selectedTutorialId, setSelectedTutorialId] = useState<string | null>(null);
   const [newProgram, setNewProgram] = useState({
     title: '',
     description: '',
@@ -48,6 +53,12 @@ const TrainingModal: React.FC<TrainingModalProps> = ({ onClose, onOpenKnowledgeB
     maxParticipants: '',
     startDate: '',
     endDate: ''
+  });
+
+  // Fetch tutorials
+  const { data: tutorials = [] } = useQuery<Tutorial[]>({
+    queryKey: ['/api/tutorials'],
+    enabled: activeTab === 'knowledgebase' && knowledgeBaseSection === 'tutorials'
   });
 
   React.useEffect(() => {
@@ -473,9 +484,170 @@ const TrainingModal: React.FC<TrainingModalProps> = ({ onClose, onOpenKnowledgeB
           {/* Knowledge Base Tab */}
           {activeTab === 'knowledgebase' && (
             <div className="space-y-6">
-              <KnowledgeBaseWidget 
-                onOpenModal={onOpenKnowledgeBase || (() => {})} 
-              />
+              {/* Section Toggle */}
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg inline-flex">
+                <button
+                  onClick={() => setKnowledgeBaseSection('articles')}
+                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                    knowledgeBaseSection === 'articles'
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                  data-testid="button-articles"
+                >
+                  <BookOpen className="h-4 w-4 inline mr-2" />
+                  Articles
+                </button>
+                <button
+                  onClick={() => setKnowledgeBaseSection('tutorials')}
+                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                    knowledgeBaseSection === 'tutorials'
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 shadow'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                  data-testid="button-tutorials"
+                >
+                  <GraduationCap className="h-4 w-4 inline mr-2" />
+                  Tutorials
+                </button>
+              </div>
+
+              {/* Articles Section */}
+              {knowledgeBaseSection === 'articles' && (
+                <KnowledgeBaseWidget 
+                  onOpenModal={onOpenKnowledgeBase || (() => {})} 
+                />
+              )}
+
+              {/* Tutorials Section */}
+              {knowledgeBaseSection === 'tutorials' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Interactive Tutorials</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Step-by-step guides to help you master HRStudio360
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tutorials Grid */}
+                  {tutorials.length === 0 ? (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-8 text-center">
+                      <GraduationCap className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">No Tutorials Available</h4>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm">
+                        Tutorials will be loaded here. Contact your administrator to set up tutorials.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {tutorials.map((tutorial) => {
+                        const progressData = (tutorial as any).progress;
+                        const completedSteps = progressData?.completedSteps?.length || 0;
+                        const totalSteps = (tutorial as any).steps?.length || 0;
+                        const progressPercentage = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+                        const isCompleted = progressData?.isCompleted || false;
+
+                        const getDifficultyColor = (difficulty: string) => {
+                          switch (difficulty) {
+                            case 'beginner': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+                            case 'intermediate': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+                            case 'advanced': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+                            default: return 'bg-gray-100 text-gray-800';
+                          }
+                        };
+
+                        const getCategoryIcon = (category: string) => {
+                          switch (category) {
+                            case 'payroll': return '💰';
+                            case 'hiring': return '👥';
+                            case 'ai-features': return '🤖';
+                            case 'getting-started': return '🚀';
+                            default: return '📚';
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={tutorial.id}
+                            onClick={() => setSelectedTutorialId(tutorial.id)}
+                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer group"
+                            data-testid={`tutorial-card-${tutorial.id}`}
+                          >
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-start gap-3 flex-1">
+                                <span className="text-2xl">{getCategoryIcon(tutorial.category)}</span>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    {tutorial.title}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                    {tutorial.description}
+                                  </p>
+                                </div>
+                              </div>
+                              {isCompleted && (
+                                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                              )}
+                            </div>
+
+                            {/* Metadata */}
+                            <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                <span>{tutorial.estimatedMinutes} min</span>
+                              </div>
+                              <span className={`px-2 py-1 rounded-full font-medium ${getDifficultyColor(tutorial.difficulty)}`}>
+                                {tutorial.difficulty}
+                              </span>
+                            </div>
+
+                            {/* Progress */}
+                            {progressPercentage > 0 && (
+                              <div className="mb-3">
+                                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                  <span>Progress</span>
+                                  <span>{Math.round(progressPercentage)}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                                  <div
+                                    className="bg-blue-600 h-1.5 rounded-full transition-all"
+                                    style={{ width: `${progressPercentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tags */}
+                            {tutorial.tags && tutorial.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {tutorial.tags.slice(0, 3).map((tag, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* CTA */}
+                            <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {isCompleted ? 'Review tutorial' : progressPercentage > 0 ? 'Continue learning' : 'Start tutorial'}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -619,6 +791,25 @@ const TrainingModal: React.FC<TrainingModalProps> = ({ onClose, onOpenKnowledgeB
             </div>
           </div>
         </div>
+      )}
+
+      {/* Tutorial Viewer Modal */}
+      {selectedTutorialId && (
+        <TutorialViewer
+          tutorialId={selectedTutorialId}
+          onClose={() => setSelectedTutorialId(null)}
+          onAction={(actionType, actionTarget) => {
+            // Handle actions like opening modals
+            console.log(`Tutorial action: ${actionType} - ${actionTarget}`);
+            setSelectedTutorialId(null);
+            
+            // Close Training modal and trigger the action
+            if (onClose) {
+              onClose();
+            }
+            // Action handling can be extended here based on actionType and actionTarget
+          }}
+        />
       )}
     </div>
   );
