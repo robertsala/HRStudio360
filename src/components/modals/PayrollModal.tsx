@@ -10,6 +10,8 @@ import { formatCurrency, Currency, sumByCurrency, getCurrencySymbol, getCurrency
 import { EmployeePayrollDetailModal } from './EmployeePayrollDetailModal';
 import { PayrollWizardModal } from './PayrollWizardModal';
 import LeaveManagementModal from './LeaveManagementModal';
+import AutoFixReviewModal from './AutoFixReviewModal';
+import { apiRequest, queryClient } from '../../lib/queryClient';
 
 interface TimesheetEntry {
   date: string;
@@ -121,6 +123,10 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
   const [showWizard, setShowWizard] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [autoFixSuggestions, setAutoFixSuggestions] = useState<any[]>([]);
+  const [selectedFixForReview, setSelectedFixForReview] = useState<any | null>(null);
+  const [isLoadingAutoFixes, setIsLoadingAutoFixes] = useState(false);
+  const [isApprovingFix, setIsApprovingFix] = useState(false);
   const [leaveNavigationParams, setLeaveNavigationParams] = useState<{
     employeeId: string;
     employeeName: string;
@@ -369,6 +375,8 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const runAIAnalysis = async () => {
     setShowAIInsights(true);
     setAiAnalysisComplete(false);
+    setIsLoadingAutoFixes(false);
+    setAutoFixSuggestions([]);
 
     // Simulate AI analysis
     await new Promise(resolve => setTimeout(resolve, 2500));
@@ -378,6 +386,74 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
     const warnings = aiInsights.filter(i => i.type === 'warning').length;
     const suggestions = aiInsights.filter(i => i.type === 'suggestion').length;
     showNotification('success', `AI analysis complete! Found ${errors} error${errors !== 1 ? 's' : ''}, ${warnings} warning${warnings !== 1 ? 's' : ''}, and ${suggestions} suggestion${suggestions !== 1 ? 's' : ''}.`);
+
+    // After AI validation, fetch auto-fix suggestions
+    await fetchAutoFixSuggestions();
+  };
+
+  const fetchAutoFixSuggestions = async () => {
+    setIsLoadingAutoFixes(true);
+    
+    try {
+      // Create a mock validation result based on current insights
+      const validation = {
+        score: 75,
+        criticalIssues: aiInsights
+          .filter(i => i.type === 'error')
+          .map(insight => ({
+            employeeId: employees.find(e => insight.affectedEmployees.includes(e.name))?.id || '',
+            employeeName: insight.affectedEmployees[0] || '',
+            issue: insight.title,
+            suggestion: insight.description
+          })),
+        warnings: aiInsights
+          .filter(i => i.type === 'warning')
+          .map(insight => ({
+            employeeId: employees.find(e => insight.affectedEmployees.includes(e.name))?.id || '',
+            employeeName: insight.affectedEmployees[0] || '',
+            warning: insight.title,
+            suggestion: insight.description
+          })),
+        summary: 'AI analysis complete',
+        recommendations: []
+      };
+
+      const response = await apiRequest('/api/ai-payroll/auto-fix-suggestions', {
+        method: 'POST',
+        body: JSON.stringify({
+          validation,
+          employees: filteredEmployees.map(emp => ({
+            id: emp.id,
+            name: emp.name,
+            department: emp.department,
+            employeeType: emp.employeeType,
+            hourlyRate: emp.hourlyRate,
+            salary: emp.salary,
+            regularHours: emp.regularHours,
+            overtimeHours: emp.overtimeHours,
+            grossPay: emp.grossPay,
+            deductions: emp.deductions,
+            taxes: emp.taxes,
+            netPay: emp.netPay,
+            status: emp.status,
+            errors: emp.errors,
+            warnings: emp.warnings
+          }))
+        })
+      });
+
+      if (response.success && response.suggestions) {
+        setAutoFixSuggestions(response.suggestions);
+        if (response.suggestions.length > 0) {
+          showNotification('info', `Found ${response.suggestions.length} auto-fix suggestion${response.suggestions.length !== 1 ? 's' : ''} available for review.`);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error fetching auto-fix suggestions:', error);
+      showNotification('error', error.message || 'Failed to fetch auto-fix suggestions');
+    } finally {
+      setIsLoadingAutoFixes(false);
+    }
   };
 
   const autoFixError = (insightId: string) => {
@@ -408,6 +484,77 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
       setAiInsights(prev => prev.filter(i => i.id !== insightId));
 
       showNotification('success', 'Timesheet approval granted for Emma Wilson');
+    }
+  };
+
+  const handleApproveAutoFix = async (reason?: string) => {
+    if (!selectedFixForReview) return;
+
+    setIsApprovingFix(true);
+    
+    try {
+      const response = await apiRequest('/api/auto-fix/approve', {
+        method: 'POST',
+        body: JSON.stringify({
+          fixId: selectedFixForReview.id,
+          fixData: selectedFixForReview,
+          reason: reason || undefined
+        })
+      });
+
+      if (response.success) {
+        // Apply the fix to local state
+        const affectedEmployeeIds = selectedFixForReview.affectedEmployees.map((e: any) => e.id);
+        
+        setEmployees(prev => prev.map(emp => {
+          if (affectedEmployeeIds.includes(emp.id)) {
+            // Update based on fix type
+            if (selectedFixForReview.type === 'tax_calculation') {
+              return {
+                ...emp,
+                taxes: selectedFixForReview.afterState.taxes,
+                netPay: selectedFixForReview.afterState.netPay,
+                status: 'Verified' as const,
+                errors: []
+              };
+            } else if (selectedFixForReview.type === 'timesheet_approval') {
+              return {
+                ...emp,
+                timesheetApproved: true,
+                timesheetApprovedBy: 'HR Department (Auto-Approved)',
+                timesheetApprovedAt: new Date().toLocaleString(),
+                status: 'Verified' as const,
+                warnings: emp.warnings?.filter(w => !w.includes('approval')) || []
+              };
+            }
+          }
+          return emp;
+        }));
+
+        // Remove the auto-fix suggestion from the list
+        setAutoFixSuggestions(prev => prev.filter(s => s.id !== selectedFixForReview.id));
+
+        // Remove corresponding insight from the list
+        setAiInsights(prev => prev.filter(insight => 
+          !selectedFixForReview.affectedEmployees.some((emp: any) => 
+            insight.affectedEmployees.includes(emp.name)
+          )
+        ));
+
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['/api/payroll'] });
+        
+        showNotification('success', `Auto-fix approved and applied successfully!`);
+        
+        // Close the modal
+        setSelectedFixForReview(null);
+      }
+    } catch (error: any) {
+      console.error('Error approving auto-fix:', error);
+      showNotification('error', error.message || 'Failed to approve auto-fix');
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsApprovingFix(false);
     }
   };
 
@@ -1556,6 +1703,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                         ? 'bg-blue-50 border-blue-500'
                         : 'bg-green-50 border-green-500'
                     }`}
+                    data-testid={`insight-${insight.id}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -1589,6 +1737,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                           <button
                             onClick={() => autoFixError(insight.id)}
                             className="bg-green-600 text-white px-3 py-1.5 rounded text-sm hover:bg-green-700 transition-colors flex items-center whitespace-nowrap"
+                            data-testid={`button-auto-fix-${insight.id}`}
                           >
                             <Zap className="h-3 w-3 mr-1" />
                             Auto Fix
@@ -1597,6 +1746,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                         <button
                           onClick={() => setSelectedInsight(insight)}
                           className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          data-testid={`button-view-details-${insight.id}`}
                         >
                           View Details
                         </button>
@@ -1605,6 +1755,101 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                   </div>
                 ))}
               </div>
+
+              {/* Auto-Fix Suggestions Section */}
+              {isLoadingAutoFixes && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-6 mb-6">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
+                    <span className="text-blue-900 dark:text-blue-100 font-medium">
+                      Generating auto-fix suggestions...
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {!isLoadingAutoFixes && autoFixSuggestions.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Auto-Fix Suggestions
+                      </h3>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        {autoFixSuggestions.length} Available
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3" data-testid="auto-fix-suggestions-list">
+                    {autoFixSuggestions.map((suggestion, index) => (
+                      <div
+                        key={suggestion.id}
+                        className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4"
+                        data-testid={`auto-fix-suggestion-${suggestion.id}`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Target className="h-5 w-5 text-blue-600" />
+                              <h4 className="font-semibold text-gray-900 dark:text-white">
+                                {suggestion.title}
+                              </h4>
+                              <span
+                                className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                                  suggestion.severity === 'critical'
+                                    ? 'bg-red-100 text-red-800'
+                                    : suggestion.severity === 'high'
+                                    ? 'bg-orange-100 text-orange-800'
+                                    : suggestion.severity === 'medium'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}
+                              >
+                                {suggestion.severity.toUpperCase()}
+                              </span>
+                            </div>
+                            
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                              {suggestion.explanation}
+                            </p>
+
+                            {suggestion.affectedEmployees && suggestion.affectedEmployees.length > 0 && (
+                              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                <Users className="h-4 w-4" />
+                                <span>
+                                  Affects: {suggestion.affectedEmployees.map((e: any) => e.name).join(', ')}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {suggestion.impact && suggestion.impact.map((item: string, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 px-2 py-1 rounded"
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => setSelectedFixForReview(suggestion)}
+                            className="ml-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium whitespace-nowrap"
+                            data-testid={`button-review-approve-${suggestion.id}`}
+                          >
+                            <CheckSquare className="h-4 w-4" />
+                            Review & Approve
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-between items-center">
                 <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
@@ -1844,6 +2089,15 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Auto-Fix Review Modal */}
+      {selectedFixForReview && (
+        <AutoFixReviewModal
+          onClose={() => setSelectedFixForReview(null)}
+          onApprove={handleApproveAutoFix}
+          fixData={selectedFixForReview}
+        />
       )}
       </>
     );

@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { X, Building, Users, Briefcase, Settings, Bell, Mail, Smartphone, Monitor, Clock, UserPlus, Trash2, Plus, Save, CheckCircle, FileText } from 'lucide-react';
+import { X, Building, Users, Briefcase, Settings, Bell, Mail, Smartphone, Monitor, Clock, UserPlus, Trash2, Plus, Save, CheckCircle, FileText, DollarSign, Edit, Loader2 } from 'lucide-react';
 import ChangeLogTab from './ChangeLogTab';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import type { TaxJurisdiction, InsertTaxJurisdiction, ReciprocalAgreement, InsertReciprocalAgreement } from '@shared/schema';
 
 interface SystemSettingsModalProps {
   onClose?: () => void;
@@ -213,10 +217,208 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
     return jobTitles.filter(jt => jt.department === department).length;
   };
 
+  const { toast } = useToast();
+  
+  // Tax Configuration State
+  const [taxConfigSubTab, setTaxConfigSubTab] = useState<'federal' | 'state' | 'local' | 'reciprocal'>('federal');
+  const [showTaxJurisdictionForm, setShowTaxJurisdictionForm] = useState(false);
+  const [editingTaxJurisdiction, setEditingTaxJurisdiction] = useState<TaxJurisdiction | null>(null);
+  const [showReciprocalAgreementForm, setShowReciprocalAgreementForm] = useState(false);
+  const [editingReciprocalAgreement, setEditingReciprocalAgreement] = useState<ReciprocalAgreement | null>(null);
+  const [taxJurisdictionForm, setTaxJurisdictionForm] = useState<Partial<InsertTaxJurisdiction>>({
+    jurisdictionType: 'federal',
+    jurisdictionName: '',
+    isActive: true,
+    effectiveDate: new Date().toISOString().split('T')[0]
+  });
+  const [reciprocalAgreementForm, setReciprocalAgreementForm] = useState<Partial<InsertReciprocalAgreement>>({
+    agreementType: 'full_reciprocity',
+    isActive: true,
+    effectiveDate: new Date().toISOString().split('T')[0]
+  });
+
+  // Tax Jurisdictions Query
+  const { data: taxJurisdictions = [], isLoading: isLoadingJurisdictions } = useQuery<TaxJurisdiction[]>({
+    queryKey: ['/api/tax-jurisdictions'],
+    enabled: activeTab === 'taxConfig'
+  });
+
+  // Reciprocal Agreements Query
+  const { data: reciprocalAgreements = [], isLoading: isLoadingAgreements } = useQuery<ReciprocalAgreement[]>({
+    queryKey: ['/api/reciprocal-agreements'],
+    enabled: activeTab === 'taxConfig'
+  });
+
+  // Tax Jurisdiction Mutations
+  const createTaxJurisdictionMutation = useMutation({
+    mutationFn: (data: InsertTaxJurisdiction) => apiRequest('/api/tax-jurisdictions', 'POST', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tax-jurisdictions'] });
+      setShowTaxJurisdictionForm(false);
+      resetTaxJurisdictionForm();
+      toast({ title: 'Success', description: 'Tax jurisdiction created successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create tax jurisdiction', variant: 'destructive' });
+    }
+  });
+
+  const updateTaxJurisdictionMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<InsertTaxJurisdiction> }) => 
+      apiRequest(`/api/tax-jurisdictions/${id}`, 'PUT', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tax-jurisdictions'] });
+      setShowTaxJurisdictionForm(false);
+      setEditingTaxJurisdiction(null);
+      resetTaxJurisdictionForm();
+      toast({ title: 'Success', description: 'Tax jurisdiction updated successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to update tax jurisdiction', variant: 'destructive' });
+    }
+  });
+
+  const deleteTaxJurisdictionMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/tax-jurisdictions/${id}`, 'DELETE'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tax-jurisdictions'] });
+      toast({ title: 'Success', description: 'Tax jurisdiction deleted successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to delete tax jurisdiction', variant: 'destructive' });
+    }
+  });
+
+  // Reciprocal Agreement Mutations
+  const createReciprocalAgreementMutation = useMutation({
+    mutationFn: (data: InsertReciprocalAgreement) => apiRequest('/api/reciprocal-agreements', 'POST', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reciprocal-agreements'] });
+      setShowReciprocalAgreementForm(false);
+      resetReciprocalAgreementForm();
+      toast({ title: 'Success', description: 'Reciprocal agreement created successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create reciprocal agreement', variant: 'destructive' });
+    }
+  });
+
+  const updateReciprocalAgreementMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<InsertReciprocalAgreement> }) => 
+      apiRequest(`/api/reciprocal-agreements/${id}`, 'PUT', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reciprocal-agreements'] });
+      setShowReciprocalAgreementForm(false);
+      setEditingReciprocalAgreement(null);
+      resetReciprocalAgreementForm();
+      toast({ title: 'Success', description: 'Reciprocal agreement updated successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to update reciprocal agreement', variant: 'destructive' });
+    }
+  });
+
+  const deleteReciprocalAgreementMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/reciprocal-agreements/${id}`, 'DELETE'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reciprocal-agreements'] });
+      toast({ title: 'Success', description: 'Reciprocal agreement deleted successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to delete reciprocal agreement', variant: 'destructive' });
+    }
+  });
+
+  const resetTaxJurisdictionForm = () => {
+    setTaxJurisdictionForm({
+      jurisdictionType: taxConfigSubTab === 'federal' ? 'federal' : taxConfigSubTab === 'state' ? 'state' : 'local',
+      jurisdictionName: '',
+      isActive: true,
+      effectiveDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const resetReciprocalAgreementForm = () => {
+    setReciprocalAgreementForm({
+      agreementType: 'full_reciprocity',
+      isActive: true,
+      effectiveDate: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const handleEditTaxJurisdiction = (jurisdiction: TaxJurisdiction) => {
+    setEditingTaxJurisdiction(jurisdiction);
+    setTaxJurisdictionForm({
+      jurisdictionType: jurisdiction.jurisdictionType,
+      jurisdictionName: jurisdiction.jurisdictionName,
+      stateCode: jurisdiction.stateCode || undefined,
+      cityName: jurisdiction.cityName || undefined,
+      federalIncomeTaxRate: jurisdiction.federalIncomeTaxRate || undefined,
+      stateIncomeTaxRate: jurisdiction.stateIncomeTaxRate || undefined,
+      localIncomeTaxRate: jurisdiction.localIncomeTaxRate || undefined,
+      socialSecurityRate: jurisdiction.socialSecurityRate || undefined,
+      medicareRate: jurisdiction.medicareRate || undefined,
+      additionalMedicareRate: jurisdiction.additionalMedicareRate || undefined,
+      unemploymentTaxRate: jurisdiction.unemploymentTaxRate || undefined,
+      isActive: jurisdiction.isActive ?? true,
+      effectiveDate: jurisdiction.effectiveDate,
+      expirationDate: jurisdiction.expirationDate || undefined,
+      notes: jurisdiction.notes || undefined
+    });
+    setShowTaxJurisdictionForm(true);
+  };
+
+  const handleEditReciprocalAgreement = (agreement: ReciprocalAgreement) => {
+    setEditingReciprocalAgreement(agreement);
+    setReciprocalAgreementForm({
+      workStateCode: agreement.workStateCode,
+      residenceStateCode: agreement.residenceStateCode,
+      agreementType: agreement.agreementType,
+      description: agreement.description || undefined,
+      isActive: agreement.isActive ?? true,
+      effectiveDate: agreement.effectiveDate,
+      expirationDate: agreement.expirationDate || undefined,
+      notes: agreement.notes || undefined
+    });
+    setShowReciprocalAgreementForm(true);
+  };
+
+  const handleSaveTaxJurisdiction = () => {
+    if (!taxJurisdictionForm.jurisdictionName || !taxJurisdictionForm.jurisdictionType || !taxJurisdictionForm.effectiveDate) {
+      toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' });
+      return;
+    }
+
+    if (editingTaxJurisdiction) {
+      updateTaxJurisdictionMutation.mutate({ id: editingTaxJurisdiction.id, data: taxJurisdictionForm as InsertTaxJurisdiction });
+    } else {
+      createTaxJurisdictionMutation.mutate(taxJurisdictionForm as InsertTaxJurisdiction);
+    }
+  };
+
+  const handleSaveReciprocalAgreement = () => {
+    if (!reciprocalAgreementForm.workStateCode || !reciprocalAgreementForm.residenceStateCode || 
+        !reciprocalAgreementForm.agreementType || !reciprocalAgreementForm.effectiveDate) {
+      toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' });
+      return;
+    }
+
+    if (editingReciprocalAgreement) {
+      updateReciprocalAgreementMutation.mutate({ id: editingReciprocalAgreement.id, data: reciprocalAgreementForm as InsertReciprocalAgreement });
+    } else {
+      createReciprocalAgreementMutation.mutate(reciprocalAgreementForm as InsertReciprocalAgreement);
+    }
+  };
+
+  const federalJurisdiction = taxJurisdictions.find(j => j.jurisdictionType === 'federal' && j.isActive);
+  const stateJurisdictions = taxJurisdictions.filter(j => j.jurisdictionType === 'state' && j.isActive);
+  const localJurisdictions = taxJurisdictions.filter(j => j.jurisdictionType === 'local' && j.isActive);
+
   const tabs = [
     { id: 'company', label: 'Company Info', icon: Building },
     { id: 'departments', label: 'Departments', icon: Users },
     { id: 'jobTitles', label: 'Job Titles', icon: Briefcase },
+    { id: 'taxConfig', label: 'Tax Configuration', icon: DollarSign },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'changelog', label: 'Change Log', icon: FileText },
     { id: 'system', label: 'System Settings', icon: Settings }
@@ -796,6 +998,387 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
                 </div>
               )}
 
+              {/* Tax Configuration Tab */}
+              {activeTab === 'taxConfig' && (
+                <div className="max-w-6xl space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white" data-testid="text-tax-config-title">Tax Configuration</h3>
+                  </div>
+                  
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200">
+                    <p className="text-blue-800 dark:text-blue-100 text-sm">
+                      Configure federal, state, and local tax jurisdictions, along with reciprocal tax agreements between states. These settings are used for payroll calculations.
+                    </p>
+                  </div>
+
+                  {/* Tax Config Sub-tabs */}
+                  <div className="border-b border-gray-200 dark:border-gray-700">
+                    <nav className="-mb-px flex space-x-8" data-testid="nav-tax-subtabs">
+                      <button
+                        onClick={() => setTaxConfigSubTab('federal')}
+                        data-testid="button-tax-subtab-federal"
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          taxConfigSubTab === 'federal'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Federal Tax Rates
+                      </button>
+                      <button
+                        onClick={() => setTaxConfigSubTab('state')}
+                        data-testid="button-tax-subtab-state"
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          taxConfigSubTab === 'state'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        State Tax Rates
+                      </button>
+                      <button
+                        onClick={() => setTaxConfigSubTab('local')}
+                        data-testid="button-tax-subtab-local"
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          taxConfigSubTab === 'local'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Local/City Taxes
+                      </button>
+                      <button
+                        onClick={() => setTaxConfigSubTab('reciprocal')}
+                        data-testid="button-tax-subtab-reciprocal"
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          taxConfigSubTab === 'reciprocal'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Reciprocal Agreements
+                      </button>
+                    </nav>
+                  </div>
+
+                  {/* Federal Tax Rates Sub-tab */}
+                  {taxConfigSubTab === 'federal' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Federal Tax Jurisdiction</h4>
+                        {!federalJurisdiction && (
+                          <button
+                            onClick={() => {
+                              setTaxJurisdictionForm({ ...taxJurisdictionForm, jurisdictionType: 'federal' });
+                              setShowTaxJurisdictionForm(true);
+                            }}
+                            data-testid="button-add-federal-jurisdiction"
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Federal Jurisdiction
+                          </button>
+                        )}
+                      </div>
+
+                      {isLoadingJurisdictions ? (
+                        <div className="flex justify-center items-center py-12" data-testid="loading-federal-jurisdiction">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        </div>
+                      ) : federalJurisdiction ? (
+                        <div className="bg-white dark:bg-gray-800 border rounded-lg p-6 shadow-sm" data-testid="card-federal-jurisdiction">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Jurisdiction Name</label>
+                              <p className="text-gray-900 dark:text-white" data-testid="text-federal-name">{federalJurisdiction.jurisdictionName}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Federal Income Tax</label>
+                              <p className="text-gray-900 dark:text-white" data-testid="text-federal-income-tax">
+                                {federalJurisdiction.federalIncomeTaxRate ? `${(parseFloat(federalJurisdiction.federalIncomeTaxRate) * 100).toFixed(2)}%` : 'N/A'}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Social Security</label>
+                              <p className="text-gray-900 dark:text-white" data-testid="text-federal-ss">
+                                {federalJurisdiction.socialSecurityRate ? `${(parseFloat(federalJurisdiction.socialSecurityRate) * 100).toFixed(2)}%` : 'N/A'}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Medicare</label>
+                              <p className="text-gray-900 dark:text-white" data-testid="text-federal-medicare">
+                                {federalJurisdiction.medicareRate ? `${(parseFloat(federalJurisdiction.medicareRate) * 100).toFixed(2)}%` : 'N/A'}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Additional Medicare</label>
+                              <p className="text-gray-900 dark:text-white" data-testid="text-federal-additional-medicare">
+                                {federalJurisdiction.additionalMedicareRate ? `${(parseFloat(federalJurisdiction.additionalMedicareRate) * 100).toFixed(2)}%` : 'N/A'}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Effective Date</label>
+                              <p className="text-gray-900 dark:text-white" data-testid="text-federal-effective-date">{federalJurisdiction.effectiveDate}</p>
+                            </div>
+                          </div>
+                          {federalJurisdiction.notes && (
+                            <div className="mt-4">
+                              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</label>
+                              <p className="text-gray-700 dark:text-gray-300 text-sm" data-testid="text-federal-notes">{federalJurisdiction.notes}</p>
+                            </div>
+                          )}
+                          <div className="mt-6 flex gap-2">
+                            <button
+                              onClick={() => handleEditTaxJurisdiction(federalJurisdiction)}
+                              data-testid="button-edit-federal-jurisdiction"
+                              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg" data-testid="empty-federal-jurisdiction">
+                          <p className="text-gray-500 dark:text-gray-400">No federal tax jurisdiction configured</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* State Tax Rates Sub-tab */}
+                  {taxConfigSubTab === 'state' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">State Tax Jurisdictions</h4>
+                        <button
+                          onClick={() => {
+                            setTaxJurisdictionForm({ ...taxJurisdictionForm, jurisdictionType: 'state' });
+                            setShowTaxJurisdictionForm(true);
+                          }}
+                          data-testid="button-add-state-jurisdiction"
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add State Jurisdiction
+                        </button>
+                      </div>
+
+                      {isLoadingJurisdictions ? (
+                        <div className="flex justify-center items-center py-12" data-testid="loading-state-jurisdictions">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        </div>
+                      ) : stateJurisdictions.length > 0 ? (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border overflow-hidden">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" data-testid="table-state-jurisdictions">
+                            <thead className="bg-gray-50 dark:bg-gray-900">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">State</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Code</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Income Tax Rate</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Effective Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {stateJurisdictions.map((jurisdiction) => (
+                                <tr key={jurisdiction.id} data-testid={`row-state-jurisdiction-${jurisdiction.id}`}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white" data-testid={`text-state-name-${jurisdiction.id}`}>{jurisdiction.jurisdictionName}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-state-code-${jurisdiction.id}`}>{jurisdiction.stateCode || 'N/A'}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-state-rate-${jurisdiction.id}`}>
+                                    {jurisdiction.stateIncomeTaxRate ? `${(parseFloat(jurisdiction.stateIncomeTaxRate) * 100).toFixed(2)}%` : 'N/A'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-state-date-${jurisdiction.id}`}>{jurisdiction.effectiveDate}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                    <button
+                                      onClick={() => handleEditTaxJurisdiction(jurisdiction)}
+                                      data-testid={`button-edit-state-${jurisdiction.id}`}
+                                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400"
+                                    >
+                                      <Edit className="h-4 w-4 inline" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Are you sure you want to delete this state jurisdiction?')) {
+                                          deleteTaxJurisdictionMutation.mutate(jurisdiction.id);
+                                        }
+                                      }}
+                                      data-testid={`button-delete-state-${jurisdiction.id}`}
+                                      className="text-red-600 hover:text-red-900 dark:text-red-400"
+                                    >
+                                      <Trash2 className="h-4 w-4 inline" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg" data-testid="empty-state-jurisdictions">
+                          <p className="text-gray-500 dark:text-gray-400">No state tax jurisdictions configured</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Local/City Tax Rates Sub-tab */}
+                  {taxConfigSubTab === 'local' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Local/City Tax Jurisdictions</h4>
+                        <button
+                          onClick={() => {
+                            setTaxJurisdictionForm({ ...taxJurisdictionForm, jurisdictionType: 'local' });
+                            setShowTaxJurisdictionForm(true);
+                          }}
+                          data-testid="button-add-local-jurisdiction"
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Local Jurisdiction
+                        </button>
+                      </div>
+
+                      {isLoadingJurisdictions ? (
+                        <div className="flex justify-center items-center py-12" data-testid="loading-local-jurisdictions">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        </div>
+                      ) : localJurisdictions.length > 0 ? (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border overflow-hidden">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" data-testid="table-local-jurisdictions">
+                            <thead className="bg-gray-50 dark:bg-gray-900">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">City/Locality</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">State</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Local Tax Rate</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Effective Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {localJurisdictions.map((jurisdiction) => (
+                                <tr key={jurisdiction.id} data-testid={`row-local-jurisdiction-${jurisdiction.id}`}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white" data-testid={`text-local-city-${jurisdiction.id}`}>{jurisdiction.cityName || jurisdiction.jurisdictionName}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-local-state-${jurisdiction.id}`}>{jurisdiction.stateCode || 'N/A'}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-local-rate-${jurisdiction.id}`}>
+                                    {jurisdiction.localIncomeTaxRate ? `${(parseFloat(jurisdiction.localIncomeTaxRate) * 100).toFixed(2)}%` : 'N/A'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-local-date-${jurisdiction.id}`}>{jurisdiction.effectiveDate}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                    <button
+                                      onClick={() => handleEditTaxJurisdiction(jurisdiction)}
+                                      data-testid={`button-edit-local-${jurisdiction.id}`}
+                                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400"
+                                    >
+                                      <Edit className="h-4 w-4 inline" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Are you sure you want to delete this local jurisdiction?')) {
+                                          deleteTaxJurisdictionMutation.mutate(jurisdiction.id);
+                                        }
+                                      }}
+                                      data-testid={`button-delete-local-${jurisdiction.id}`}
+                                      className="text-red-600 hover:text-red-900 dark:text-red-400"
+                                    >
+                                      <Trash2 className="h-4 w-4 inline" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg" data-testid="empty-local-jurisdictions">
+                          <p className="text-gray-500 dark:text-gray-400">No local tax jurisdictions configured</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Reciprocal Agreements Sub-tab */}
+                  {taxConfigSubTab === 'reciprocal' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Reciprocal Tax Agreements</h4>
+                        <button
+                          onClick={() => setShowReciprocalAgreementForm(true)}
+                          data-testid="button-add-reciprocal-agreement"
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Agreement
+                        </button>
+                      </div>
+
+                      {isLoadingAgreements ? (
+                        <div className="flex justify-center items-center py-12" data-testid="loading-reciprocal-agreements">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        </div>
+                      ) : reciprocalAgreements.length > 0 ? (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border overflow-hidden">
+                          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700" data-testid="table-reciprocal-agreements">
+                            <thead className="bg-gray-50 dark:bg-gray-900">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Work State</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Residence State</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Agreement Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Effective Date</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                              {reciprocalAgreements.map((agreement) => (
+                                <tr key={agreement.id} data-testid={`row-reciprocal-agreement-${agreement.id}`}>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white" data-testid={`text-agreement-work-state-${agreement.id}`}>{agreement.workStateCode}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-agreement-residence-state-${agreement.id}`}>{agreement.residenceStateCode}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-agreement-type-${agreement.id}`}>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      agreement.agreementType === 'full_reciprocity' 
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' 
+                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                                    }`}>
+                                      {agreement.agreementType === 'full_reciprocity' ? 'Full Reciprocity' : 'Partial Reciprocity'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" data-testid={`text-agreement-date-${agreement.id}`}>{agreement.effectiveDate}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                    <button
+                                      onClick={() => handleEditReciprocalAgreement(agreement)}
+                                      data-testid={`button-edit-agreement-${agreement.id}`}
+                                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400"
+                                    >
+                                      <Edit className="h-4 w-4 inline" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Are you sure you want to delete this reciprocal agreement?')) {
+                                          deleteReciprocalAgreementMutation.mutate(agreement.id);
+                                        }
+                                      }}
+                                      data-testid={`button-delete-agreement-${agreement.id}`}
+                                      className="text-red-600 hover:text-red-900 dark:text-red-400"
+                                    >
+                                      <Trash2 className="h-4 w-4 inline" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg" data-testid="empty-reciprocal-agreements">
+                          <p className="text-gray-500 dark:text-gray-400">No reciprocal agreements configured</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Change Log Tab */}
               {activeTab === 'changelog' && (
                 <ChangeLogTab />
@@ -1043,6 +1626,448 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
                     Add Job Title
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tax Jurisdiction Form Modal */}
+        {showTaxJurisdictionForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4" data-testid="modal-tax-jurisdiction-form">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {editingTaxJurisdiction ? 'Edit Tax Jurisdiction' : 'Add Tax Jurisdiction'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowTaxJurisdictionForm(false);
+                    setEditingTaxJurisdiction(null);
+                    resetTaxJurisdictionForm();
+                  }}
+                  data-testid="button-close-jurisdiction-form"
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Jurisdiction Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={taxJurisdictionForm.jurisdictionType}
+                      onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, jurisdictionType: e.target.value })}
+                      data-testid="select-jurisdiction-type"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      disabled={!!editingTaxJurisdiction}
+                    >
+                      <option value="federal">Federal</option>
+                      <option value="state">State</option>
+                      <option value="local">Local</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Jurisdiction Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={taxJurisdictionForm.jurisdictionName || ''}
+                      onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, jurisdictionName: e.target.value })}
+                      data-testid="input-jurisdiction-name"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., United States Federal, California, New York City"
+                    />
+                  </div>
+
+                  {(taxJurisdictionForm.jurisdictionType === 'state' || taxJurisdictionForm.jurisdictionType === 'local') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        State Code
+                      </label>
+                      <input
+                        type="text"
+                        value={taxJurisdictionForm.stateCode || ''}
+                        onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, stateCode: e.target.value })}
+                        data-testid="input-state-code"
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="e.g., CA, NY"
+                        maxLength={2}
+                      />
+                    </div>
+                  )}
+
+                  {taxJurisdictionForm.jurisdictionType === 'local' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        City Name
+                      </label>
+                      <input
+                        type="text"
+                        value={taxJurisdictionForm.cityName || ''}
+                        onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, cityName: e.target.value })}
+                        data-testid="input-city-name"
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="e.g., New York City"
+                      />
+                    </div>
+                  )}
+
+                  {taxJurisdictionForm.jurisdictionType === 'federal' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Federal Income Tax Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={taxJurisdictionForm.federalIncomeTaxRate || ''}
+                          onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, federalIncomeTaxRate: e.target.value })}
+                          data-testid="input-federal-income-tax-rate"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="e.g., 0.2200 for 22%"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Social Security Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={taxJurisdictionForm.socialSecurityRate || ''}
+                          onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, socialSecurityRate: e.target.value })}
+                          data-testid="input-social-security-rate"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="e.g., 0.062 for 6.2%"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Medicare Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={taxJurisdictionForm.medicareRate || ''}
+                          onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, medicareRate: e.target.value })}
+                          data-testid="input-medicare-rate"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="e.g., 0.0145 for 1.45%"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Additional Medicare Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={taxJurisdictionForm.additionalMedicareRate || ''}
+                          onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, additionalMedicareRate: e.target.value })}
+                          data-testid="input-additional-medicare-rate"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="e.g., 0.009 for 0.9%"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {taxJurisdictionForm.jurisdictionType === 'state' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          State Income Tax Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={taxJurisdictionForm.stateIncomeTaxRate || ''}
+                          onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, stateIncomeTaxRate: e.target.value })}
+                          data-testid="input-state-income-tax-rate"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="e.g., 0.093 for 9.3%"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Unemployment Tax Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={taxJurisdictionForm.unemploymentTaxRate || ''}
+                          onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, unemploymentTaxRate: e.target.value })}
+                          data-testid="input-unemployment-tax-rate"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          placeholder="e.g., 0.006 for 0.6%"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {taxJurisdictionForm.jurisdictionType === 'local' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Local Income Tax Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={taxJurisdictionForm.localIncomeTaxRate || ''}
+                        onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, localIncomeTaxRate: e.target.value })}
+                        data-testid="input-local-income-tax-rate"
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="e.g., 0.0375 for 3.75%"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Effective Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={taxJurisdictionForm.effectiveDate || ''}
+                      onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, effectiveDate: e.target.value })}
+                      data-testid="input-effective-date"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Expiration Date
+                    </label>
+                    <input
+                      type="date"
+                      value={taxJurisdictionForm.expirationDate || ''}
+                      onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, expirationDate: e.target.value })}
+                      data-testid="input-expiration-date"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    value={taxJurisdictionForm.notes || ''}
+                    onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, notes: e.target.value })}
+                    data-testid="input-notes"
+                    rows={3}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Additional notes or information"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={taxJurisdictionForm.isActive ?? true}
+                    onChange={(e) => setTaxJurisdictionForm({ ...taxJurisdictionForm, isActive: e.target.checked })}
+                    data-testid="checkbox-is-active"
+                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label className="text-sm text-gray-700 dark:text-gray-300">Active</label>
+                </div>
+              </div>
+
+              <div className="p-6 border-t dark:border-gray-700 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowTaxJurisdictionForm(false);
+                    setEditingTaxJurisdiction(null);
+                    resetTaxJurisdictionForm();
+                  }}
+                  data-testid="button-cancel-jurisdiction"
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveTaxJurisdiction}
+                  disabled={createTaxJurisdictionMutation.isPending || updateTaxJurisdictionMutation.isPending}
+                  data-testid="button-save-jurisdiction"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {(createTaxJurisdictionMutation.isPending || updateTaxJurisdictionMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  {editingTaxJurisdiction ? 'Update' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reciprocal Agreement Form Modal */}
+        {showReciprocalAgreementForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-60 flex items-center justify-center p-4" data-testid="modal-reciprocal-agreement-form">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {editingReciprocalAgreement ? 'Edit Reciprocal Agreement' : 'Add Reciprocal Agreement'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowReciprocalAgreementForm(false);
+                    setEditingReciprocalAgreement(null);
+                    resetReciprocalAgreementForm();
+                  }}
+                  data-testid="button-close-agreement-form"
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Work State Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={reciprocalAgreementForm.workStateCode || ''}
+                      onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, workStateCode: e.target.value.toUpperCase() })}
+                      data-testid="input-work-state-code"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., CA"
+                      maxLength={2}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Residence State Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={reciprocalAgreementForm.residenceStateCode || ''}
+                      onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, residenceStateCode: e.target.value.toUpperCase() })}
+                      data-testid="input-residence-state-code"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., NV"
+                      maxLength={2}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Agreement Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={reciprocalAgreementForm.agreementType}
+                      onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, agreementType: e.target.value })}
+                      data-testid="select-agreement-type"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                      <option value="full_reciprocity">Full Reciprocity</option>
+                      <option value="partial_reciprocity">Partial Reciprocity</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Effective Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={reciprocalAgreementForm.effectiveDate || ''}
+                      onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, effectiveDate: e.target.value })}
+                      data-testid="input-agreement-effective-date"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Expiration Date
+                    </label>
+                    <input
+                      type="date"
+                      value={reciprocalAgreementForm.expirationDate || ''}
+                      onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, expirationDate: e.target.value })}
+                      data-testid="input-agreement-expiration-date"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={reciprocalAgreementForm.description || ''}
+                    onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, description: e.target.value })}
+                    data-testid="input-agreement-description"
+                    rows={3}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Description of the reciprocal agreement"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    value={reciprocalAgreementForm.notes || ''}
+                    onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, notes: e.target.value })}
+                    data-testid="input-agreement-notes"
+                    rows={2}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Additional notes"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={reciprocalAgreementForm.isActive ?? true}
+                    onChange={(e) => setReciprocalAgreementForm({ ...reciprocalAgreementForm, isActive: e.target.checked })}
+                    data-testid="checkbox-agreement-is-active"
+                    className="mr-2 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label className="text-sm text-gray-700 dark:text-gray-300">Active</label>
+                </div>
+              </div>
+
+              <div className="p-6 border-t dark:border-gray-700 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowReciprocalAgreementForm(false);
+                    setEditingReciprocalAgreement(null);
+                    resetReciprocalAgreementForm();
+                  }}
+                  data-testid="button-cancel-agreement"
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveReciprocalAgreement}
+                  disabled={createReciprocalAgreementMutation.isPending || updateReciprocalAgreementMutation.isPending}
+                  data-testid="button-save-agreement"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {(createReciprocalAgreementMutation.isPending || updateReciprocalAgreementMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  {editingReciprocalAgreement ? 'Update' : 'Create'}
+                </button>
               </div>
             </div>
           </div>

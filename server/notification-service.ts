@@ -252,3 +252,58 @@ class NotificationService {
 }
 
 export const notificationService = new NotificationService();
+
+// Simple helper for routes.ts to send individual auto-fix emails
+export async function sendAutoFixNotificationEmail(params: {
+  to: string;
+  employeeName: string;
+  fixTitle: string;
+  fixType: string;
+  approverName: string;
+  beforeState: any;
+  afterState: any;
+}): Promise<void> {
+  const { to, employeeName, fixTitle, fixType, approverName, beforeState, afterState } = params;
+  
+  const changesSummary = fixType === 'tax_calculation' 
+    ? `Tax calculation corrected: Before $${beforeState.taxes?.toLocaleString() || '0.00'}, After $${afterState.taxes?.toLocaleString() || '0.00'}`
+    : `${fixTitle} applied successfully`;
+
+  try {
+    await resend.emails.send({
+      from: 'HRStudio360 <noreply@hrstudio360.com>',
+      to,
+      subject: `Payroll Auto-Fix Applied: ${fixTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Payroll Auto-Fix Notification</h2>
+          
+          <p>Dear ${employeeName},</p>
+          
+          <p>An automated correction has been applied to payroll records.</p>
+          
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #374151;">Fix Details</h3>
+            <p><strong>Type:</strong> ${fixTitle}</p>
+            <p><strong>Approved By:</strong> ${approverName}</p>
+          </div>
+          
+          <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; border-left: 4px solid #2563eb;">
+            <h4 style="margin-top: 0; color: #1e40af;">What Changed</h4>
+            <p>${changesSummary}</p>
+          </div>
+          
+          <p style="margin-top: 30px;">You can view the updated details in your employee portal. If you have any questions, please contact HR.</p>
+          
+          <p style="margin-top: 30px; font-size: 12px; color: #6b7280;">
+            This is an automated message from HRStudio360. Please do not reply to this email.
+          </p>
+        </div>
+      `
+    });
+    console.log(`✅ Sent auto-fix notification to ${to}`);
+  } catch (error) {
+    console.error(`Failed to send auto-fix notification to ${to}:`, error);
+    throw error;
+  }
+}

@@ -866,8 +866,9 @@ export class DbStorage implements IStorage {
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
+    query = query.orderBy(desc(collaboratorInvitations.createdAt));
     
-    return query.orderBy(desc(collaboratorInvitations.createdAt));
+    return await query;
   }
 
   async getCollaboratorInvitationById(id: string): Promise<CollaboratorInvitation | undefined> {
@@ -906,8 +907,9 @@ export class DbStorage implements IStorage {
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
+    query = query.orderBy(desc(changeLog.createdAt)).limit(limit);
     
-    return query.orderBy(desc(changeLog.createdAt)).limit(limit);
+    return await query;
   }
 
   async getChangeLogById(id: string): Promise<ChangeLog | undefined> {

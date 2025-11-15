@@ -24,6 +24,7 @@ import {
   userTutorialBadges
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
+import { sendAutoFixNotificationEmail } from './notification-service.js';
 import { seedProductionDatabase } from './seed-production.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
 import rateLimit from 'express-rate-limit';
@@ -3391,6 +3392,197 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('[AI Payroll] Chat error:', error);
       res.status(500).json({ error: 'Failed to process chat request', details: error.message });
+    }
+  });
+
+  // Generate auto-fix suggestions from validation results
+  app.post('/api/ai-payroll/auto-fix-suggestions', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Only HR can generate auto-fix suggestions' });
+      }
+
+      const { validation, employees } = req.body;
+      
+      if (!validation || !employees) {
+        return res.status(400).json({ error: 'Validation results and employees are required' });
+      }
+
+      // Generate auto-fix suggestions based on critical issues
+      const autoFixSuggestions = validation.criticalIssues
+        .filter((issue: any) => issue.suggestion && issue.employeeId)
+        .map((issue: any, index: number) => {
+          const employee = employees.find((e: any) => e.id === issue.employeeId);
+          if (!employee) return null;
+
+          return {
+            id: `autofix-${Date.now()}-${index}`,
+            title: `Fix: ${issue.issue}`,
+            type: 'tax_calculation',
+            severity: 'high',
+            affectedEmployees: [{
+              id: employee.id,
+              name: employee.name,
+              department: employee.department || 'N/A'
+            }],
+            beforeState: {
+              grossPay: employee.grossPay,
+              taxes: employee.taxes,
+              netPay: employee.netPay
+            },
+            afterState: {
+              grossPay: employee.grossPay,
+              taxes: parseFloat((employee.grossPay * 0.22).toFixed(2)),
+              netPay: parseFloat((employee.grossPay * 0.78).toFixed(2))
+            },
+            explanation: issue.issue,
+            recommendation: issue.suggestion,
+            impact: [
+              `Employee: ${employee.name}`,
+              `Gross Pay: $${employee.grossPay}`,
+              `Corrected Tax Amount: $${(employee.grossPay * 0.22).toFixed(2)}`
+            ]
+          };
+        })
+        .filter(Boolean);
+
+      res.json({
+        success: true,
+        suggestions: autoFixSuggestions
+      });
+    } catch (error: any) {
+      console.error('[AI Payroll] Auto-fix generation error:', error);
+      res.status(500).json({ error: 'Failed to generate auto-fix suggestions', details: error.message });
+    }
+  });
+
+  // Apply approved auto-fix
+  app.post('/api/auto-fix/approve', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Only HR can approve auto-fixes' });
+      }
+
+      const { fixId, fixData, reason } = req.body;
+      
+      if (!fixId || !fixData) {
+        return res.status(400).json({ error: 'Fix ID and data are required' });
+      }
+
+      const approver = await storage.getProfileById(userId);
+      if (!approver) {
+        return res.status(404).json({ error: 'Approver profile not found' });
+      }
+
+      // Create audit log entry
+      await storage.createAutoFixAuditLog({
+        fixType: fixData.type,
+        fixTitle: fixData.title,
+        affectedEmployeeIds: fixData.affectedEmployees.map((e: any) => e.id),
+        beforeState: JSON.stringify(fixData.beforeState),
+        afterState: JSON.stringify(fixData.afterState),
+        approverId: userId,
+        approverName: approver.name,
+        approvalReason: reason || 'Auto-fix approved',
+        status: 'approved'
+      });
+
+      // Send notifications to all stakeholders
+      const affectedEmployeeIds = fixData.affectedEmployees.map((e: any) => e.id);
+      
+      for (const empId of affectedEmployeeIds) {
+        const employee = await storage.getProfileById(empId);
+        if (!employee) continue;
+
+        // Send email notification
+        await sendAutoFixNotificationEmail({
+          to: employee.email,
+          employeeName: employee.name,
+          fixTitle: fixData.title,
+          fixType: fixData.type,
+          approverName: approver.name,
+          beforeState: fixData.beforeState,
+          afterState: fixData.afterState
+        });
+
+        // Create in-app notification
+        await storage.createNotification({
+          userId: empId,
+          type: 'auto_fix_approved',
+          title: 'Payroll Auto-Fix Applied',
+          message: `${fixData.title} was approved by ${approver.name}. Your payroll has been updated.`,
+          relatedEntityType: 'payroll',
+          relatedEntityId: fixId,
+          actionUrl: '/payroll',
+          read: false
+        });
+
+        // Get manager and send notification
+        const manager = employee.managerId ? await storage.getProfileById(employee.managerId) : null;
+        if (manager) {
+          await sendAutoFixNotificationEmail({
+            to: manager.email,
+            employeeName: employee.name,
+            fixTitle: fixData.title,
+            fixType: fixData.type,
+            approverName: approver.name,
+            beforeState: fixData.beforeState,
+            afterState: fixData.afterState
+          });
+
+          await storage.createNotification({
+            userId: manager.id,
+            type: 'auto_fix_approved',
+            title: 'Payroll Auto-Fix Applied for Team Member',
+            message: `${fixData.title} was approved for ${employee.name}.`,
+            relatedEntityType: 'payroll',
+            relatedEntityId: fixId,
+            actionUrl: '/payroll',
+            read: false
+          });
+        }
+      }
+
+      // Notify HR team and payroll team
+      const hrProfiles = await storage.getAllProfiles();
+      const hrAndPayrollTeam = hrProfiles.filter(p => 
+        p.department === 'HR' || p.department === 'Payroll' || p.role === 'Product Owner'
+      );
+
+      for (const teamMember of hrAndPayrollTeam) {
+        if (teamMember.id === userId) continue; // Skip the approver
+
+        await storage.createNotification({
+          userId: teamMember.id,
+          type: 'auto_fix_approved',
+          title: 'Payroll Auto-Fix Approved',
+          message: `${approver.name} approved: ${fixData.title}`,
+          relatedEntityType: 'payroll',
+          relatedEntityId: fixId,
+          actionUrl: '/payroll',
+          read: false
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Auto-fix approved and notifications sent to all stakeholders'
+      });
+    } catch (error: any) {
+      console.error('[Auto-Fix] Approval error:', error);
+      res.status(500).json({ error: 'Failed to approve auto-fix', details: error.message });
     }
   });
 
