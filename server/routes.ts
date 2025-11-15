@@ -1292,6 +1292,30 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get('/api/changelog/seed', async (req, res) => {
+    try {
+      const { seedChangeLog } = await import('./seed-changelog.js');
+      const result = await seedChangeLog();
+      
+      if (result.seeded) {
+        return res.json({
+          message: 'Successfully seeded change log with historical entries',
+          count: result.count,
+          seeded: true
+        });
+      } else {
+        return res.json({
+          message: 'Change log already contains entries',
+          count: result.count,
+          skipped: true
+        });
+      }
+    } catch (error: any) {
+      console.error('Error seeding change log:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/changelog/:id', async (req, res) => {
     try {
       const log = await storage.getChangeLogById(req.params.id);
