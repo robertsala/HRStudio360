@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, Clock, CheckCircle, XCircle, AlertCircle, FileText, User, Calendar } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
+import { apiRequest, queryClient } from '../../lib/queryClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CorrectionRequestModalProps {
   isOpen?: boolean;
@@ -27,7 +26,7 @@ interface TimesheetCorrectionRequest {
 }
 
 const CorrectionRequestModal: React.FC<CorrectionRequestModalProps> = ({ isOpen = true, onClose }) => {
-  const { toast } = useToast();
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>('Pending');
   const [selectedRequest, setSelectedRequest] = useState<TimesheetCorrectionRequest | null>(null);
@@ -49,20 +48,15 @@ const CorrectionRequestModal: React.FC<CorrectionRequestModalProps> = ({ isOpen 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/timesheet-corrections'] });
-      toast({
-        title: 'Request Approved',
-        description: 'Timesheet correction has been approved and applied.'
-      });
+      setToast({ type: 'success', message: 'Request approved successfully' });
+      setTimeout(() => setToast(null), 3000);
       setSelectedRequest(null);
       setReviewNotes('');
       refetch();
     },
     onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to approve correction request',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: error.message || 'Failed to approve correction request' });
+      setTimeout(() => setToast(null), 3000);
     }
   });
 
@@ -76,20 +70,15 @@ const CorrectionRequestModal: React.FC<CorrectionRequestModalProps> = ({ isOpen 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/timesheet-corrections'] });
-      toast({
-        title: 'Request Rejected',
-        description: 'Timesheet correction has been rejected.'
-      });
+      setToast({ type: 'success', message: 'Request rejected successfully' });
+      setTimeout(() => setToast(null), 3000);
       setSelectedRequest(null);
       setReviewNotes('');
       refetch();
     },
     onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to reject correction request',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: error.message || 'Failed to reject correction request' });
+      setTimeout(() => setToast(null), 3000);
     }
   });
 
@@ -134,11 +123,8 @@ const CorrectionRequestModal: React.FC<CorrectionRequestModalProps> = ({ isOpen 
   const handleReject = () => {
     if (!selectedRequest) return;
     if (!reviewNotes.trim()) {
-      toast({
-        title: 'Review Notes Required',
-        description: 'Please provide a reason for rejecting this request',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: 'Please provide a reason for rejecting this request' });
+      setTimeout(() => setToast(null), 3000);
       return;
     }
     rejectMutation.mutate({ id: selectedRequest.id, notes: reviewNotes });
@@ -404,6 +390,20 @@ const CorrectionRequestModal: React.FC<CorrectionRequestModalProps> = ({ isOpen 
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-[100] flex items-center text-white ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+            {toast.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <XCircle className="h-5 w-5 mr-2" />
+            )}
+            <span className="font-medium">{toast.message}</span>
           </div>
         )}
       </div>

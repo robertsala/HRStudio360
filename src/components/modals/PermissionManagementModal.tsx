@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Shield, Plus, Trash2, Check, AlertCircle } from 'lucide-react';
+import { X, Shield, Plus, Trash2, Check, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '../../lib/queryClient';
 
 interface PermissionManagementModalProps {
   isOpen?: boolean;
@@ -28,7 +27,7 @@ interface RolePermission {
 const roles = ['HR', 'Manager', 'Employee', 'Product Owner'];
 
 const PermissionManagementModal: React.FC<PermissionManagementModalProps> = ({ isOpen = true, onClose }) => {
-  const { toast } = useToast();
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'permissions' | 'matrix'>('matrix');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showCreatePermission, setShowCreatePermission] = useState(false);
@@ -63,19 +62,14 @@ const PermissionManagementModal: React.FC<PermissionManagementModalProps> = ({ i
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/permissions'] });
-      toast({
-        title: 'Permission Created',
-        description: 'New permission has been created successfully.'
-      });
+      setToast({ type: 'success', message: 'Permission created successfully' });
       setShowCreatePermission(false);
       setNewPermission({ code: '', category: 'Timesheets', name: '', description: '' });
+      setTimeout(() => setToast(null), 3000);
     },
     onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to create permission',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: error.message || 'Failed to create permission' });
+      setTimeout(() => setToast(null), 3000);
     }
   });
 
@@ -89,17 +83,12 @@ const PermissionManagementModal: React.FC<PermissionManagementModalProps> = ({ i
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/permissions/role', variables.role] });
-      toast({
-        title: 'Permission Assigned',
-        description: 'Permission has been assigned to the role.'
-      });
+      setToast({ type: 'success', message: 'Permission assigned to role' });
+      setTimeout(() => setToast(null), 3000);
     },
     onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to assign permission',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: error.message || 'Failed to assign permission' });
+      setTimeout(() => setToast(null), 3000);
     }
   });
 
@@ -113,17 +102,12 @@ const PermissionManagementModal: React.FC<PermissionManagementModalProps> = ({ i
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/permissions/role', variables.role] });
-      toast({
-        title: 'Permission Revoked',
-        description: 'Permission has been revoked from the role.'
-      });
+      setToast({ type: 'success', message: 'Permission revoked from role' });
+      setTimeout(() => setToast(null), 3000);
     },
     onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to revoke permission',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: error.message || 'Failed to revoke permission' });
+      setTimeout(() => setToast(null), 3000);
     }
   });
 
@@ -167,11 +151,8 @@ const PermissionManagementModal: React.FC<PermissionManagementModalProps> = ({ i
 
   const handleCreatePermission = () => {
     if (!newPermission.code || !newPermission.name) {
-      toast({
-        title: 'Validation Error',
-        description: 'Permission code and name are required',
-        variant: 'destructive'
-      });
+      setToast({ type: 'error', message: 'Permission code and name are required' });
+      setTimeout(() => setToast(null), 3000);
       return;
     }
     createPermissionMutation.mutate(newPermission);
@@ -459,6 +440,20 @@ const PermissionManagementModal: React.FC<PermissionManagementModalProps> = ({ i
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-[100] flex items-center text-white ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+            {toast.type === 'success' ? (
+              <CheckCircle className="h-5 w-5 mr-2" />
+            ) : (
+              <XCircle className="h-5 w-5 mr-2" />
+            )}
+            <span className="font-medium">{toast.message}</span>
           </div>
         )}
       </div>
