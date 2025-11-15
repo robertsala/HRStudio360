@@ -102,6 +102,9 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
 
   // Chat-specific state
   const [initialChatChannelId, setInitialChatChannelId] = React.useState<string | undefined>(undefined);
+  
+  // Studio AI context state
+  const [studioAIContext, setStudioAIContext] = React.useState<'recruitment' | 'payroll'>('recruitment');
 
   // User role - use database role with fallback for special emails
   const getDatabaseRole = () => {
@@ -574,7 +577,10 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
       case 'notifications':
         return <NotificationsModal onTakeAction={handleNotificationAction} onClose={closeInlineContent} />;
       case 'payroll':
-        return <PayrollModal onClose={closeInlineContent} onOpenStudioAI={() => openModal('studioAIChat')} />;
+        return <PayrollModal onClose={closeInlineContent} onOpenStudioAI={() => {
+          setStudioAIContext('payroll');
+          openModal('studioAIChat');
+        }} />;
       case 'timeAttendance':
         return <TimeAttendanceModal onClose={closeInlineContent} />;
       case 'employeeProfile':
@@ -633,7 +639,10 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
           }
         />;
       case 'hiring':
-        return <HiringModal onNavigateToOnboarding={() => setActiveContent('onboarding')} onClose={closeInlineContent} onOpenStudioAI={() => openModal('studioAIChat')} />;
+        return <HiringModal onNavigateToOnboarding={() => setActiveContent('onboarding')} onClose={closeInlineContent} onOpenStudioAI={() => {
+          setStudioAIContext('recruitment');
+          openModal('studioAIChat');
+        }} />;
       case 'hrDataReporting':
         return <HRDataReportingModal isOpen={true} onClose={closeInlineContent} />;
       case 'comprehensiveProfile':
@@ -1244,7 +1253,10 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
             {/* Studio AI Chat - Autonomous Recruitment Assistant */}
             <div className="mt-8 mb-8">
               <div className="bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-700 rounded-xl p-6 text-white shadow-lg border-2 border-purple-400/30 cursor-pointer hover:shadow-2xl transition-all transform hover:scale-[1.02]"
-                   onClick={() => openModal('studioAIChat')}
+                   onClick={() => {
+                     setStudioAIContext('recruitment');
+                     openModal('studioAIChat');
+                   }}
                    data-testid="card-studio-ai-chat">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
@@ -1297,6 +1309,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      setStudioAIContext('recruitment');
                       openModal('studioAIChat');
                     }}
                     className="flex items-center justify-center bg-white/10 rounded-lg py-3 hover:bg-white/20 transition-colors"
@@ -1403,13 +1416,17 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         {modals.jobManagement && (
           <JobManagementModal
             onClose={() => closeModal('jobManagement')}
-            onOpenStudioAI={() => openModal('studioAIChat')}
+            onOpenStudioAI={() => {
+              setStudioAIContext('recruitment');
+              openModal('studioAIChat');
+            }}
           />
         )}
         {modals.studioAIChat && (
           <StudioAIChatModal
             isOpen={modals.studioAIChat}
             onClose={() => closeModal('studioAIChat')}
+            context={studioAIContext}
           />
         )}
         {modals.agentActivity && (

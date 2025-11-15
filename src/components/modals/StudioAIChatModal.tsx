@@ -6,6 +6,7 @@ import { apiRequest } from '../../lib/queryClient';
 interface StudioAIChatModalProps {
   isOpen: boolean;
   onClose: () => void;
+  context?: 'recruitment' | 'payroll';
 }
 
 interface ChatMessage {
@@ -15,12 +16,21 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const StudioAIChatModal: React.FC<StudioAIChatModalProps> = ({ isOpen, onClose }) => {
+const StudioAIChatModal: React.FC<StudioAIChatModalProps> = ({ isOpen, onClose, context = 'recruitment' }) => {
+  // Define context-specific welcome messages
+  const getWelcomeMessage = () => {
+    if (context === 'payroll') {
+      return "👋 Hi! I'm Studio AI, your payroll assistant. I can help you with:\n\n• Validating payroll calculations and detecting errors\n• Analyzing expense reports for compliance\n• Checking leave requests and approvals\n• Answering questions about payroll processing\n\nWhat would you like to know?";
+    }
+    // Default to recruitment
+    return "👋 Hi! I'm Studio AI, your autonomous HR assistant. I can help you with:\n\n• Screening candidates automatically\n• Analyzing hiring pipelines\n• Generating insights about job applications\n• Answering questions about candidates\n\nWhat would you like to know?";
+  };
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: "👋 Hi! I'm Studio AI, your autonomous HR assistant. I can help you with:\n\n• Screening candidates automatically\n• Analyzing hiring pipelines\n• Generating insights about job applications\n• Answering questions about candidates\n\nWhat would you like to know?",
+      content: getWelcomeMessage(),
       timestamp: new Date()
     }
   ]);
@@ -36,9 +46,23 @@ const StudioAIChatModal: React.FC<StudioAIChatModalProps> = ({ isOpen, onClose }
     scrollToBottom();
   }, [messages]);
 
+  // Reset messages when context changes
+  useEffect(() => {
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: getWelcomeMessage(),
+        timestamp: new Date()
+      }
+    ]);
+  }, [context]);
+
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const response = await apiRequest('/api/ai-agent/chat', {
+      // Use different endpoint based on context
+      const endpoint = context === 'payroll' ? '/api/ai-payroll/chat' : '/api/ai-agent/chat';
+      const response = await apiRequest(endpoint, {
         method: 'POST',
         body: JSON.stringify({ message })
       });
@@ -167,7 +191,7 @@ const StudioAIChatModal: React.FC<StudioAIChatModalProps> = ({ isOpen, onClose }
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask Studio AI about candidates, hiring, or HR processes..."
+              placeholder={context === 'payroll' ? "Ask Studio AI about payroll, expenses, or calculations..." : "Ask Studio AI about candidates, hiring, or HR processes..."}
               className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"
               rows={3}
               disabled={chatMutation.isPending}
