@@ -11,6 +11,8 @@ import {
   insertReviewCycleSchema,
   insertTaxJurisdictionSchema, insertReciprocalAgreementSchema,
   insertEmployeeTaxConfigurationSchema, insertAutoFixAuditLogSchema,
+  insertPermissionTemplateSchema, insertRoleHierarchySchema,
+  insertTimeBasedPermissionGrantSchema, insertPermissionRequestSchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -5568,6 +5570,577 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error fetching timesheet audit trail:', error);
       res.status(500).json({ error: 'Failed to fetch audit trail', details: error.message });
+    }
+  });
+
+  // **PHASE 3: ADVANCED ACCESS CONTROL - API ENDPOINTS**
+
+  // Helper function to check HR/Product Owner authorization
+  async function requireHROrProductOwner(req: any, res: any): Promise<string | null> {
+    const userId = requireAuth(req);
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return null;
+    }
+
+    const userProfile = await storage.getProfileById(userId);
+    if (!userProfile) {
+      res.status(404).json({ error: 'User profile not found' });
+      return null;
+    }
+
+    if (userProfile.department !== 'HR' && userProfile.role !== 'Product Owner') {
+      res.status(403).json({ error: 'Forbidden: HR or Product Owner role required' });
+      return null;
+    }
+
+    return userId;
+  }
+
+  // Helper function to check Manager/HR authorization
+  async function requireManagerOrHR(req: any, res: any): Promise<string | null> {
+    const userId = requireAuth(req);
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return null;
+    }
+
+    const userProfile = await storage.getProfileById(userId);
+    if (!userProfile) {
+      res.status(404).json({ error: 'User profile not found' });
+      return null;
+    }
+
+    if (userProfile.role !== 'Manager' && userProfile.department !== 'HR' && userProfile.role !== 'Product Owner') {
+      res.status(403).json({ error: 'Forbidden: Manager or HR role required' });
+      return null;
+    }
+
+    return userId;
+  }
+
+  // ========== PERMISSION TEMPLATES ==========
+
+  // GET /api/permissions/templates - List all templates (HR/Product Owner only)
+  app.get('/api/permissions/templates', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const templates = await storage.getPermissionTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      console.error('Error fetching permission templates:', error);
+      res.status(500).json({ error: 'Failed to fetch permission templates', details: error.message });
+    }
+  });
+
+  // GET /api/permissions/templates/:id - Get template by ID (HR/Product Owner only)
+  app.get('/api/permissions/templates/:id', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      const template = await storage.getPermissionTemplateById(id);
+
+      if (!template) {
+        return res.status(404).json({ error: 'Permission template not found' });
+      }
+
+      res.json(template);
+    } catch (error: any) {
+      console.error('Error fetching permission template:', error);
+      res.status(500).json({ error: 'Failed to fetch permission template', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/templates - Create template (HR/Product Owner only)
+  app.post('/api/permissions/templates', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const validated = insertPermissionTemplateSchema.parse(req.body);
+      const template = await storage.createPermissionTemplate(validated);
+
+      res.status(201).json(template);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      console.error('Error creating permission template:', error);
+      res.status(500).json({ error: 'Failed to create permission template', details: error.message });
+    }
+  });
+
+  // PUT /api/permissions/templates/:id - Update template (HR/Product Owner only)
+  app.put('/api/permissions/templates/:id', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      
+      // Check if template exists
+      const existingTemplate = await storage.getPermissionTemplateById(id);
+      if (!existingTemplate) {
+        return res.status(404).json({ error: 'Permission template not found' });
+      }
+
+      // Validate partial update
+      const validated = insertPermissionTemplateSchema.partial().parse(req.body);
+      const updatedTemplate = await storage.updatePermissionTemplate(id, validated);
+
+      res.json(updatedTemplate);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      console.error('Error updating permission template:', error);
+      res.status(500).json({ error: 'Failed to update permission template', details: error.message });
+    }
+  });
+
+  // DELETE /api/permissions/templates/:id - Delete template (HR/Product Owner only)
+  app.delete('/api/permissions/templates/:id', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      
+      // Check if template exists and is not a system template
+      const template = await storage.getPermissionTemplateById(id);
+      if (!template) {
+        return res.status(404).json({ error: 'Permission template not found' });
+      }
+
+      if (template.isSystemTemplate) {
+        return res.status(403).json({ error: 'Cannot delete system templates' });
+      }
+
+      await storage.deletePermissionTemplate(id);
+      res.json({ message: 'Permission template deleted successfully' });
+    } catch (error: any) {
+      console.error('Error deleting permission template:', error);
+      res.status(500).json({ error: 'Failed to delete permission template', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/templates/:id/apply - Apply template to role (HR/Product Owner only)
+  app.post('/api/permissions/templates/:id/apply', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      const { role, appliedBy } = req.body;
+
+      if (!role || !appliedBy) {
+        return res.status(400).json({ error: 'role and appliedBy are required' });
+      }
+
+      // Check if template exists
+      const template = await storage.getPermissionTemplateById(id);
+      if (!template) {
+        return res.status(404).json({ error: 'Permission template not found' });
+      }
+
+      await storage.applyTemplateToRole(id, role, appliedBy);
+      res.json({ message: 'Template applied to role successfully' });
+    } catch (error: any) {
+      console.error('Error applying permission template:', error);
+      res.status(500).json({ error: 'Failed to apply permission template', details: error.message });
+    }
+  });
+
+  // ========== ROLE HIERARCHY ==========
+
+  // GET /api/permissions/hierarchy - Get all hierarchy (HR/Product Owner only)
+  app.get('/api/permissions/hierarchy', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const hierarchy = await storage.getRoleHierarchy();
+      res.json(hierarchy);
+    } catch (error: any) {
+      console.error('Error fetching role hierarchy:', error);
+      res.status(500).json({ error: 'Failed to fetch role hierarchy', details: error.message });
+    }
+  });
+
+  // GET /api/permissions/hierarchy/:role - Get hierarchy for role (HR/Product Owner only)
+  app.get('/api/permissions/hierarchy/:role', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { role } = req.params;
+      const hierarchy = await storage.getRoleHierarchyByRole(role);
+
+      if (!hierarchy) {
+        return res.status(404).json({ error: 'Role hierarchy not found' });
+      }
+
+      res.json(hierarchy);
+    } catch (error: any) {
+      console.error('Error fetching role hierarchy:', error);
+      res.status(500).json({ error: 'Failed to fetch role hierarchy', details: error.message });
+    }
+  });
+
+  // GET /api/permissions/hierarchy/:role/inherited - Get inherited permissions for role (HR/Product Owner only)
+  app.get('/api/permissions/hierarchy/:role/inherited', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { role } = req.params;
+      const inheritedPermissions = await storage.getInheritedPermissions(role);
+
+      res.json(inheritedPermissions);
+    } catch (error: any) {
+      console.error('Error fetching inherited permissions:', error);
+      res.status(500).json({ error: 'Failed to fetch inherited permissions', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/hierarchy - Create hierarchy (HR/Product Owner only)
+  app.post('/api/permissions/hierarchy', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const validated = insertRoleHierarchySchema.parse(req.body);
+      const hierarchy = await storage.createRoleHierarchy(validated);
+
+      res.status(201).json(hierarchy);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      console.error('Error creating role hierarchy:', error);
+      res.status(500).json({ error: 'Failed to create role hierarchy', details: error.message });
+    }
+  });
+
+  // PUT /api/permissions/hierarchy/:id - Update hierarchy (HR/Product Owner only)
+  app.put('/api/permissions/hierarchy/:id', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      
+      // Validate partial update
+      const validated = insertRoleHierarchySchema.partial().parse(req.body);
+      const updatedHierarchy = await storage.updateRoleHierarchy(id, validated);
+
+      if (!updatedHierarchy) {
+        return res.status(404).json({ error: 'Role hierarchy not found' });
+      }
+
+      res.json(updatedHierarchy);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      console.error('Error updating role hierarchy:', error);
+      res.status(500).json({ error: 'Failed to update role hierarchy', details: error.message });
+    }
+  });
+
+  // ========== TIME-BASED GRANTS ==========
+
+  // GET /api/permissions/grants - Get all grants, optionally filter by userId (HR/Product Owner only)
+  app.get('/api/permissions/grants', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { userId: filterUserId } = req.query;
+      const grants = await storage.getAllTimeBasedGrants(filterUserId as string | undefined);
+
+      res.json(grants);
+    } catch (error: any) {
+      console.error('Error fetching time-based grants:', error);
+      res.status(500).json({ error: 'Failed to fetch time-based grants', details: error.message });
+    }
+  });
+
+  // GET /api/permissions/grants/active/:userId - Get active grants for user (HR/Product Owner only)
+  app.get('/api/permissions/grants/active/:userId', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { userId: targetUserId } = req.params;
+      const grants = await storage.getActiveTimeBasedGrants(targetUserId);
+
+      res.json(grants);
+    } catch (error: any) {
+      console.error('Error fetching active grants:', error);
+      res.status(500).json({ error: 'Failed to fetch active grants', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/grants - Create grant (HR/Product Owner only)
+  app.post('/api/permissions/grants', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const validated = insertTimeBasedPermissionGrantSchema.parse(req.body);
+      const grant = await storage.createTimeBasedGrant(validated);
+
+      res.status(201).json(grant);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      console.error('Error creating time-based grant:', error);
+      res.status(500).json({ error: 'Failed to create time-based grant', details: error.message });
+    }
+  });
+
+  // DELETE /api/permissions/grants/:id/revoke - Revoke grant (HR/Product Owner only)
+  app.delete('/api/permissions/grants/:id/revoke', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      const { revokedBy } = req.body;
+
+      if (!revokedBy) {
+        return res.status(400).json({ error: 'revokedBy is required' });
+      }
+
+      await storage.revokeTimeBasedGrant(id, revokedBy);
+      res.json({ message: 'Grant revoked successfully' });
+    } catch (error: any) {
+      console.error('Error revoking time-based grant:', error);
+      res.status(500).json({ error: 'Failed to revoke time-based grant', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/grants/expire - Expire old grants (HR/Product Owner only)
+  app.post('/api/permissions/grants/expire', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const expiredCount = await storage.expireOldGrants();
+      res.json({ expired: expiredCount });
+    } catch (error: any) {
+      console.error('Error expiring grants:', error);
+      res.status(500).json({ error: 'Failed to expire grants', details: error.message });
+    }
+  });
+
+  // ========== PERMISSION REQUESTS ==========
+
+  // GET /api/permissions/requests - Get requests with filters (HR/Manager for all, Employee for own)
+  app.get('/api/permissions/requests', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+
+      const { status, requestedById } = req.query;
+
+      // Employees can only view their own requests
+      const filters: { requestedById?: string; status?: string } = {};
+      
+      if (userProfile.role === 'Employee') {
+        filters.requestedById = userId;
+      } else if (requestedById) {
+        filters.requestedById = requestedById as string;
+      }
+      
+      if (status) {
+        filters.status = status as string;
+      }
+
+      const requests = await storage.getPermissionRequests(filters);
+      res.json(requests);
+    } catch (error: any) {
+      console.error('Error fetching permission requests:', error);
+      res.status(500).json({ error: 'Failed to fetch permission requests', details: error.message });
+    }
+  });
+
+  // GET /api/permissions/requests/:id - Get request by ID (HR/Manager/requestor only)
+  app.get('/api/permissions/requests/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+
+      const { id } = req.params;
+      const request = await storage.getPermissionRequestById(id);
+
+      if (!request) {
+        return res.status(404).json({ error: 'Permission request not found' });
+      }
+
+      // Check authorization: HR/Manager can view all, Employees can only view their own
+      if (userProfile.role === 'Employee' && request.requestedById !== userId) {
+        return res.status(403).json({ error: 'Forbidden: You can only view your own requests' });
+      }
+
+      res.json(request);
+    } catch (error: any) {
+      console.error('Error fetching permission request:', error);
+      res.status(500).json({ error: 'Failed to fetch permission request', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/requests - Create request (any authenticated user)
+  app.post('/api/permissions/requests', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const validated = insertPermissionRequestSchema.parse(req.body);
+      const request = await storage.createPermissionRequest(validated);
+
+      res.status(201).json(request);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      console.error('Error creating permission request:', error);
+      res.status(500).json({ error: 'Failed to create permission request', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/requests/:id/approve - Approve request (HR/Manager only)
+  app.post('/api/permissions/requests/:id/approve', async (req, res) => {
+    try {
+      const userId = await requireManagerOrHR(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      const { reviewerId, reviewNotes } = req.body;
+
+      if (!reviewerId) {
+        return res.status(400).json({ error: 'reviewerId is required' });
+      }
+
+      const approvedRequest = await storage.approvePermissionRequest(id, reviewerId, reviewNotes);
+      res.json(approvedRequest);
+    } catch (error: any) {
+      console.error('Error approving permission request:', error);
+      res.status(500).json({ error: 'Failed to approve permission request', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/requests/:id/reject - Reject request (HR/Manager only)
+  app.post('/api/permissions/requests/:id/reject', async (req, res) => {
+    try {
+      const userId = await requireManagerOrHR(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      const { reviewerId, reviewNotes } = req.body;
+
+      if (!reviewerId || !reviewNotes) {
+        return res.status(400).json({ error: 'reviewerId and reviewNotes are required' });
+      }
+
+      const rejectedRequest = await storage.rejectPermissionRequest(id, reviewerId, reviewNotes);
+      res.json(rejectedRequest);
+    } catch (error: any) {
+      console.error('Error rejecting permission request:', error);
+      res.status(500).json({ error: 'Failed to reject permission request', details: error.message });
+    }
+  });
+
+  // ========== BULK OPERATIONS ==========
+
+  // POST /api/permissions/bulk/assign - Bulk assign (HR/Product Owner only)
+  app.post('/api/permissions/bulk/assign', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { role, permissionIds, assignedBy, reason } = req.body;
+
+      if (!role || !permissionIds || !assignedBy) {
+        return res.status(400).json({ error: 'role, permissionIds, and assignedBy are required' });
+      }
+
+      if (!Array.isArray(permissionIds)) {
+        return res.status(400).json({ error: 'permissionIds must be an array' });
+      }
+
+      await storage.bulkAssignPermissions(role, permissionIds, assignedBy, reason);
+      res.json({ message: 'Permissions assigned successfully' });
+    } catch (error: any) {
+      console.error('Error bulk assigning permissions:', error);
+      res.status(500).json({ error: 'Failed to bulk assign permissions', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/bulk/revoke - Bulk revoke (HR/Product Owner only)
+  app.post('/api/permissions/bulk/revoke', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { role, permissionIds, revokedBy, reason } = req.body;
+
+      if (!role || !permissionIds || !revokedBy) {
+        return res.status(400).json({ error: 'role, permissionIds, and revokedBy are required' });
+      }
+
+      if (!Array.isArray(permissionIds)) {
+        return res.status(400).json({ error: 'permissionIds must be an array' });
+      }
+
+      await storage.bulkRevokePermissions(role, permissionIds, revokedBy, reason);
+      res.json({ message: 'Permissions revoked successfully' });
+    } catch (error: any) {
+      console.error('Error bulk revoking permissions:', error);
+      res.status(500).json({ error: 'Failed to bulk revoke permissions', details: error.message });
+    }
+  });
+
+  // ========== AUDIT TRAIL ==========
+
+  // GET /api/permissions/audit - Get audit trail with filters (HR/Product Owner only)
+  app.get('/api/permissions/audit', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { targetType, targetId } = req.query;
+      const auditTrail = await storage.getPermissionChangeAudit(
+        targetType as string | undefined,
+        targetId as string | undefined
+      );
+
+      res.json(auditTrail);
+    } catch (error: any) {
+      console.error('Error fetching permission audit trail:', error);
+      res.status(500).json({ error: 'Failed to fetch permission audit trail', details: error.message });
     }
   });
 }
