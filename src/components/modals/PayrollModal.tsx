@@ -9,6 +9,7 @@ import { supabase } from '../../utils/supabaseClient';
 import { formatCurrency, Currency, sumByCurrency, getCurrencySymbol, getCurrencyFlag } from '../../utils/currencyUtils';
 import { EmployeePayrollDetailModal } from './EmployeePayrollDetailModal';
 import { PayrollWizardModal } from './PayrollWizardModal';
+import LeaveManagementModal from './LeaveManagementModal';
 
 interface TimesheetEntry {
   date: string;
@@ -119,6 +120,14 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [selectedEmployeeDetail, setSelectedEmployeeDetail] = useState<Employee | null>(null);
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
   const [showWizard, setShowWizard] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveNavigationParams, setLeaveNavigationParams] = useState<{
+    employeeId: string;
+    employeeName: string;
+    department: string;
+    date?: string;
+    type?: 'PTO' | 'Sick';
+  } | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([
     {
       id: '1',
@@ -1371,12 +1380,60 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
       )}
 
       {/* Employee Payroll Detail Modal */}
-      {selectedEmployeeDetail && (
+      {selectedEmployeeDetail && !showLeaveModal && (
         <EmployeePayrollDetailModal
           employee={selectedEmployeeDetail}
           onClose={() => setSelectedEmployeeDetail(null)}
           onSave={handleSaveEmployeeChanges}
+          onNavigateToLeave={(params) => {
+            // Close the payroll detail modal first
+            setSelectedEmployeeDetail(null);
+            // Then open the leave modal with navigation params
+            setLeaveNavigationParams(params);
+            setShowLeaveModal(true);
+          }}
         />
+      )}
+
+      {/* Leave Management Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Calendar className="h-6 w-6" />
+                  Time & Leave - {leaveNavigationParams?.employeeName}
+                </h2>
+                {leaveNavigationParams && (
+                  <p className="text-emerald-100 text-sm mt-1">
+                    {leaveNavigationParams.type ? `${leaveNavigationParams.type} Request` : 'Leave Requests'}
+                    {leaveNavigationParams.date && ` - ${leaveNavigationParams.date}`}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowLeaveModal(false);
+                  setLeaveNavigationParams(null);
+                }}
+                className="text-white hover:bg-emerald-800 rounded-lg p-2 transition-colors"
+                data-testid="button-close-leave-modal"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <LeaveManagementModal
+                onClose={() => {
+                  setShowLeaveModal(false);
+                  setLeaveNavigationParams(null);
+                }}
+                navigationParams={leaveNavigationParams || undefined}
+              />
+            </div>
+          </div>
+        </div>
       )}
       </>
     );

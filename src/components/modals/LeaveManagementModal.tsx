@@ -51,14 +51,23 @@ interface LeaveManagementModalProps {
     department?: string;
     location?: string;
   };
+  navigationParams?: {
+    employeeId?: string;
+    employeeName?: string;
+    department?: string;
+    date?: string;
+    type?: 'PTO' | 'Sick';
+  };
 }
 
-const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, initialFilter }) => {
+const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, initialFilter, navigationParams }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('requests');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [filterType, setFilterType] = useState('All');
+  const [filterType, setFilterType] = useState(
+    navigationParams?.type === 'PTO' ? 'Vacation' : navigationParams?.type === 'Sick' ? 'Sick' : 'All'
+  );
   const [teamFilter, setTeamFilter] = useState<'my-team' | 'my-department' | 'my-location' | 'all'>(initialFilter?.type || 'all');
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequestWithEmployee | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -294,6 +303,21 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
   };
 
   const filteredRequests = leaveRequests.filter(request => {
+    // If navigated from payroll, filter by specific employee
+    if (navigationParams?.employeeName && request.employeeName !== navigationParams.employeeName) {
+      return false;
+    }
+
+    // If specific date is provided, filter by that date range
+    if (navigationParams?.date) {
+      const requestStart = new Date(request.startDate);
+      const requestEnd = new Date(request.endDate);
+      const targetDate = new Date(navigationParams.date);
+      if (targetDate < requestStart || targetDate > requestEnd) {
+        return false;
+      }
+    }
+
     if (teamFilter === 'my-team' && initialFilter?.managerId) {
       if (request.manager !== initialFilter.managerId && request.employeeName !== initialFilter.managerId) {
         return false;

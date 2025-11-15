@@ -50,12 +50,20 @@ interface EmployeePayrollDetailModalProps {
   employee: Employee;
   onClose: () => void;
   onSave: (updatedEmployee: Employee) => void;
+  onNavigateToLeave?: (params: {
+    employeeId: string;
+    employeeName: string;
+    department: string;
+    date?: string;
+    type?: 'PTO' | 'Sick';
+  }) => void;
 }
 
 export const EmployeePayrollDetailModal: React.FC<EmployeePayrollDetailModalProps> = ({
   employee,
   onClose,
-  onSave
+  onSave,
+  onNavigateToLeave
 }) => {
   const [editedEmployee, setEditedEmployee] = useState<Employee>(employee);
   const [isEditing, setIsEditing] = useState(false);
@@ -261,18 +269,44 @@ export const EmployeePayrollDetailModal: React.FC<EmployeePayrollDetailModalProp
                     )}
                   </div>
                   
-                  <div>
+                  <div
+                    onClick={() => {
+                      if ((editedEmployee.ptoHours || 0) > 0 && onNavigateToLeave) {
+                        onNavigateToLeave({
+                          employeeId: editedEmployee.id,
+                          employeeName: editedEmployee.name,
+                          department: editedEmployee.department,
+                          type: 'PTO'
+                        });
+                      }
+                    }}
+                    className={(editedEmployee.ptoHours || 0) > 0 ? 'cursor-pointer hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg p-2 -m-2 transition-colors' : ''}
+                    data-testid="card-pto-hours"
+                  >
                     <label className="text-xs text-green-700 dark:text-green-400 mb-1 font-medium block">
-                      PTO Hours
+                      PTO Hours {(editedEmployee.ptoHours || 0) > 0 && '→'}
                     </label>
                     <p className="text-2xl font-bold text-green-600">
                       {editedEmployee.ptoHours || 0}
                     </p>
                   </div>
                   
-                  <div>
+                  <div
+                    onClick={() => {
+                      if ((editedEmployee.sickHours || 0) > 0 && onNavigateToLeave) {
+                        onNavigateToLeave({
+                          employeeId: editedEmployee.id,
+                          employeeName: editedEmployee.name,
+                          department: editedEmployee.department,
+                          type: 'Sick'
+                        });
+                      }
+                    }}
+                    className={(editedEmployee.sickHours || 0) > 0 ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg p-2 -m-2 transition-colors' : ''}
+                    data-testid="card-sick-hours"
+                  >
                     <label className="text-xs text-blue-700 dark:text-blue-400 mb-1 font-medium block">
-                      Sick Hours
+                      Sick Hours {(editedEmployee.sickHours || 0) > 0 && '→'}
                     </label>
                     <p className="text-2xl font-bold text-blue-600">
                       {editedEmployee.sickHours || 0}
@@ -342,36 +376,53 @@ export const EmployeePayrollDetailModal: React.FC<EmployeePayrollDetailModalProp
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                      {editedEmployee.timesheetEntries.map((entry, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.date}</td>
-                          <td className="px-4 py-3 text-center text-sm font-medium text-gray-900 dark:text-white">{entry.day}</td>
-                          <td className="px-4 py-3 text-center text-sm text-gray-900 dark:text-white">{entry.regularHours}</td>
-                          <td className="px-4 py-3 text-center text-sm">
-                            {entry.overtimeHours > 0 ? (
-                              <span className="font-medium text-orange-600">{entry.overtimeHours}</span>
-                            ) : (
-                              <span className="text-gray-400">0</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center text-sm">
-                            {entry.ptoHours > 0 ? (
-                              <span className="font-medium text-green-600">{entry.ptoHours}</span>
-                            ) : (
-                              <span className="text-gray-400">0</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center text-sm">
-                            {entry.sickHours > 0 ? (
-                              <span className="font-medium text-blue-600">{entry.sickHours}</span>
-                            ) : (
-                              <span className="text-gray-400">0</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center text-sm">
-                            {entry.unpaidLeaveHours > 0 ? (
-                              <span className="font-medium text-gray-600 dark:text-gray-400">{entry.unpaidLeaveHours}</span>
-                            ) : (
+                      {editedEmployee.timesheetEntries.map((entry, idx) => {
+                        const hasLeaveRequest = entry.ptoHours > 0 || entry.sickHours > 0;
+                        return (
+                          <tr 
+                            key={idx} 
+                            onClick={() => {
+                              if (hasLeaveRequest && onNavigateToLeave) {
+                                onNavigateToLeave({
+                                  employeeId: editedEmployee.id,
+                                  employeeName: editedEmployee.name,
+                                  department: editedEmployee.department,
+                                  date: entry.date,
+                                  type: entry.ptoHours > 0 ? 'PTO' : 'Sick'
+                                });
+                              }
+                            }}
+                            className={`hover:bg-gray-50 dark:hover:bg-gray-900 ${hasLeaveRequest ? 'cursor-pointer' : ''}`}
+                            data-testid={`row-timesheet-${entry.date}`}
+                          >
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.date}</td>
+                            <td className="px-4 py-3 text-center text-sm font-medium text-gray-900 dark:text-white">{entry.day}</td>
+                            <td className="px-4 py-3 text-center text-sm text-gray-900 dark:text-white">{entry.regularHours}</td>
+                            <td className="px-4 py-3 text-center text-sm">
+                              {entry.overtimeHours > 0 ? (
+                                <span className="font-medium text-orange-600">{entry.overtimeHours}</span>
+                              ) : (
+                                <span className="text-gray-400">0</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center text-sm">
+                              {entry.ptoHours > 0 ? (
+                                <span className="font-medium text-green-600">{entry.ptoHours}h {hasLeaveRequest && '→'}</span>
+                              ) : (
+                                <span className="text-gray-400">0</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center text-sm">
+                              {entry.sickHours > 0 ? (
+                                <span className="font-medium text-blue-600">{entry.sickHours}h {hasLeaveRequest && '→'}</span>
+                              ) : (
+                                <span className="text-gray-400">0</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center text-sm">
+                              {entry.unpaidLeaveHours > 0 ? (
+                                <span className="font-medium text-gray-600 dark:text-gray-400">{entry.unpaidLeaveHours}</span>
+                              ) : (
                               <span className="text-gray-400">0</span>
                             )}
                           </td>
@@ -379,7 +430,8 @@ export const EmployeePayrollDetailModal: React.FC<EmployeePayrollDetailModalProp
                             {entry.notes || '-'}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
