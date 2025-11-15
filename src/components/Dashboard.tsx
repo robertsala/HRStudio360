@@ -915,7 +915,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                 </div>
 
                 {/* Recent Notifications */}
-                {renderWidget('recent-activity', () => (
+                {renderWidget('recent-notifications', () => (
                   <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
                       <Bell className="h-5 w-5 mr-2 text-yellow-500" />
@@ -953,42 +953,59 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                 </div>
                 ))}
 
-                {/* KPI Dashboard - Visible to All Users */}
-                <div className="bg-gradient-to-br from-blue-50 via-emerald-50 to-blue-50 dark:from-blue-900/30 dark:via-emerald-900/30 dark:to-blue-900/30 rounded-xl p-6 shadow-sm border border-blue-100 dark:border-blue-800">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
-                    <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
-                    {t('dashboard.hrKPIDashboard')}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400 mb-4">
-                    {t('dashboard.hrKPIDashboardIntro')}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 dark:border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.headcount')}</p>
-                          <p className="text-xl font-bold text-gray-900 dark:text-white dark:text-white">247</p>
-                        </div>
-                        <Users className="h-8 w-8 text-blue-500 opacity-50" />
-                      </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 dark:border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.turnover')}</p>
-                          <p className="text-xl font-bold text-green-600">12.3%</p>
-                        </div>
-                        <TrendingDown className="h-8 w-8 text-green-500 opacity-50" />
-                      </div>
+                {/* Compliance Alerts - Manager/HR/Product Owner Only */}
+                {renderWidget('compliance-alerts', () => (
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                      <Shield className="h-5 w-5 mr-2 text-orange-500" />
+                      Compliance Alerts
+                    </h3>
+                    <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Coming soon: Real-time compliance notifications and regulatory updates to keep your organization compliant.
+                      </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => openModal('hrKPIDashboard')}
-                    className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-emerald-700 transition-all font-medium text-sm shadow-md hover:shadow-lg"
-                  >
-                    {t('dashboard.openFullKPIDashboard')} →
-                  </button>
-                </div>
+                ))}
+
+                {/* KPI Dashboard - HR/Product Owner Only */}
+                {renderWidget('kpi-dashboard', () => (
+                  <div className="bg-gradient-to-br from-blue-50 via-emerald-50 to-blue-50 dark:from-blue-900/30 dark:via-emerald-900/30 dark:to-blue-900/30 rounded-xl p-6 shadow-sm border border-blue-100 dark:border-blue-800">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
+                      <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                      {t('dashboard.hrKPIDashboard')}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400 mb-4">
+                      {t('dashboard.hrKPIDashboardIntro')}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.headcount')}</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white dark:text-white">247</p>
+                          </div>
+                          <Users className="h-8 w-8 text-blue-500 opacity-50" />
+                        </div>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.turnover')}</p>
+                            <p className="text-xl font-bold text-green-600">12.3%</p>
+                          </div>
+                          <TrendingDown className="h-8 w-8 text-green-500 opacity-50" />
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openModal('hrKPIDashboard')}
+                      className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-emerald-700 transition-all font-medium text-sm shadow-md hover:shadow-lg"
+                    >
+                      {t('dashboard.openFullKPIDashboard')} →
+                    </button>
+                  </div>
+                ))}
               </div>
 
               {/* Right Column - Company News & Calendar */}

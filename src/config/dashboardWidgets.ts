@@ -92,6 +92,15 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     defaultDisplayOrder: 32,
     isActive: true
   },
+  {
+    widgetId: 'compliance-alerts',
+    widgetName: 'Compliance Alerts',
+    widgetDescription: 'Compliance notifications and regulatory updates',
+    category: 'notifications',
+    defaultVisibleForRoles: ['HR', 'Manager', 'Product Owner'],
+    defaultDisplayOrder: 33,
+    isActive: true
+  },
 
   // Analytics & Insights (HR & Manager focus, order 21-30)
   {
