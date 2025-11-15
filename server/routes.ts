@@ -2553,6 +2553,111 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Dashboard widget customization endpoints
+  app.get('/api/dashboard/widgets/seed', async (req, res) => {
+    try {
+      const { seedDashboardWidgetPresets } = await import('./seed-dashboard-widgets.js');
+      const result = await seedDashboardWidgetPresets();
+      
+      if (result.seeded) {
+        return res.json({
+          message: 'Successfully seeded dashboard widget presets from registry',
+          count: result.count,
+          seeded: true
+        });
+      } else {
+        return res.json({
+          message: 'Dashboard widget presets already exist',
+          count: result.count,
+          skipped: true
+        });
+      }
+    } catch (error: any) {
+      console.error('Error seeding dashboard widgets:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/dashboard/widgets', async (req, res) => {
+    try {
+      const { userId, role } = req.query;
+      
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ error: 'userId parameter is required' });
+      }
+      
+      if (!role || typeof role !== 'string') {
+        return res.status(400).json({ error: 'role parameter is required' });
+      }
+
+      // Import the widget registry
+      const { DASHBOARD_WIDGETS } = await import('../src/config/dashboardWidgets.js');
+      
+      // Fetch database presets and user preferences
+      const [presets, userPrefs] = await Promise.all([
+        storage.getDashboardWidgetPresets(),
+        storage.getUserDashboardPreferences(userId)
+      ]);
+
+      // Create lookup maps for efficient merging
+      const presetsMap = new Map(presets.map(p => [p.widgetId, p]));
+      const userPrefsMap = new Map(userPrefs.map(u => [u.widgetId, u]));
+
+      // Merge widgets with priority: user prefs → presets → registry defaults
+      const mergedWidgets = DASHBOARD_WIDGETS
+        .filter(widget => {
+          // First: Check if widget is active in registry
+          if (!widget.isActive) return false;
+          
+          // Second: Check if preset exists and is inactive in database
+          const preset = presetsMap.get(widget.widgetId);
+          if (preset && !preset.isActive) {
+            return false; // Database preset deactivated this widget
+          }
+          
+          // Third: Check if widget is visible for this role
+          return widget.defaultVisibleForRoles.includes(role as any);
+        })
+        .map(widget => {
+          const preset = presetsMap.get(widget.widgetId);
+          const userPref = userPrefsMap.get(widget.widgetId);
+
+          // Determine visibility and display order based on priority
+          let isVisible = true;
+          let displayOrder = widget.defaultDisplayOrder;
+
+          // User preference has highest priority
+          if (userPref) {
+            isVisible = userPref.isVisible;
+            displayOrder = userPref.displayOrder;
+          }
+          // Preset overrides registry default (if exists)
+          else if (preset) {
+            // Preset is visible if role is in defaultVisibleForRoles
+            isVisible = preset.defaultVisibleForRoles?.includes(role) ?? true;
+            displayOrder = preset.defaultDisplayOrder;
+          }
+
+          return {
+            widgetId: widget.widgetId,
+            widgetName: widget.widgetName,
+            widgetDescription: widget.widgetDescription,
+            category: widget.category,
+            isVisible,
+            displayOrder
+          };
+        })
+        // Only return visible widgets, sorted by display order
+        .filter(w => w.isVisible)
+        .sort((a, b) => a.displayOrder - b.displayOrder || a.widgetId.localeCompare(b.widgetId));
+
+      res.json({ widgets: mergedWidgets });
+    } catch (error: any) {
+      console.error('Error fetching dashboard widgets:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Announcements endpoints
   app.get('/api/announcements', async (req, res) => {
     try {

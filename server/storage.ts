@@ -27,7 +27,9 @@ import type {
   ReviewCycle, InsertReviewCycle,
   PaycheckFunFact, InsertPaycheckFunFact,
   EmployeeFunFactHistory, InsertEmployeeFunFactHistory,
-  DailyFunFactUsage, InsertDailyFunFactUsage
+  DailyFunFactUsage, InsertDailyFunFactUsage,
+  DashboardWidgetPreset, InsertDashboardWidgetPreset,
+  UserDashboardPreference
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -38,7 +40,8 @@ import {
   celebrationBadges, earnedBadges, celebrationHistory, celebrationNotifications,
   reviewCycles,
   jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments,
-  paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage
+  paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage,
+  dashboardWidgetPresets, userDashboardPreferences
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -243,6 +246,11 @@ export interface IStorage {
   saveFunFactHistory(employeeId: string, funFactId: string, funFactText: string, payStubId?: string): Promise<EmployeeFunFactHistory>;
   getDailyUsageInfo(employeeId: string): Promise<{ count: number; limit: number; remaining: number }>;
   trackManualFunFactGeneration(employeeId: string, funFactId: string): Promise<void>;
+
+  // Dashboard Widget Customization (Phase 1: Read-only + seeding)
+  getDashboardWidgetPresets(): Promise<DashboardWidgetPreset[]>;
+  bulkCreateDashboardWidgetPresets(presets: InsertDashboardWidgetPreset[]): Promise<DashboardWidgetPreset[]>;
+  getUserDashboardPreferences(userId: string): Promise<UserDashboardPreference[]>;
 }
 
 // Database storage implementation
@@ -1611,6 +1619,33 @@ export class DbStorage implements IStorage {
       funFactId,
       isManualGeneration: true
     });
+  }
+
+  // Dashboard Widget Customization (Phase 1: Read-only + seeding)
+  
+  async getDashboardWidgetPresets(): Promise<DashboardWidgetPreset[]> {
+    // Return ALL presets (including inactive) so API layer can decide what to show
+    // API will filter based on isActive flag
+    return await db.select()
+      .from(dashboardWidgetPresets)
+      .orderBy(dashboardWidgetPresets.defaultDisplayOrder);
+  }
+
+  async bulkCreateDashboardWidgetPresets(presets: InsertDashboardWidgetPreset[]): Promise<DashboardWidgetPreset[]> {
+    if (presets.length === 0) {
+      return [];
+    }
+    
+    return await db.insert(dashboardWidgetPresets)
+      .values(presets)
+      .returning();
+  }
+
+  async getUserDashboardPreferences(userId: string): Promise<UserDashboardPreference[]> {
+    return await db.select()
+      .from(userDashboardPreferences)
+      .where(eq(userDashboardPreferences.userId, userId))
+      .orderBy(userDashboardPreferences.displayOrder);
   }
 }
 

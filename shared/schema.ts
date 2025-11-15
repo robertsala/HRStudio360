@@ -8,6 +8,8 @@ export const employmentTypeEnum = pgEnum('employment_type', ['Full-time', 'Part-
 export const employeeStatusEnum = pgEnum('employee_status', ['Active', 'On Leave', 'Terminated', 'Pending']);
 export const leaveTypeEnum = pgEnum('leave_type', ['Vacation', 'Sick', 'Personal', 'Bereavement', 'Maternity', 'Paternity', 'FMLA']);
 export const leaveStatusEnum = pgEnum('leave_status', ['Pending', 'Approved', 'Denied', 'Cancelled']);
+export const userRoleEnum = pgEnum('user_role', ['HR', 'Manager', 'Employee', 'Product Owner']);
+export const dashboardWidgetCategoryEnum = pgEnum('dashboard_widget_category', ['stats', 'team', 'analytics', 'notifications', 'quick-actions', 'calendar', 'ai']);
 
 // Profiles table
 export const profiles = pgTable('profiles', {
@@ -526,6 +528,36 @@ export const weatherCache = pgTable('weather_cache', {
   lastUpdated: timestamp('last_updated').defaultNow(),
   cacheExpiresAt: timestamp('cache_expires_at')
 });
+
+// Dashboard Widget Customization Tables
+
+// Dashboard widget presets - defines all available widgets and their role-based defaults
+export const dashboardWidgetPresets = pgTable('dashboard_widget_presets', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  widgetId: text('widget_id').notNull().unique(), // e.g., 'weather', 'team-overview', 'kpi-dashboard'
+  widgetName: text('widget_name').notNull(),
+  widgetDescription: text('widget_description'),
+  category: dashboardWidgetCategoryEnum('category').notNull(),
+  defaultVisibleForRoles: text('default_visible_for_roles').array(), // Array of role values
+  defaultDisplayOrder: integer('default_display_order').notNull(),
+  widgetSettings: json('widget_settings'), // Future: per-widget configuration options
+  isActive: boolean('is_active').default(true).notNull(), // Allow disabling widgets system-wide
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// User dashboard preferences - individual user customization overrides
+export const userDashboardPreferences = pgTable('user_dashboard_preferences', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  widgetId: text('widget_id').notNull(), // References widgetId from dashboardWidgetPresets
+  isVisible: boolean('is_visible').notNull(),
+  displayOrder: integer('display_order').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  uniqueUserWidget: sql`unique (user_id, widget_id)`
+}));
 
 // Performance Review System Tables
 
@@ -1169,6 +1201,16 @@ export type InsertEmployeeFunFactHistory = z.infer<typeof insertEmployeeFunFactH
 
 export type DailyFunFactUsage = typeof dailyFunFactUsage.$inferSelect;
 export type InsertDailyFunFactUsage = z.infer<typeof insertDailyFunFactUsageSchema>;
+
+// Dashboard Widget Customization schemas and types
+export const insertDashboardWidgetPresetSchema = createInsertSchema(dashboardWidgetPresets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUserDashboardPreferenceSchema = createInsertSchema(userDashboardPreferences).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type DashboardWidgetPreset = typeof dashboardWidgetPresets.$inferSelect;
+export type InsertDashboardWidgetPreset = z.infer<typeof insertDashboardWidgetPresetSchema>;
+
+export type UserDashboardPreference = typeof userDashboardPreferences.$inferSelect;
+export type InsertUserDashboardPreference = z.infer<typeof insertUserDashboardPreferenceSchema>;
 
 // User Permissions type
 export interface UserPermissions {
