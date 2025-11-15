@@ -123,6 +123,30 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
   const [showWizard, setShowWizard] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [isSavingTimesheets, setIsSavingTimesheets] = useState(false);
+  const [timesheetsSaved, setTimesheetsSaved] = useState(false);
+  
+  // Calculate pay period (current bi-weekly period)
+  const getPayPeriod = () => {
+    const today = new Date();
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const days = Math.floor((today.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+    const weekNumber = Math.ceil(days / 7);
+    const payPeriodNumber = Math.floor((weekNumber - 1) / 2);
+    
+    const periodStartDate = new Date(startOfYear);
+    periodStartDate.setDate(periodStartDate.getDate() + (payPeriodNumber * 14));
+    
+    const periodEndDate = new Date(periodStartDate);
+    periodEndDate.setDate(periodEndDate.getDate() + 13);
+    
+    return {
+      start: periodStartDate.toISOString().split('T')[0],
+      end: periodEndDate.toISOString().split('T')[0]
+    };
+  };
+  
+  const [payPeriod] = useState(getPayPeriod());
   const [autoFixSuggestions, setAutoFixSuggestions] = useState<any[]>([]);
   const [selectedFixForReview, setSelectedFixForReview] = useState<any | null>(null);
   const [isLoadingAutoFixes, setIsLoadingAutoFixes] = useState(false);
@@ -566,7 +590,41 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
     setCurrentStep('review');
   };
 
-  const handleProceedToAICheck = () => {
+  const handleProceedToAICheck = async () => {
+    // Save timesheets to database before proceeding to AI check
+    if (!timesheetsSaved) {
+      setIsSavingTimesheets(true);
+      try {
+        const timesheets = filteredEmployees.map(emp => ({
+          employeeId: emp.id,
+          regularHours: emp.regularHours || 0,
+          overtimeHours: emp.overtimeHours || 0,
+          ptoHours: emp.ptoHours || 0,
+          sickHours: emp.sickHours || 0,
+          notes: null
+        }));
+
+        await apiRequest('/api/timesheets/bulk-save', {
+          method: 'POST',
+          body: JSON.stringify({
+            timesheets,
+            payPeriodStart: payPeriod.start,
+            payPeriodEnd: payPeriod.end
+          })
+        });
+
+        setTimesheetsSaved(true);
+        showNotification('success', 'Timesheets saved to database successfully');
+      } catch (error: any) {
+        console.error('Error saving timesheets:', error);
+        showNotification('error', 'Failed to save timesheets: ' + (error.message || 'Unknown error'));
+        setIsSavingTimesheets(false);
+        return; // Don't proceed if save failed
+      } finally {
+        setIsSavingTimesheets(false);
+      }
+    }
+    
     setCurrentStep('ai-check');
     runAIAnalysis();
   };
@@ -581,6 +639,38 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   };
 
   const handleProcessPayroll = async () => {
+    // Validation: Ensure timesheets are saved before processing
+    if (!timesheetsSaved) {
+      showNotification('error', 'Timesheets must be saved before processing payroll');
+      return;
+    }
+
+    // Additional validation: Check if timesheets are approved
+    try {
+      const approvedTimesheets = await apiRequest(`/api/timesheets/approved?payPeriodStart=${payPeriod.start}&payPeriodEnd=${payPeriod.end}`);
+      
+      if (!approvedTimesheets || approvedTimesheets.length === 0) {
+        showNotification('error', 'No approved timesheets found. Timesheets must be approved before processing payroll.');
+        return;
+      }
+
+      // Check if all filtered employees have approved timesheets
+      const employeesWithoutTimesheets = filteredEmployees.filter(emp => 
+        !approvedTimesheets.some((ts: any) => ts.employeeId === emp.id)
+      );
+
+      if (employeesWithoutTimesheets.length > 0) {
+        showNotification('error', 
+          `${employeesWithoutTimesheets.length} employee(s) do not have approved timesheets. All timesheets must be approved before processing payroll.`
+        );
+        return;
+      }
+    } catch (error: any) {
+      console.error('Error checking approved timesheets:', error);
+      showNotification('error', 'Failed to verify timesheet approvals: ' + (error.message || 'Unknown error'));
+      return;
+    }
+
     setCurrentStep('processing');
 
     // Simulate payroll processing

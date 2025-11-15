@@ -29,7 +29,10 @@ import type {
   EmployeeFunFactHistory, InsertEmployeeFunFactHistory,
   DailyFunFactUsage, InsertDailyFunFactUsage,
   DashboardWidgetPreset, InsertDashboardWidgetPreset,
-  UserDashboardPreference
+  UserDashboardPreference,
+  TimesheetEntry, InsertTimesheetEntry,
+  TimesheetApproval, InsertTimesheetApproval,
+  PayrollLock, InsertPayrollLock
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -42,7 +45,8 @@ import {
   jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments,
   paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage,
   dashboardWidgetPresets, userDashboardPreferences,
-  taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog
+  taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog,
+  timesheetEntries, timesheetApprovals, payrollLocks
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -279,6 +283,23 @@ export interface IStorage {
   getAutoFixAuditLogs(): Promise<import('../shared/schema.js').AutoFixAuditLog[]>;
   getAutoFixAuditLogById(id: string): Promise<import('../shared/schema.js').AutoFixAuditLog | undefined>;
   createAutoFixAuditLog(log: import('../shared/schema.js').InsertAutoFixAuditLog): Promise<import('../shared/schema.js').AutoFixAuditLog>;
+
+  // Timesheet Management
+  getTimesheetEntries(payPeriodStart: string, payPeriodEnd: string): Promise<TimesheetEntry[]>;
+  getTimesheetEntryByEmployeeAndPeriod(employeeId: string, payPeriodStart: string, payPeriodEnd: string): Promise<TimesheetEntry | undefined>;
+  createTimesheetEntry(entry: InsertTimesheetEntry): Promise<TimesheetEntry>;
+  updateTimesheetEntry(id: string, entry: Partial<InsertTimesheetEntry>): Promise<TimesheetEntry | undefined>;
+  bulkCreateTimesheetEntries(entries: InsertTimesheetEntry[]): Promise<TimesheetEntry[]>;
+  getApprovedTimesheetsByPeriod(payPeriodStart: string, payPeriodEnd: string): Promise<TimesheetEntry[]>;
+  
+  // Timesheet Approvals
+  createTimesheetApproval(approval: InsertTimesheetApproval): Promise<TimesheetApproval>;
+  getTimesheetApprovalsByTimesheetId(timesheetId: string): Promise<TimesheetApproval[]>;
+  
+  // Payroll Locks
+  getPayrollLock(payPeriodStart: string, payPeriodEnd: string): Promise<PayrollLock | undefined>;
+  createPayrollLock(lock: InsertPayrollLock): Promise<PayrollLock>;
+  updatePayrollLock(id: string, lock: Partial<InsertPayrollLock>): Promise<PayrollLock | undefined>;
 }
 
 // Database storage implementation
@@ -1814,6 +1835,92 @@ export class DbStorage implements IStorage {
 
   async createAutoFixAuditLog(log: import('../shared/schema.js').InsertAutoFixAuditLog): Promise<import('../shared/schema.js').AutoFixAuditLog> {
     const result = await db.insert(autoFixAuditLog).values(log).returning();
+    return result[0];
+  }
+
+  // Timesheet Management
+  async getTimesheetEntries(payPeriodStart: string, payPeriodEnd: string): Promise<TimesheetEntry[]> {
+    return await db.select()
+      .from(timesheetEntries)
+      .where(and(
+        eq(timesheetEntries.payPeriodStart, payPeriodStart),
+        eq(timesheetEntries.payPeriodEnd, payPeriodEnd)
+      ));
+  }
+
+  async getTimesheetEntryByEmployeeAndPeriod(employeeId: string, payPeriodStart: string, payPeriodEnd: string): Promise<TimesheetEntry | undefined> {
+    const result = await db.select()
+      .from(timesheetEntries)
+      .where(and(
+        eq(timesheetEntries.employeeId, employeeId),
+        eq(timesheetEntries.payPeriodStart, payPeriodStart),
+        eq(timesheetEntries.payPeriodEnd, payPeriodEnd)
+      ));
+    return result[0];
+  }
+
+  async createTimesheetEntry(entry: InsertTimesheetEntry): Promise<TimesheetEntry> {
+    const result = await db.insert(timesheetEntries).values(entry).returning();
+    return result[0];
+  }
+
+  async updateTimesheetEntry(id: string, entry: Partial<InsertTimesheetEntry>): Promise<TimesheetEntry | undefined> {
+    const result = await db.update(timesheetEntries)
+      .set({ ...entry, updatedAt: new Date() })
+      .where(eq(timesheetEntries.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async bulkCreateTimesheetEntries(entries: InsertTimesheetEntry[]): Promise<TimesheetEntry[]> {
+    if (entries.length === 0) return [];
+    return await db.insert(timesheetEntries).values(entries).returning();
+  }
+
+  async getApprovedTimesheetsByPeriod(payPeriodStart: string, payPeriodEnd: string): Promise<TimesheetEntry[]> {
+    return await db.select()
+      .from(timesheetEntries)
+      .where(and(
+        eq(timesheetEntries.payPeriodStart, payPeriodStart),
+        eq(timesheetEntries.payPeriodEnd, payPeriodEnd),
+        eq(timesheetEntries.status, 'Approved')
+      ));
+  }
+
+  // Timesheet Approvals
+  async createTimesheetApproval(approval: InsertTimesheetApproval): Promise<TimesheetApproval> {
+    const result = await db.insert(timesheetApprovals).values(approval).returning();
+    return result[0];
+  }
+
+  async getTimesheetApprovalsByTimesheetId(timesheetId: string): Promise<TimesheetApproval[]> {
+    return await db.select()
+      .from(timesheetApprovals)
+      .where(eq(timesheetApprovals.timesheetId, timesheetId))
+      .orderBy(desc(timesheetApprovals.createdAt));
+  }
+
+  // Payroll Locks
+  async getPayrollLock(payPeriodStart: string, payPeriodEnd: string): Promise<PayrollLock | undefined> {
+    const result = await db.select()
+      .from(payrollLocks)
+      .where(and(
+        eq(payrollLocks.payPeriodStart, payPeriodStart),
+        eq(payrollLocks.payPeriodEnd, payPeriodEnd)
+      ));
+    return result[0];
+  }
+
+  async createPayrollLock(lock: InsertPayrollLock): Promise<PayrollLock> {
+    const result = await db.insert(payrollLocks).values(lock).returning();
+    return result[0];
+  }
+
+  async updatePayrollLock(id: string, lock: Partial<InsertPayrollLock>): Promise<PayrollLock | undefined> {
+    const result = await db.update(payrollLocks)
+      .set(lock)
+      .where(eq(payrollLocks.id, id))
+      .returning();
     return result[0];
   }
 }

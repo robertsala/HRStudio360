@@ -10,6 +10,8 @@ export const leaveTypeEnum = pgEnum('leave_type', ['Vacation', 'Sick', 'Personal
 export const leaveStatusEnum = pgEnum('leave_status', ['Pending', 'Approved', 'Denied', 'Cancelled']);
 export const userRoleEnum = pgEnum('user_role', ['HR', 'Manager', 'Employee', 'Product Owner']);
 export const dashboardWidgetCategoryEnum = pgEnum('dashboard_widget_category', ['stats', 'team', 'analytics', 'notifications', 'quick-actions', 'calendar', 'ai']);
+export const timesheetStatusEnum = pgEnum('timesheet_status', ['Draft', 'Pending_Approval', 'Approved', 'Rejected', 'Locked']);
+export const payrollLockStatusEnum = pgEnum('payroll_lock_status', ['Locked', 'Processing', 'Completed']);
 
 // Profiles table
 export const profiles = pgTable('profiles', {
@@ -1518,6 +1520,54 @@ export const autoFixAuditLog = pgTable('auto_fix_audit_log', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Timesheet Entries
+export const timesheetEntries = pgTable('timesheet_entries', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'cascade' }).notNull(),
+  payPeriodStart: date('pay_period_start').notNull(),
+  payPeriodEnd: date('pay_period_end').notNull(),
+  regularHours: numeric('regular_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+  overtimeHours: numeric('overtime_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+  ptoHours: numeric('pto_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+  sickHours: numeric('sick_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+  holidayHours: numeric('holiday_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+  status: timesheetStatusEnum('status').default('Draft').notNull(),
+  submittedAt: timestamp('submitted_at'),
+  submittedBy: uuid('submitted_by').references(() => profiles.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  employeePeriodIdx: uniqueIndex('employee_period_idx').on(table.employeeId, table.payPeriodStart, table.payPeriodEnd)
+}));
+
+// Timesheet Approvals
+export const timesheetApprovals = pgTable('timesheet_approvals', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  timesheetId: uuid('timesheet_id').references(() => timesheetEntries.id, { onDelete: 'cascade' }).notNull(),
+  approverId: uuid('approver_id').references(() => profiles.id).notNull(),
+  status: timesheetStatusEnum('status').notNull(), // 'Approved' or 'Rejected'
+  approvedAt: timestamp('approved_at').defaultNow(),
+  comments: text('comments'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Payroll Locks
+export const payrollLocks = pgTable('payroll_locks', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  payPeriodStart: date('pay_period_start').notNull(),
+  payPeriodEnd: date('pay_period_end').notNull(),
+  status: payrollLockStatusEnum('status').default('Locked').notNull(),
+  lockedBy: uuid('locked_by').references(() => profiles.id).notNull(),
+  lockedAt: timestamp('locked_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  employeeIds: uuid('employee_ids').array(), // Employees included in this payroll run
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => ({
+  periodIdx: uniqueIndex('payroll_period_idx').on(table.payPeriodStart, table.payPeriodEnd)
+}));
+
 // Insert schemas
 export const insertTaxJurisdictionSchema = createInsertSchema(taxJurisdictions).omit({
   id: true,
@@ -1549,3 +1599,25 @@ export const insertAutoFixAuditLogSchema = createInsertSchema(autoFixAuditLog).o
 });
 export type InsertAutoFixAuditLog = z.infer<typeof insertAutoFixAuditLogSchema>;
 export type AutoFixAuditLog = typeof autoFixAuditLog.$inferSelect;
+
+export const insertTimesheetEntrySchema = createInsertSchema(timesheetEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertTimesheetEntry = z.infer<typeof insertTimesheetEntrySchema>;
+export type TimesheetEntry = typeof timesheetEntries.$inferSelect;
+
+export const insertTimesheetApprovalSchema = createInsertSchema(timesheetApprovals).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTimesheetApproval = z.infer<typeof insertTimesheetApprovalSchema>;
+export type TimesheetApproval = typeof timesheetApprovals.$inferSelect;
+
+export const insertPayrollLockSchema = createInsertSchema(payrollLocks).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertPayrollLock = z.infer<typeof insertPayrollLockSchema>;
+export type PayrollLock = typeof payrollLocks.$inferSelect;

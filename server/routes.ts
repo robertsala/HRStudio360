@@ -3524,6 +3524,68 @@ export function registerRoutes(app: Express) {
 
       const affectedEmployeeIds = fixData.affectedEmployees.map((e: any) => e.id);
       
+      // SECURITY FIX: Validate all affected employees have approved timesheets for the SAME pay period
+      // This prevents manipulation by ensuring a consistent, server-verified pay period
+      
+      // Step 1: Load approved timesheets for all affected employees
+      const employeeTimesheets = await Promise.all(
+        affectedEmployeeIds.map(async (empId: string) => {
+          const timesheets = await db.select()
+            .from(timesheetEntries)
+            .where(and(
+              eq(timesheetEntries.employeeId, empId),
+              or(
+                eq(timesheetEntries.status, 'Approved'),
+                eq(timesheetEntries.status, 'Locked')
+              )
+            ))
+            .orderBy(desc(timesheetEntries.createdAt))
+            .limit(1);
+          
+          return timesheets.length > 0 ? { employeeId: empId, timesheet: timesheets[0] } : null;
+        })
+      );
+
+      const validTimesheets = employeeTimesheets.filter(Boolean);
+      
+      if (validTimesheets.length === 0) {
+        return res.status(400).json({ 
+          error: 'No approved timesheets found',
+          details: 'All affected employees must have approved timesheets before auto-fix can be applied'
+        });
+      }
+
+      if (validTimesheets.length !== affectedEmployeeIds.length) {
+        const missingTimesheets = affectedEmployeeIds.filter(id => 
+          !validTimesheets.some(t => t?.employeeId === id)
+        );
+        return res.status(400).json({ 
+          error: 'Missing approved timesheets',
+          details: `${missingTimesheets.length} employee(s) do not have approved timesheets`,
+          missingEmployeeIds: missingTimesheets
+        });
+      }
+
+      // Step 2: Validate ALL timesheets are for the SAME pay period (prevent manipulation)
+      const payPeriods = new Set(validTimesheets.map(t => 
+        t ? `${t.timesheet.payPeriodStart}|${t.timesheet.payPeriodEnd}` : ''
+      ));
+      
+      if (payPeriods.size > 1) {
+        return res.status(400).json({ 
+          error: 'Inconsistent pay periods',
+          details: 'All affected employees must have timesheets for the same pay period. Found multiple pay periods.',
+          payPeriods: Array.from(payPeriods)
+        });
+      }
+
+      // Step 3: Use the validated, consistent pay period from database
+      const firstTimesheet = validTimesheets[0]!.timesheet;
+      const payPeriodStart = firstTimesheet.payPeriodStart;
+      const payPeriodEnd = firstTimesheet.payPeriodEnd;
+      
+      console.log(`[Auto-Fix] Validated consistent pay period across ${validTimesheets.length} employees: ${payPeriodStart} to ${payPeriodEnd}`);
+
       // For each affected employee, recalculate EVERYTHING from authoritative database records (don't trust client data)
       const recalculatedStates = await Promise.all(
         affectedEmployeeIds.map(async (empId: string) => {
@@ -3531,14 +3593,28 @@ export function registerRoutes(app: Express) {
           const employee = await storage.getEmployeeById(empId);
           if (!profile || !employee) return null;
 
-          // Get timesheet data from employeePayrollData (HR has already reviewed this)
-          const payrollData = employeePayrollData?.find((e: any) => e.id === empId);
+          // Load approved timesheet from database (SECURITY: Don't trust client hours)
+          const approvedTimesheet = await storage.getTimesheetEntryByEmployeeAndPeriod(
+            empId,
+            payPeriodStart,
+            payPeriodEnd
+          );
+
+          if (!approvedTimesheet) {
+            console.warn(`No approved timesheet found for employee ${empId} in period ${payPeriodStart} to ${payPeriodEnd}`);
+            return null; // Skip employees without approved timesheets
+          }
+
+          if (approvedTimesheet.status !== 'Approved' && approvedTimesheet.status !== 'Locked') {
+            console.warn(`Timesheet for employee ${empId} is not approved (status: ${approvedTimesheet.status})`);
+            return null; // Skip employees with unapproved timesheets
+          }
           
-          // Recalculate gross pay from authoritative employee record (not client data)
+          // Recalculate gross pay from authoritative employee record + approved timesheet hours
           let authoritativeGrossPay: number;
           if (employee.employeeType === 'Hourly') {
-            const regularHours = payrollData?.regularHours || 0;
-            const overtimeHours = payrollData?.overtimeHours || 0;
+            const regularHours = parseFloat(approvedTimesheet.regularHours);
+            const overtimeHours = parseFloat(approvedTimesheet.overtimeHours);
             const hourlyRate = parseFloat(employee.hourlyRate || '0');
             const overtimeRate = hourlyRate * 1.5;
             authoritativeGrossPay = (regularHours * hourlyRate) + (overtimeHours * overtimeRate);
@@ -4906,6 +4982,246 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: 'Validation error', details: error.errors });
       }
       res.status(500).json({ error: 'Failed to create auto-fix audit log', details: error.message });
+    }
+  });
+
+  // Timesheet API Routes
+  // These routes handle timesheet entry creation, approval workflows, and payroll locks
+  
+  // Bulk save timesheets (typically called when HR reviews Step 1 of payroll wizard)
+  app.post('/api/timesheets/bulk-save', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can save timesheets' 
+        });
+      }
+
+      const { timesheets, payPeriodStart, payPeriodEnd } = req.body;
+
+      if (!Array.isArray(timesheets) || timesheets.length === 0) {
+        return res.status(400).json({ error: 'Timesheets array is required and cannot be empty' });
+      }
+
+      if (!payPeriodStart || !payPeriodEnd) {
+        return res.status(400).json({ error: 'Pay period dates are required' });
+      }
+
+      // Validate and prepare timesheet entries
+      const timesheetEntries = timesheets.map(ts => ({
+        employeeId: ts.employeeId,
+        payPeriodStart,
+        payPeriodEnd,
+        regularHours: ts.regularHours || '0',
+        overtimeHours: ts.overtimeHours || '0',
+        ptoHours: ts.ptoHours || '0',
+        sickHours: ts.sickHours || '0',
+        holidayHours: ts.holidayHours || '0',
+        status: 'Pending_Approval',
+        submittedBy: userId,
+        submittedAt: new Date(),
+        notes: ts.notes || null
+      }));
+
+      // Check if timesheets already exist for this period and update/create accordingly
+      const savedTimesheets = [];
+      for (const entry of timesheetEntries) {
+        const existing = await storage.getTimesheetEntryByEmployeeAndPeriod(
+          entry.employeeId,
+          entry.payPeriodStart,
+          entry.payPeriodEnd
+        );
+
+        if (existing) {
+          // Update existing timesheet
+          const updated = await storage.updateTimesheetEntry(existing.id, entry);
+          savedTimesheets.push(updated);
+        } else {
+          // Create new timesheet
+          const created = await storage.createTimesheetEntry(entry);
+          savedTimesheets.push(created);
+        }
+      }
+
+      res.status(201).json({ 
+        message: 'Timesheets saved successfully',
+        timesheets: savedTimesheets
+      });
+    } catch (error: any) {
+      console.error('Error saving timesheets:', error);
+      res.status(500).json({ error: 'Failed to save timesheets', details: error.message });
+    }
+  });
+
+  // Approve timesheets (manager or HR approval)
+  app.post('/api/timesheets/approve', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can approve timesheets' 
+        });
+      }
+
+      const { timesheetIds, payPeriodStart, payPeriodEnd } = req.body;
+
+      if (!Array.isArray(timesheetIds) || timesheetIds.length === 0) {
+        return res.status(400).json({ error: 'Timesheet IDs array is required' });
+      }
+
+      // Update all timesheets to approved status and create approval records
+      const approvals = [];
+      for (const timesheetId of timesheetIds) {
+        // Update status to Approved
+        await storage.updateTimesheetEntry(timesheetId, { status: 'Approved' });
+
+        // Create approval record
+        const approval = await storage.createTimesheetApproval({
+          timesheetId,
+          approverId: userId,
+          status: 'Approved',
+          approvedAt: new Date(),
+          comments: 'Approved via payroll wizard'
+        });
+        approvals.push(approval);
+      }
+
+      res.json({ 
+        message: 'Timesheets approved successfully',
+        approvals
+      });
+    } catch (error: any) {
+      console.error('Error approving timesheets:', error);
+      res.status(500).json({ error: 'Failed to approve timesheets', details: error.message });
+    }
+  });
+
+  // Get approved timesheets for a pay period (used by auto-fix and payroll processing)
+  app.get('/api/timesheets/approved', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { payPeriodStart, payPeriodEnd } = req.query;
+
+      if (!payPeriodStart || !payPeriodEnd) {
+        return res.status(400).json({ error: 'Pay period dates are required' });
+      }
+
+      const timesheets = await storage.getApprovedTimesheetsByPeriod(
+        payPeriodStart as string,
+        payPeriodEnd as string
+      );
+
+      res.json(timesheets);
+    } catch (error: any) {
+      console.error('Error fetching approved timesheets:', error);
+      res.status(500).json({ error: 'Failed to fetch approved timesheets', details: error.message });
+    }
+  });
+
+  // Create payroll lock (locks timesheets once payroll processing starts)
+  app.post('/api/payroll-lock', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create payroll locks' 
+        });
+      }
+
+      const { payPeriodStart, payPeriodEnd, employeeIds, notes } = req.body;
+
+      if (!payPeriodStart || !payPeriodEnd) {
+        return res.status(400).json({ error: 'Pay period dates are required' });
+      }
+
+      // Check if lock already exists
+      const existingLock = await storage.getPayrollLock(payPeriodStart, payPeriodEnd);
+      if (existingLock) {
+        return res.status(409).json({ 
+          error: 'Payroll lock already exists for this period',
+          lock: existingLock
+        });
+      }
+
+      // Get all approved timesheets for this period
+      const approvedTimesheets = await storage.getApprovedTimesheetsByPeriod(
+        payPeriodStart,
+        payPeriodEnd
+      );
+
+      // Update all approved timesheets to Locked status
+      for (const timesheet of approvedTimesheets) {
+        await storage.updateTimesheetEntry(timesheet.id, { status: 'Locked' });
+      }
+
+      // Create payroll lock
+      const lock = await storage.createPayrollLock({
+        payPeriodStart,
+        payPeriodEnd,
+        status: 'Locked',
+        lockedBy: userId,
+        lockedAt: new Date(),
+        employeeIds: employeeIds || approvedTimesheets.map(t => t.employeeId),
+        notes: notes || 'Payroll processing started'
+      });
+
+      res.status(201).json({ 
+        message: 'Payroll locked successfully',
+        lock,
+        timesheetsLocked: approvedTimesheets.length
+      });
+    } catch (error: any) {
+      console.error('Error creating payroll lock:', error);
+      res.status(500).json({ error: 'Failed to create payroll lock', details: error.message });
+    }
+  });
+
+  // Get payroll lock status
+  app.get('/api/payroll-lock/status', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { payPeriodStart, payPeriodEnd } = req.query;
+
+      if (!payPeriodStart || !payPeriodEnd) {
+        return res.status(400).json({ error: 'Pay period dates are required' });
+      }
+
+      const lock = await storage.getPayrollLock(
+        payPeriodStart as string,
+        payPeriodEnd as string
+      );
+
+      res.json({ 
+        isLocked: !!lock,
+        lock: lock || null
+      });
+    } catch (error: any) {
+      console.error('Error checking payroll lock status:', error);
+      res.status(500).json({ error: 'Failed to check payroll lock status', details: error.message });
     }
   });
 }
