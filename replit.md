@@ -4,6 +4,17 @@
 
 HR Studio 360 is an AI-powered Human Resources management platform designed to streamline the entire employee lifecycle, from recruitment to offboarding. It offers comprehensive HR functionality, including hiring, employee management, payroll, performance reviews, benefits administration, time tracking, and analytics. The platform features a modular dashboard with over 40 specialized components, emphasizing user experience with celebration systems, real-time chat, and extensive customization. The project aims to provide an end-to-end HR solution, enhancing efficiency and employee engagement, and includes an enterprise-grade Applicant Tracking System (ATS) and an autonomous AI agent, "Studio AI," for tasks like candidate screening and hiring insights.
 
+## Recent Changes
+
+### v3.5.0 - Phase 1: Role-Based Dashboard Widgets (November 15, 2025)
+- ✅ Backend infrastructure complete for customizable dashboard widgets
+- Database schema with `dashboard_widget_presets` and `user_dashboard_preferences` tables
+- Widget registry system defining 11 dashboard widgets with role-based visibility
+- Role-based defaults: Employee (7 widgets), Manager (10 widgets), HR (11 widgets)
+- API endpoint `/api/dashboard/widgets` with merge logic (user prefs → role presets → registry defaults)
+- isActive flag support allowing admins to deactivate widgets without code changes
+- Architecture ready for Phase 2 (customization UI) and Phase 3 (visual improvements)
+
 ## User Preferences
 
 - **Communication style**: Simple, everyday language.
@@ -25,6 +36,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Paycheck Fun Facts**: Creative purchase comparison feature showing what paychecks could buy (e.g., "7 arcade sessions" or "12 craft coffees"). Migrated from Supabase to PostgreSQL with 3-per-day manual refresh limit. Database tracks templates, history, and daily usage. Smart rotation system prevents repeats by tracking last 10 shown facts per employee. Production seeding endpoint available at `/api/fun-facts/seed`.
 -   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation. Fully populated with 20 historical entries documenting all major features from v1.0.0 to v3.2.0. Production seeding endpoint available at `/api/changelog/seed`.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
+-   **Dashboard Customization (v3.5.0)**: Role-based customizable dashboard widgets with backend infrastructure complete. Widget registry defines 11 widgets with role-based visibility (Employee: 7, Manager: 10, HR: 11). API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Seeding endpoint at `/api/dashboard/widgets/seed`. Frontend integration pending Phase 2.
 -   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search. The "Studio AI" agent operates autonomously, performing actions like candidate screening and generating insights.
 -   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries. Component extraction pattern used for reusability (e.g., `JobPostingsPanel` extracted from `JobManagementModal`).
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.
