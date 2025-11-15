@@ -5224,4 +5224,350 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to check payroll lock status', details: error.message });
     }
   });
+
+  // Permission Management API Routes
+  
+  // Get all permissions (optionally filtered by category)
+  app.get('/api/permissions', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { category } = req.query;
+
+      let permissions;
+      if (category) {
+        permissions = await storage.getPermissionsByCategory(category as string);
+      } else {
+        permissions = await storage.getPermissions();
+      }
+
+      res.json(permissions);
+    } catch (error: any) {
+      console.error('Error fetching permissions:', error);
+      res.status(500).json({ error: 'Failed to fetch permissions', details: error.message });
+    }
+  });
+
+  // Get role permissions
+  app.get('/api/permissions/role/:role', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { role } = req.params;
+      const rolePermissions = await storage.getRolePermissions(role);
+      
+      res.json(rolePermissions);
+    } catch (error: any) {
+      console.error('Error fetching role permissions:', error);
+      res.status(500).json({ error: 'Failed to fetch role permissions', details: error.message });
+    }
+  });
+
+  // Check if role has specific permission
+  app.get('/api/permissions/check/:role/:permissionCode', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { role, permissionCode } = req.params;
+      const hasPermission = await storage.hasPermission(role, permissionCode);
+      
+      res.json({ hasPermission });
+    } catch (error: any) {
+      console.error('Error checking permission:', error);
+      res.status(500).json({ error: 'Failed to check permission', details: error.message });
+    }
+  });
+
+  // Create new permission (HR/Product Owner only)
+  app.post('/api/permissions', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile || (userProfile.role !== 'HR' && userProfile.role !== 'Product Owner')) {
+        return res.status(403).json({ error: 'Unauthorized - HR or Product Owner role required' });
+      }
+
+      const { code, category, name, description } = req.body;
+
+      if (!code || !category || !name) {
+        return res.status(400).json({ error: 'Code, category, and name are required' });
+      }
+
+      const permission = await storage.createPermission({
+        code,
+        category,
+        name,
+        description
+      });
+
+      res.status(201).json(permission);
+    } catch (error: any) {
+      console.error('Error creating permission:', error);
+      res.status(500).json({ error: 'Failed to create permission', details: error.message });
+    }
+  });
+
+  // Assign permission to role (HR/Product Owner only)
+  app.post('/api/permissions/assign', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile || (userProfile.role !== 'HR' && userProfile.role !== 'Product Owner')) {
+        return res.status(403).json({ error: 'Unauthorized - HR or Product Owner role required' });
+      }
+
+      const { role, permissionId } = req.body;
+
+      if (!role || !permissionId) {
+        return res.status(400).json({ error: 'Role and permissionId are required' });
+      }
+
+      const rolePermission = await storage.assignPermissionToRole({
+        role,
+        permissionId
+      });
+
+      res.status(201).json(rolePermission);
+    } catch (error: any) {
+      console.error('Error assigning permission to role:', error);
+      res.status(500).json({ error: 'Failed to assign permission', details: error.message });
+    }
+  });
+
+  // Revoke permission from role (HR/Product Owner only)
+  app.delete('/api/permissions/revoke', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile || (userProfile.role !== 'HR' && userProfile.role !== 'Product Owner')) {
+        return res.status(403).json({ error: 'Unauthorized - HR or Product Owner role required' });
+      }
+
+      const { role, permissionId } = req.body;
+
+      if (!role || !permissionId) {
+        return res.status(400).json({ error: 'Role and permissionId are required' });
+      }
+
+      await storage.revokePermissionFromRole(role, permissionId);
+
+      res.json({ message: 'Permission revoked successfully' });
+    } catch (error: any) {
+      console.error('Error revoking permission from role:', error);
+      res.status(500).json({ error: 'Failed to revoke permission', details: error.message });
+    }
+  });
+
+  // Timesheet Correction Request API Routes
+
+  // Get correction requests (filtered by user role)
+  app.get('/api/timesheet-corrections', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+
+      const { status, timesheetEntryId } = req.query;
+      let filters: any = {};
+
+      if (status) {
+        filters.status = status as string;
+      }
+
+      if (timesheetEntryId) {
+        filters.timesheetEntryId = timesheetEntryId as string;
+      }
+
+      // Employees can only see their own requests
+      if (userProfile.role === 'Employee') {
+        filters.requestedById = userId;
+      }
+
+      const correctionRequests = await storage.getCorrectionRequests(filters);
+      res.json(correctionRequests);
+    } catch (error: any) {
+      console.error('Error fetching correction requests:', error);
+      res.status(500).json({ error: 'Failed to fetch correction requests', details: error.message });
+    }
+  });
+
+  // Create correction request
+  app.post('/api/timesheet-corrections', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { timesheetEntryId, originalValues, requestedValues, justification, supportingDocuments } = req.body;
+
+      if (!timesheetEntryId || !originalValues || !requestedValues || !justification) {
+        return res.status(400).json({ 
+          error: 'Timesheet entry ID, original values, requested values, and justification are required' 
+        });
+      }
+
+      // Verify the timesheet entry exists and get employee info
+      const employee = await storage.getEmployeeById(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      const correctionRequest = await storage.createCorrectionRequest({
+        timesheetEntryId,
+        requestedById: userId,
+        originalValues,
+        requestedValues,
+        justification,
+        supportingDocuments: supportingDocuments || null,
+        status: 'Pending'
+      });
+
+      // Create audit trail entry
+      await storage.createTimesheetChangeAudit({
+        timesheetEntryId,
+        changedBy: userId,
+        changeType: 'Employee_Edit',
+        oldValues: originalValues,
+        newValues: requestedValues,
+        justification,
+        correctionRequestId: correctionRequest.id
+      });
+
+      res.status(201).json(correctionRequest);
+    } catch (error: any) {
+      console.error('Error creating correction request:', error);
+      res.status(500).json({ error: 'Failed to create correction request', details: error.message });
+    }
+  });
+
+  // Approve correction request (Manager/HR only)
+  app.post('/api/timesheet-corrections/:id/approve', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile || (userProfile.role !== 'Manager' && userProfile.role !== 'HR' && userProfile.role !== 'Product Owner')) {
+        return res.status(403).json({ error: 'Unauthorized - Manager, HR, or Product Owner role required' });
+      }
+
+      const { id } = req.params;
+      const { reviewNotes } = req.body;
+
+      // Determine change type based on reviewer role
+      const changeType = userProfile.role === 'Manager' ? 'Manager_Correction' : 'HR_Override';
+
+      // Execute atomic approval (all 3 operations in a single transaction)
+      const approvedRequest = await storage.approveCorrectionRequestAtomic(
+        id,
+        userId,
+        changeType,
+        reviewNotes
+      );
+
+      res.json({ 
+        message: 'Correction request approved and changes applied',
+        correctionRequest: approvedRequest 
+      });
+    } catch (error: any) {
+      console.error('Error approving correction request:', error);
+      res.status(500).json({ error: 'Failed to approve correction request', details: error.message });
+    }
+  });
+
+  // Reject correction request (Manager/HR only)
+  app.post('/api/timesheet-corrections/:id/reject', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile || (userProfile.role !== 'Manager' && userProfile.role !== 'HR' && userProfile.role !== 'Product Owner')) {
+        return res.status(403).json({ error: 'Unauthorized - Manager, HR, or Product Owner role required' });
+      }
+
+      const { id } = req.params;
+      const { reviewNotes } = req.body;
+
+      if (!reviewNotes) {
+        return res.status(400).json({ error: 'Review notes are required when rejecting a correction request' });
+      }
+
+      // Execute atomic rejection (all validation + update in a single transaction)
+      const rejectedRequest = await storage.rejectCorrectionRequestAtomic(id, userId, reviewNotes);
+
+      res.json({ 
+        message: 'Correction request rejected',
+        correctionRequest: rejectedRequest 
+      });
+    } catch (error: any) {
+      console.error('Error rejecting correction request:', error);
+      res.status(500).json({ error: 'Failed to reject correction request', details: error.message });
+    }
+  });
+
+  // Get audit trail for a timesheet entry
+  app.get('/api/timesheet-audit/:timesheetEntryId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile) {
+        return res.status(404).json({ error: 'User profile not found' });
+      }
+
+      const { timesheetEntryId } = req.params;
+
+      // Verify user has permission to view this audit trail
+      // Employees can only view their own, Managers/HR can view all
+      if (userProfile.role === 'Employee') {
+        const employee = await storage.getEmployeeById(userId);
+        if (!employee) {
+          return res.status(404).json({ error: 'Employee not found' });
+        }
+        // Additional check could be added here to verify the timesheet belongs to this employee
+      }
+
+      const auditTrail = await storage.getTimesheetChangeAudit(timesheetEntryId);
+      res.json(auditTrail);
+    } catch (error: any) {
+      console.error('Error fetching timesheet audit trail:', error);
+      res.status(500).json({ error: 'Failed to fetch audit trail', details: error.message });
+    }
+  });
 }

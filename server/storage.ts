@@ -32,7 +32,11 @@ import type {
   UserDashboardPreference,
   TimesheetEntry, InsertTimesheetEntry,
   TimesheetApproval, InsertTimesheetApproval,
-  PayrollLock, InsertPayrollLock
+  PayrollLock, InsertPayrollLock,
+  Permission, InsertPermission,
+  RolePermission, InsertRolePermission,
+  TimesheetCorrectionRequest, InsertTimesheetCorrectionRequest,
+  TimesheetChangeAudit, InsertTimesheetChangeAudit
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -46,7 +50,8 @@ import {
   paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage,
   dashboardWidgetPresets, userDashboardPreferences,
   taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog,
-  timesheetEntries, timesheetApprovals, payrollLocks
+  timesheetEntries, timesheetApprovals, payrollLocks,
+  permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -300,6 +305,35 @@ export interface IStorage {
   getPayrollLock(payPeriodStart: string, payPeriodEnd: string): Promise<PayrollLock | undefined>;
   createPayrollLock(lock: InsertPayrollLock): Promise<PayrollLock>;
   updatePayrollLock(id: string, lock: Partial<InsertPayrollLock>): Promise<PayrollLock | undefined>;
+
+  // Permission Management
+  getPermissions(): Promise<import('../shared/schema.js').Permission[]>;
+  getPermissionById(id: string): Promise<import('../shared/schema.js').Permission | undefined>;
+  getPermissionByCode(code: string): Promise<import('../shared/schema.js').Permission | undefined>;
+  getPermissionsByCategory(category: string): Promise<import('../shared/schema.js').Permission[]>;
+  createPermission(permission: import('../shared/schema.js').InsertPermission): Promise<import('../shared/schema.js').Permission>;
+  updatePermission(id: string, permission: Partial<import('../shared/schema.js').InsertPermission>): Promise<import('../shared/schema.js').Permission | undefined>;
+  deletePermission(id: string): Promise<void>;
+
+  // Role-Permission Mapping
+  getRolePermissions(role: string): Promise<import('../shared/schema.js').RolePermission[]>;
+  assignPermissionToRole(rolePermission: import('../shared/schema.js').InsertRolePermission): Promise<import('../shared/schema.js').RolePermission>;
+  revokePermissionFromRole(role: string, permissionId: string): Promise<void>;
+  hasPermission(role: string, permissionCode: string): Promise<boolean>;
+
+  // Timesheet Correction Requests
+  getCorrectionRequests(filters?: { timesheetEntryId?: string; requestedById?: string; status?: string }): Promise<import('../shared/schema.js').TimesheetCorrectionRequest[]>;
+  getCorrectionRequestById(id: string): Promise<import('../shared/schema.js').TimesheetCorrectionRequest | undefined>;
+  createCorrectionRequest(request: import('../shared/schema.js').InsertTimesheetCorrectionRequest): Promise<import('../shared/schema.js').TimesheetCorrectionRequest>;
+  updateCorrectionRequest(id: string, request: Partial<import('../shared/schema.js').InsertTimesheetCorrectionRequest>): Promise<import('../shared/schema.js').TimesheetCorrectionRequest | undefined>;
+  approveCorrectionRequest(id: string, reviewerId: string, reviewNotes?: string): Promise<import('../shared/schema.js').TimesheetCorrectionRequest | undefined>;
+  rejectCorrectionRequest(id: string, reviewerId: string, reviewNotes: string): Promise<import('../shared/schema.js').TimesheetCorrectionRequest | undefined>;
+  approveCorrectionRequestAtomic(id: string, reviewerId: string, changeType: 'Manager_Correction' | 'HR_Override', reviewNotes?: string): Promise<import('../shared/schema.js').TimesheetCorrectionRequest>;
+  rejectCorrectionRequestAtomic(id: string, reviewerId: string, reviewNotes: string): Promise<import('../shared/schema.js').TimesheetCorrectionRequest>;
+
+  // Timesheet Change Audit Trail
+  getTimesheetChangeAudit(timesheetEntryId: string): Promise<import('../shared/schema.js').TimesheetChangeAudit[]>;
+  createTimesheetChangeAudit(audit: import('../shared/schema.js').InsertTimesheetChangeAudit): Promise<import('../shared/schema.js').TimesheetChangeAudit>;
 }
 
 // Database storage implementation
@@ -1922,6 +1956,255 @@ export class DbStorage implements IStorage {
       .where(eq(payrollLocks.id, id))
       .returning();
     return result[0];
+  }
+
+  // Permission Management
+  async getPermissions(): Promise<Permission[]> {
+    return await db.select().from(permissions).orderBy(permissions.category, permissions.name);
+  }
+
+  async getPermissionById(id: string): Promise<Permission | undefined> {
+    const result = await db.select().from(permissions).where(eq(permissions.id, id));
+    return result[0];
+  }
+
+  async getPermissionByCode(code: string): Promise<Permission | undefined> {
+    const result = await db.select().from(permissions).where(eq(permissions.code, code));
+    return result[0];
+  }
+
+  async getPermissionsByCategory(category: string): Promise<Permission[]> {
+    return await db.select()
+      .from(permissions)
+      .where(eq(permissions.category, category))
+      .orderBy(permissions.name);
+  }
+
+  async createPermission(permission: InsertPermission): Promise<Permission> {
+    const result = await db.insert(permissions).values(permission).returning();
+    return result[0];
+  }
+
+  async updatePermission(id: string, permission: Partial<InsertPermission>): Promise<Permission | undefined> {
+    const result = await db.update(permissions)
+      .set(permission)
+      .where(eq(permissions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePermission(id: string): Promise<void> {
+    await db.delete(permissions).where(eq(permissions.id, id));
+  }
+
+  // Role-Permission Mapping
+  async getRolePermissions(role: string): Promise<RolePermission[]> {
+    return await db.select()
+      .from(rolePermissions)
+      .where(eq(rolePermissions.role, role))
+      .orderBy(rolePermissions.createdAt);
+  }
+
+  async assignPermissionToRole(rolePermission: InsertRolePermission): Promise<RolePermission> {
+    const result = await db.insert(rolePermissions).values(rolePermission).returning();
+    return result[0];
+  }
+
+  async revokePermissionFromRole(role: string, permissionId: string): Promise<void> {
+    await db.delete(rolePermissions)
+      .where(and(
+        eq(rolePermissions.role, role),
+        eq(rolePermissions.permissionId, permissionId)
+      ));
+  }
+
+  async hasPermission(role: string, permissionCode: string): Promise<boolean> {
+    const result = await db.select()
+      .from(rolePermissions)
+      .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+      .where(and(
+        eq(rolePermissions.role, role),
+        eq(permissions.code, permissionCode)
+      ))
+      .limit(1);
+    return result.length > 0;
+  }
+
+  // Timesheet Correction Requests
+  async getCorrectionRequests(filters?: { timesheetEntryId?: string; requestedById?: string; status?: string }): Promise<TimesheetCorrectionRequest[]> {
+    const conditions = [];
+    if (filters?.timesheetEntryId) {
+      conditions.push(eq(timesheetCorrectionRequests.timesheetEntryId, filters.timesheetEntryId));
+    }
+    if (filters?.requestedById) {
+      conditions.push(eq(timesheetCorrectionRequests.requestedById, filters.requestedById));
+    }
+    if (filters?.status) {
+      conditions.push(eq(timesheetCorrectionRequests.status, filters.status as any));
+    }
+
+    const query = db.select().from(timesheetCorrectionRequests);
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions)).orderBy(desc(timesheetCorrectionRequests.createdAt));
+    }
+    return await query.orderBy(desc(timesheetCorrectionRequests.createdAt));
+  }
+
+  async getCorrectionRequestById(id: string): Promise<TimesheetCorrectionRequest | undefined> {
+    const result = await db.select().from(timesheetCorrectionRequests).where(eq(timesheetCorrectionRequests.id, id));
+    return result[0];
+  }
+
+  async createCorrectionRequest(request: InsertTimesheetCorrectionRequest): Promise<TimesheetCorrectionRequest> {
+    const result = await db.insert(timesheetCorrectionRequests).values(request).returning();
+    return result[0];
+  }
+
+  async updateCorrectionRequest(id: string, request: Partial<InsertTimesheetCorrectionRequest>): Promise<TimesheetCorrectionRequest | undefined> {
+    const result = await db.update(timesheetCorrectionRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(timesheetCorrectionRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async approveCorrectionRequest(id: string, reviewerId: string, reviewNotes?: string): Promise<TimesheetCorrectionRequest | undefined> {
+    const result = await db.update(timesheetCorrectionRequests)
+      .set({
+        status: 'Approved',
+        reviewedBy: reviewerId,
+        reviewedAt: new Date(),
+        reviewNotes,
+        updatedAt: new Date()
+      })
+      .where(eq(timesheetCorrectionRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async rejectCorrectionRequest(id: string, reviewerId: string, reviewNotes: string): Promise<TimesheetCorrectionRequest | undefined> {
+    const result = await db.update(timesheetCorrectionRequests)
+      .set({
+        status: 'Rejected',
+        reviewedBy: reviewerId,
+        reviewedAt: new Date(),
+        reviewNotes,
+        updatedAt: new Date()
+      })
+      .where(eq(timesheetCorrectionRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Timesheet Change Audit Trail
+  async getTimesheetChangeAudit(timesheetEntryId: string): Promise<TimesheetChangeAudit[]> {
+    return await db.select()
+      .from(timesheetChangeAudit)
+      .where(eq(timesheetChangeAudit.timesheetEntryId, timesheetEntryId))
+      .orderBy(desc(timesheetChangeAudit.changedAt));
+  }
+
+  async createTimesheetChangeAudit(audit: InsertTimesheetChangeAudit): Promise<TimesheetChangeAudit> {
+    const result = await db.insert(timesheetChangeAudit).values(audit).returning();
+    return result[0];
+  }
+
+  // Atomic correction approval - all operations in a single transaction
+  async approveCorrectionRequestAtomic(
+    id: string,
+    reviewerId: string,
+    changeType: 'Manager_Correction' | 'HR_Override',
+    reviewNotes?: string
+  ): Promise<TimesheetCorrectionRequest> {
+    return await db.transaction(async (tx) => {
+      // Step 1: Get the correction request
+      const correctionRequestResult = await tx
+        .select()
+        .from(timesheetCorrectionRequests)
+        .where(eq(timesheetCorrectionRequests.id, id));
+      
+      const correctionRequest = correctionRequestResult[0];
+      if (!correctionRequest) {
+        throw new Error('Correction request not found');
+      }
+
+      if (correctionRequest.status !== 'Pending') {
+        throw new Error('Correction request has already been reviewed');
+      }
+
+      // Step 2: Update the correction request to Approved
+      const approvedRequestResult = await tx
+        .update(timesheetCorrectionRequests)
+        .set({
+          status: 'Approved',
+          reviewedBy: reviewerId,
+          reviewedAt: new Date(),
+          reviewNotes,
+          updatedAt: new Date()
+        })
+        .where(eq(timesheetCorrectionRequests.id, id))
+        .returning();
+
+      const approvedRequest = approvedRequestResult[0];
+
+      // Step 3: Apply the changes to the timesheet entry
+      await tx
+        .update(timesheetEntries)
+        .set(correctionRequest.requestedValues as any)
+        .where(eq(timesheetEntries.id, correctionRequest.timesheetEntryId));
+
+      // Step 4: Create audit trail entry
+      await tx.insert(timesheetChangeAudit).values({
+        timesheetEntryId: correctionRequest.timesheetEntryId,
+        changedBy: reviewerId,
+        changeType,
+        oldValues: correctionRequest.originalValues as any,
+        newValues: correctionRequest.requestedValues as any,
+        justification: `Approved correction request: ${reviewNotes || 'No notes provided'}`,
+        correctionRequestId: id
+      });
+
+      return approvedRequest;
+    });
+  }
+
+  // Atomic correction rejection - all operations in a single transaction
+  async rejectCorrectionRequestAtomic(
+    id: string,
+    reviewerId: string,
+    reviewNotes: string
+  ): Promise<TimesheetCorrectionRequest> {
+    return await db.transaction(async (tx) => {
+      // Step 1: Get the correction request
+      const correctionRequestResult = await tx
+        .select()
+        .from(timesheetCorrectionRequests)
+        .where(eq(timesheetCorrectionRequests.id, id));
+      
+      const correctionRequest = correctionRequestResult[0];
+      if (!correctionRequest) {
+        throw new Error('Correction request not found');
+      }
+
+      if (correctionRequest.status !== 'Pending') {
+        throw new Error('Correction request has already been reviewed');
+      }
+
+      // Step 2: Update the correction request to Rejected
+      const rejectedRequestResult = await tx
+        .update(timesheetCorrectionRequests)
+        .set({
+          status: 'Rejected',
+          reviewedBy: reviewerId,
+          reviewedAt: new Date(),
+          reviewNotes,
+          updatedAt: new Date()
+        })
+        .where(eq(timesheetCorrectionRequests.id, id))
+        .returning();
+
+      return rejectedRequestResult[0];
+    });
   }
 }
 

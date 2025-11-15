@@ -12,6 +12,8 @@ export const userRoleEnum = pgEnum('user_role', ['HR', 'Manager', 'Employee', 'P
 export const dashboardWidgetCategoryEnum = pgEnum('dashboard_widget_category', ['stats', 'team', 'analytics', 'notifications', 'quick-actions', 'calendar', 'ai']);
 export const timesheetStatusEnum = pgEnum('timesheet_status', ['Draft', 'Pending_Approval', 'Approved', 'Rejected', 'Locked']);
 export const payrollLockStatusEnum = pgEnum('payroll_lock_status', ['Locked', 'Processing', 'Completed']);
+export const correctionStatusEnum = pgEnum('correction_status', ['Pending', 'Approved', 'Rejected', 'Cancelled']);
+export const changeTypeEnum = pgEnum('change_type', ['Employee_Edit', 'Manager_Correction', 'HR_Override', 'System_Adjustment']);
 
 // Profiles table
 export const profiles = pgTable('profiles', {
@@ -1568,6 +1570,56 @@ export const payrollLocks = pgTable('payroll_locks', {
   periodIdx: uniqueIndex('payroll_period_idx').on(table.payPeriodStart, table.payPeriodEnd)
 }));
 
+// Permissions Catalog - Granular permissions for access control
+export const permissions = pgTable('permissions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  code: text('code').unique().notNull(), // e.g., 'timesheets.edit_own_draft'
+  category: text('category').notNull(), // e.g., 'Timesheets', 'Payroll', 'Leave'
+  name: text('name').notNull(), // Display name
+  description: text('description'), // What this permission allows
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Role-Permission Mapping - Many-to-many relationship
+export const rolePermissions = pgTable('role_permissions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  role: text('role').notNull(), // e.g., 'Manager', 'HR', 'Employee'
+  permissionId: uuid('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => ({
+  rolePermissionIdx: uniqueIndex('role_permission_idx').on(table.role, table.permissionId)
+}));
+
+// Timesheet Correction Requests - Employee-initiated correction workflow
+export const timesheetCorrectionRequests = pgTable('timesheet_correction_requests', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  timesheetEntryId: uuid('timesheet_entry_id').references(() => timesheetEntries.id, { onDelete: 'cascade' }).notNull(),
+  requestedById: uuid('requested_by_id').references(() => profiles.id).notNull(), // Employee who requested
+  originalValues: json('original_values').notNull(), // Snapshot of original timesheet data
+  requestedValues: json('requested_values').notNull(), // Requested changes
+  justification: text('justification').notNull(), // Required explanation
+  supportingDocuments: text('supporting_documents').array(), // Optional file paths/URLs
+  status: correctionStatusEnum('status').default('Pending').notNull(),
+  reviewedBy: uuid('reviewed_by').references(() => profiles.id), // Manager/HR who reviewed
+  reviewedAt: timestamp('reviewed_at'),
+  reviewNotes: text('review_notes'), // Approval/rejection notes
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Timesheet Change Audit Trail - Complete history of all timesheet modifications
+export const timesheetChangeAudit = pgTable('timesheet_change_audit', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  timesheetEntryId: uuid('timesheet_entry_id').references(() => timesheetEntries.id, { onDelete: 'cascade' }).notNull(),
+  changedBy: uuid('changed_by').references(() => profiles.id).notNull(), // Who made the change
+  changeType: changeTypeEnum('change_type').notNull(), // Type of change
+  oldValues: json('old_values'), // Previous values
+  newValues: json('new_values').notNull(), // New values
+  justification: text('justification'), // Why the change was made
+  correctionRequestId: uuid('correction_request_id').references(() => timesheetCorrectionRequests.id), // Link to correction request if applicable
+  changedAt: timestamp('changed_at').defaultNow()
+});
+
 // Insert schemas
 export const insertTaxJurisdictionSchema = createInsertSchema(taxJurisdictions).omit({
   id: true,
@@ -1621,3 +1673,33 @@ export const insertPayrollLockSchema = createInsertSchema(payrollLocks).omit({
 });
 export type InsertPayrollLock = z.infer<typeof insertPayrollLockSchema>;
 export type PayrollLock = typeof payrollLocks.$inferSelect;
+
+// Insert schemas for new access control and correction tables
+export const insertPermissionSchema = createInsertSchema(permissions).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+export type Permission = typeof permissions.$inferSelect;
+
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+
+export const insertTimesheetCorrectionRequestSchema = createInsertSchema(timesheetCorrectionRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertTimesheetCorrectionRequest = z.infer<typeof insertTimesheetCorrectionRequestSchema>;
+export type TimesheetCorrectionRequest = typeof timesheetCorrectionRequests.$inferSelect;
+
+export const insertTimesheetChangeAuditSchema = createInsertSchema(timesheetChangeAudit).omit({
+  id: true,
+  changedAt: true
+});
+export type InsertTimesheetChangeAudit = z.infer<typeof insertTimesheetChangeAuditSchema>;
+export type TimesheetChangeAudit = typeof timesheetChangeAudit.$inferSelect;
