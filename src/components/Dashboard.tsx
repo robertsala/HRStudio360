@@ -688,97 +688,97 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         ) : (
           <>
             {/* Personalized Welcome Section */}
-            <div className="mb-6">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                    {getTimeBasedGreeting()}, {getUserFirstName()}! 👋
-                  </h1>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {getDepartmentMessage()}
-                  </p>
-                </div>
-                <div className="flex items-start gap-6">
-                  {renderWidget('weather', () => (
+            {renderWidget('welcome-header', () => (
+              <div className="mb-6">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                      {getTimeBasedGreeting()}, {getUserFirstName()}! 👋
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {getDepartmentMessage()}
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-6">
                     <div className="hidden lg:block flex-1">
                       <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
                     </div>
-                  ))}
-                  <div className="text-right hidden xl:block">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.todayIs')}</p>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {new Date().toLocaleDateString(i18n.language, {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
-                    <div className="mt-2">
-                      <DigitalClock format="12" />
+                    <div className="text-right hidden xl:block">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.todayIs')}</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {new Date().toLocaleDateString(i18n.language, {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                      <div className="mt-2">
+                        <DigitalClock format="12" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              {/* Mobile weather widget */}
-              {renderWidget('weather', () => (
+                {/* Mobile weather widget */}
                 <div className="lg:hidden mt-4">
                   <WeatherWidget onLocationChange={() => setModals(prev => ({ ...prev, locationOverride: true }))} />
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
 
             {/* Personalized Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {isStatsLoading ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700"
-                    data-testid={`skeleton-stat-${index}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="p-3 rounded-xl bg-gray-200 dark:bg-gray-700 shadow-md animate-pulse">
-                          <div className="h-6 w-6" />
-                        </div>
-                        <div className="ml-4 space-y-2">
-                          <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                        </div>
-                      </div>
-                      <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                stats.map((stat, index) => {
-                  const Icon = stat.icon;
-                  
-                  return (
-                    <button
+            {renderWidget('personal-stats', () => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {isStatsLoading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <div
                       key={index}
-                      className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
-                      onClick={stat.action}
-                      data-testid={`stat-card-${index}`}
+                      className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700"
+                      data-testid={`skeleton-stat-${index}`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <div className={`p-3 rounded-xl ${stat.color} shadow-md`}>
-                            <Icon className="h-6 w-6 text-white" />
+                          <div className="p-3 rounded-xl bg-gray-200 dark:bg-gray-700 shadow-md animate-pulse">
+                            <div className="h-6 w-6" />
                           </div>
-                          <div className="ml-4">
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">{stat.value}</p>
-                            <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm">{stat.label}</p>
+                          <div className="ml-4 space-y-2">
+                            <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                           </div>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                        <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                       </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
+                    </div>
+                  ))
+                ) : (
+                  stats.map((stat, index) => {
+                    const Icon = stat.icon;
+                    
+                    return (
+                      <button
+                        key={index}
+                        className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
+                        onClick={stat.action}
+                        data-testid={`stat-card-${index}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className={`p-3 rounded-xl ${stat.color} shadow-md`}>
+                              <Icon className="h-6 w-6 text-white" />
+                            </div>
+                            <div className="ml-4">
+                              <p className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">{stat.value}</p>
+                              <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm">{stat.label}</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ))}
 
             {/* Manager/HR Specific Stats */}
             {renderWidget('team-overview', () => 
@@ -883,36 +883,38 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
                   </div>
                 ))}
 
-                {/* Pending Tasks - not a configurable widget, always shown */}
-                <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
-                    <Clock className="h-5 w-5 mr-2 text-purple-500" />
-                    {t('dashboard.yourPendingTasks')}
-                  </h3>
-                  <div className="space-y-3">
-                    {personalizedData.pendingTasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white dark:text-white text-sm">{task.title}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.due')}: {new Date(task.dueDate).toLocaleDateString(i18n.language)}</p>
+                {/* Pending Tasks */}
+                {renderWidget('pending-tasks', () => (
+                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
+                      <Clock className="h-5 w-5 mr-2 text-purple-500" />
+                      {t('dashboard.yourPendingTasks')}
+                    </h3>
+                    <div className="space-y-3">
+                      {personalizedData.pendingTasks.map((task) => (
+                        <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 dark:text-white dark:text-white text-sm">{task.title}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.due')}: {new Date(task.dueDate).toLocaleDateString(i18n.language)}</p>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            task.priority === 'High' ? 'bg-red-100 text-red-800' :
+                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {task.priority}
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                          task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {task.priority}
-                        </span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => openModal('inbox')}
+                      className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium"
+                    >
+                      {t('dashboard.viewAllTasks')} →
+                    </button>
                   </div>
-                  <button
-                    onClick={() => openModal('inbox')}
-                    className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium"
-                  >
-                    {t('dashboard.viewAllTasks')} →
-                  </button>
-                </div>
+                ))}
 
                 {/* Recent Notifications */}
                 {renderWidget('recent-notifications', () => (
@@ -1011,233 +1013,241 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
               {/* Right Column - Company News & Calendar */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Company Announcements & News Feed */}
-                <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-6 flex items-center">
-                    <Globe className="h-5 w-5 mr-2 text-blue-500" />
-                    {t('dashboard.companyAnnouncements')}
-                  </h3>
-                  <div className="space-y-4">
-                    {isAnnouncementsLoading ? (
-                      Array.from({ length: 3 }).map((_, index) => (
-                        <div key={index} className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-2" data-testid={`skeleton-announcement-${index}`}>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 space-y-2">
-                              <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                              <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                              <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                              <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                {renderWidget('company-announcements', () => (
+                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-6 flex items-center">
+                      <Globe className="h-5 w-5 mr-2 text-blue-500" />
+                      {t('dashboard.companyAnnouncements')}
+                    </h3>
+                    <div className="space-y-4">
+                      {isAnnouncementsLoading ? (
+                        Array.from({ length: 3 }).map((_, index) => (
+                          <div key={index} className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-2" data-testid={`skeleton-announcement-${index}`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 space-y-2">
+                                <div className="h-5 w-3/4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                                <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                                <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                                <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                              </div>
+                              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ml-4" />
                             </div>
-                            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ml-4" />
                           </div>
-                        </div>
-                      ))
-                    ) : personalizedData.companyAnnouncements.length > 0 ? (
-                      personalizedData.companyAnnouncements.map((announcement) => (
-                        <div key={announcement.id} className="border-l-4 border-blue-500 pl-4 py-2" data-testid={`announcement-${announcement.id}`}>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white mb-1">{announcement.title}</h4>
-                              <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm mb-2">{announcement.excerpt}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{announcement.date}</p>
+                        ))
+                      ) : personalizedData.companyAnnouncements.length > 0 ? (
+                        personalizedData.companyAnnouncements.map((announcement) => (
+                          <div key={announcement.id} className="border-l-4 border-blue-500 pl-4 py-2" data-testid={`announcement-${announcement.id}`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white mb-1">{announcement.title}</h4>
+                                <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm mb-2">{announcement.excerpt}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{announcement.date}</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedAnnouncementId(announcement.id);
+                                  openModal('announcements');
+                                }}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium ml-4 hover:underline"
+                                data-testid={`button-read-announcement-${announcement.id}`}
+                              >
+                                {t('dashboard.readMore')}
+                              </button>
                             </div>
-                            <button
-                              onClick={() => {
-                                setSelectedAnnouncementId(announcement.id);
-                                openModal('announcements');
-                              }}
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium ml-4 hover:underline"
-                              data-testid={`button-read-announcement-${announcement.id}`}
-                            >
-                              {t('dashboard.readMore')}
-                            </button>
                           </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <Globe className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                          <p>{t('dashboard.noAnnouncements') || 'No announcements at this time'}</p>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        <Globe className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                        <p>{t('dashboard.noAnnouncements') || 'No announcements at this time'}</p>
-                      </div>
+                      )}
+                    </div>
+                    {!isAnnouncementsLoading && (
+                      <button
+                        onClick={() => openModal('announcements')}
+                        className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium hover:underline"
+                        data-testid="button-view-all-announcements"
+                      >
+                        {t('dashboard.viewAllAnnouncements')} →
+                      </button>
                     )}
                   </div>
-                  {!isAnnouncementsLoading && (
-                    <button
-                      onClick={() => openModal('announcements')}
-                      className="w-full mt-4 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium hover:underline"
-                      data-testid="button-view-all-announcements"
-                    >
-                      {t('dashboard.viewAllAnnouncements')} →
-                    </button>
-                  )}
-                </div>
+                ))}
 
                 {/* Upcoming Events & Calendar Integration */}
-                <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white flex items-center">
-                      <CalendarIcon className="h-5 w-5 mr-2 text-purple-500" />
-                      {t('dashboard.upcomingEvents')}
-                    </h3>
-                    <button
-                      onClick={() => openModal('events')}
-                      className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium"
-                    >
-                      {t('dashboard.viewFullCalendar')} →
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-3 mb-6">
-                    {personalizedData.upcomingEvents.slice(0, 4).map((event) => (
-                      <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-lg ${
-                            event.type === 'Holiday' ? 'bg-red-100' :
-                            event.type === 'Training' ? 'bg-green-100' :
-                            'bg-blue-100'
+                {renderWidget('upcoming-events', () => (
+                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white flex items-center">
+                        <CalendarIcon className="h-5 w-5 mr-2 text-purple-500" />
+                        {t('dashboard.upcomingEvents')}
+                      </h3>
+                      <button
+                        onClick={() => openModal('events')}
+                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium"
+                      >
+                        {t('dashboard.viewFullCalendar')} →
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3 mb-6">
+                      {personalizedData.upcomingEvents.slice(0, 4).map((event) => (
+                        <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className={`p-2 rounded-lg ${
+                              event.type === 'Holiday' ? 'bg-red-100' :
+                              event.type === 'Training' ? 'bg-green-100' :
+                              'bg-blue-100'
+                            }`}>
+                              {event.type === 'Holiday' ? (
+                                <CalendarIcon className={`h-4 w-4 ${
+                                  event.type === 'Holiday' ? 'text-red-600' :
+                                  event.type === 'Training' ? 'text-green-600' :
+                                  'text-blue-600'
+                                }`} />
+                              ) : event.type === 'Training' ? (
+                                <GraduationCap className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Users className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white dark:text-white text-sm">{event.title}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(event.date).toLocaleDateString(i18n.language)}</p>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            event.type === 'Holiday' ? 'bg-red-100 text-red-800' :
+                            event.type === 'Training' ? 'bg-green-100 text-green-800' :
+                            'bg-blue-100 text-blue-800'
                           }`}>
-                            {event.type === 'Holiday' ? (
-                              <CalendarIcon className={`h-4 w-4 ${
-                                event.type === 'Holiday' ? 'text-red-600' :
-                                event.type === 'Training' ? 'text-green-600' :
-                                'text-blue-600'
-                              }`} />
-                            ) : event.type === 'Training' ? (
-                              <GraduationCap className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Users className="h-4 w-4 text-blue-600" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white dark:text-white text-sm">{event.title}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(event.date).toLocaleDateString(i18n.language)}</p>
-                          </div>
+                            {event.type}
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          event.type === 'Holiday' ? 'bg-red-100 text-red-800' :
-                          event.type === 'Training' ? 'bg-green-100 text-green-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
-                          {event.type}
-                        </span>
+                      ))}
+                    </div>
+
+                    {/* Mini Calendar */}
+                    <div className="bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg p-4">
+                      <Calendar
+                        holidays={[
+                          {
+                            id: '1',
+                            name: 'Columbus Day',
+                            date: '2025-10-13',
+                            type: 'Federal',
+                            description: 'Federal holiday'
+                          },
+                          {
+                            id: '2',
+                            name: 'Company Retreat Day',
+                            date: '2025-10-10',
+                            type: 'Company',
+                            description: 'Annual team building retreat'
+                          },
+                          {
+                            id: '3',
+                            name: 'Halloween Party',
+                            date: '2025-10-31',
+                            type: 'Company',
+                            description: 'Office Halloween celebration'
+                          },
+                          {
+                            id: '4',
+                            name: 'Q4 Planning Day',
+                            date: '2025-10-01',
+                            type: 'Company',
+                            description: 'Quarterly planning session'
+                          },
+                          {
+                            id: '5',
+                            name: 'Veterans Day',
+                            date: '2025-11-11',
+                            type: 'Federal',
+                            description: 'Federal holiday honoring veterans'
+                          }
+                        ]}
+                        onAddEvent={() => openModal('events')}
+                      />
+                    </div>
+
+                    {/* Knowledge Base Widget */}
+                    {renderWidget('knowledge-base', () => (
+                      <div className="mt-6">
+                        <KnowledgeBaseWidget onOpenModal={() => setModals({ ...modals, knowledgeBase: true })} />
                       </div>
                     ))}
                   </div>
-
-                  {/* Mini Calendar */}
-                  <div className="bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg p-4">
-                    <Calendar
-                      holidays={[
-                        {
-                          id: '1',
-                          name: 'Columbus Day',
-                          date: '2025-10-13',
-                          type: 'Federal',
-                          description: 'Federal holiday'
-                        },
-                        {
-                          id: '2',
-                          name: 'Company Retreat Day',
-                          date: '2025-10-10',
-                          type: 'Company',
-                          description: 'Annual team building retreat'
-                        },
-                        {
-                          id: '3',
-                          name: 'Halloween Party',
-                          date: '2025-10-31',
-                          type: 'Company',
-                          description: 'Office Halloween celebration'
-                        },
-                        {
-                          id: '4',
-                          name: 'Q4 Planning Day',
-                          date: '2025-10-01',
-                          type: 'Company',
-                          description: 'Quarterly planning session'
-                        },
-                        {
-                          id: '5',
-                          name: 'Veterans Day',
-                          date: '2025-11-11',
-                          type: 'Federal',
-                          description: 'Federal holiday honoring veterans'
-                        }
-                      ]}
-                      onAddEvent={() => openModal('events')}
-                    />
-                  </div>
-
-                  {/* Knowledge Base Widget */}
-                  <div className="mt-6">
-                    <KnowledgeBaseWidget onOpenModal={() => setModals({ ...modals, knowledgeBase: true })} />
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
             {/* AI Insights Section */}
-            <div className="mt-8 mb-8">
-              <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 rounded-xl p-6 text-white cursor-pointer hover:shadow-lg transition-all transform hover:scale-[1.02]"
-                   onClick={() => openModal('aiInsights')}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <div className="bg-white/20 dark:bg-gray-800/20 rounded-full p-2 mr-3">
-                      <Brain className="h-6 w-6" />
+            {renderWidget('ai-insights', () => (
+              <div className="mt-8 mb-8">
+                <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 rounded-xl p-6 text-white cursor-pointer hover:shadow-lg transition-all transform hover:scale-[1.02]"
+                     onClick={() => openModal('aiInsights')}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <div className="bg-white/20 dark:bg-gray-800/20 rounded-full p-2 mr-3">
+                        <Brain className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-xl font-semibold">{t('dashboard.aiInsights')}</h3>
                     </div>
-                    <h3 className="text-xl font-semibold">{t('dashboard.aiInsights')}</h3>
+                    <div className="flex items-center bg-white/20 dark:bg-gray-800/20 rounded-full px-3 py-1">
+                      <Sparkles className="h-4 w-4 mr-1" />
+                      <span className="text-sm">{t('dashboard.poweredByAI')}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center bg-white/20 dark:bg-gray-800/20 rounded-full px-3 py-1">
-                    <Sparkles className="h-4 w-4 mr-1" />
-                    <span className="text-sm">{t('dashboard.poweredByAI')}</span>
+                  
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center">
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        {t('dashboard.workforceTrends')}
+                      </h4>
+                      <p className="text-blue-100 text-sm">
+                        {t('dashboard.workforceTrendsText')}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        {t('dashboard.actionRequired')}
+                      </h4>
+                      <p className="text-blue-100 text-sm">
+                        {t('dashboard.actionRequiredText')}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center">
+                        <Target className="h-4 w-4 mr-2" />
+                        {t('dashboard.predictiveAnalytics')}
+                      </h4>
+                      <p className="text-blue-100 text-sm">
+                        {t('dashboard.predictiveAnalyticsText')}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {t('dashboard.performanceInsights')}
+                      </h4>
+                      <p className="text-blue-100 text-sm">
+                        {t('dashboard.performanceInsightsText')}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <TrendingUp className="h-4 w-4 mr-2" />
-                      {t('dashboard.workforceTrends')}
-                    </h4>
-                    <p className="text-blue-100 text-sm">
-                      {t('dashboard.workforceTrendsText')}
-                    </p>
+                  <div className="mt-4 text-center">
+                    <span className="text-blue-100 text-sm flex items-center justify-center">
+                      <Brain className="h-4 w-4 mr-1" />
+                      {t('dashboard.clickToExplore')} →
+                    </span>
                   </div>
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      {t('dashboard.actionRequired')}
-                    </h4>
-                    <p className="text-blue-100 text-sm">
-                      {t('dashboard.actionRequiredText')}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <Target className="h-4 w-4 mr-2" />
-                      {t('dashboard.predictiveAnalytics')}
-                    </h4>
-                    <p className="text-blue-100 text-sm">
-                      {t('dashboard.predictiveAnalyticsText')}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      {t('dashboard.performanceInsights')}
-                    </h4>
-                    <p className="text-blue-100 text-sm">
-                      {t('dashboard.performanceInsightsText')}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 text-center">
-                  <span className="text-blue-100 text-sm flex items-center justify-center">
-                    <Brain className="h-4 w-4 mr-1" />
-                    {t('dashboard.clickToExplore')} →
-                  </span>
                 </div>
               </div>
-            </div>
+            ))}
 
             {/* Studio AI Chat - Autonomous Recruitment Assistant */}
             <div className="mt-8 mb-8">

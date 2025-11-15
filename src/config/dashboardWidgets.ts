@@ -57,7 +57,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     widgetName: 'Team Overview',
     widgetDescription: 'Team size, employees on leave, pending approvals, and performance metrics',
     category: 'team',
-    defaultVisibleForRoles: ['HR', 'Manager'],
+    defaultVisibleForRoles: ['HR', 'Manager', 'Product Owner'],
     defaultDisplayOrder: 11,
     isActive: true
   },
@@ -97,7 +97,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     widgetName: 'Compliance Alerts',
     widgetDescription: 'Compliance notifications and regulatory updates',
     category: 'notifications',
-    defaultVisibleForRoles: ['HR', 'Manager', 'Product Owner'],
+    defaultVisibleForRoles: ['HR', 'Product Owner'],
     defaultDisplayOrder: 33,
     isActive: true
   },
@@ -117,7 +117,7 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     widgetName: 'AI Insights',
     widgetDescription: 'AI-powered workforce trends and predictive analytics',
     category: 'ai',
-    defaultVisibleForRoles: ['HR', 'Manager', 'Product Owner'],
+    defaultVisibleForRoles: ['Manager', 'Product Owner'],
     defaultDisplayOrder: 22,
     isActive: true
   },
