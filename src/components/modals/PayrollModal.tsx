@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import { formatCurrency, Currency, sumByCurrency, getCurrencySymbol, getCurrencyFlag } from '../../utils/currencyUtils';
+import { EmployeePayrollDetailModal } from './EmployeePayrollDetailModal';
 
 interface TimesheetEntry {
   date: string;
@@ -114,6 +115,7 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [showAIInsights, setShowAIInsights] = useState(false);
   const [aiAnalysisComplete, setAiAnalysisComplete] = useState(false);
   const [selectedEmployeeTimesheet, setSelectedEmployeeTimesheet] = useState<Employee | null>(null);
+  const [selectedEmployeeDetail, setSelectedEmployeeDetail] = useState<Employee | null>(null);
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([
     {
@@ -427,6 +429,13 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
     await new Promise(resolve => setTimeout(resolve, 3500));
 
     setCurrentStep('complete');
+  };
+
+  const handleSaveEmployeeChanges = (updatedEmployee: Employee) => {
+    setEmployees(prev => prev.map(emp =>
+      emp.id === updatedEmployee.id ? updatedEmployee : emp
+    ));
+    showNotification('success', `Updated payroll for ${updatedEmployee.name}`);
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -1081,7 +1090,11 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                           </span>
                         )}
                       </div>
-                      <button className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1 ml-auto">
+                      <button
+                        onClick={() => setSelectedEmployeeDetail(emp)}
+                        className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1 ml-auto"
+                        data-testid={`button-edit-employee-${emp.id}`}
+                      >
                         <Edit2 className="h-4 w-4" />
                         Edit
                       </button>
@@ -1328,6 +1341,15 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Employee Payroll Detail Modal */}
+      {selectedEmployeeDetail && (
+        <EmployeePayrollDetailModal
+          employee={selectedEmployeeDetail}
+          onClose={() => setSelectedEmployeeDetail(null)}
+          onSave={handleSaveEmployeeChanges}
+        />
       )}
       </>
     );
