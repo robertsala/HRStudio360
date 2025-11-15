@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { X, Building, Users, Briefcase, Settings, Bell, Mail, Smartphone, Monitor, Clock, UserPlus, Trash2, Plus, Save, CheckCircle, FileText, DollarSign, Edit, Loader2 } from 'lucide-react';
+import { X, Building, Users, Briefcase, Settings, Bell, Mail, Smartphone, Monitor, Clock, UserPlus, Trash2, Plus, Save, CheckCircle, FileText, DollarSign, Edit, Loader2, Shield } from 'lucide-react';
 import ChangeLogTab from './ChangeLogTab';
+import PermissionManagementModal from './PermissionManagementModal';
+import CorrectionRequestModal from './CorrectionRequestModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '../../lib/queryClient';
 import type { TaxJurisdiction, InsertTaxJurisdiction, ReciprocalAgreement, InsertReciprocalAgreement } from '@shared/schema';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SystemSettingsModalProps {
   onClose?: () => void;
@@ -29,6 +32,9 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
     type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [showCorrectionRequestModal, setShowCorrectionRequestModal] = useState(false);
+  const { user } = useAuth();
 
   // Company Info State
   const [companyInfo, setCompanyInfo] = useState({
@@ -418,6 +424,7 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
     { id: 'departments', label: 'Departments', icon: Users },
     { id: 'jobTitles', label: 'Job Titles', icon: Briefcase },
     { id: 'taxConfig', label: 'Tax Configuration', icon: DollarSign },
+    { id: 'accessControl', label: 'Access Control', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'changelog', label: 'Change Log', icon: FileText },
     { id: 'system', label: 'System Settings', icon: Settings }
@@ -1378,6 +1385,78 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
                 </div>
               )}
 
+              {/* Access Control Tab */}
+              {activeTab === 'accessControl' && (
+                <div className="max-w-4xl space-y-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Access Control & Permissions</h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Manage role-based permissions and review timesheet correction requests
+                    </p>
+                  </div>
+
+                  {(user?.role === 'HR' || user?.role === 'Product Owner') ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Permission Management Card */}
+                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                            <Shield className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white">Permission Management</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Configure role permissions</p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                          Manage granular permissions for each role, control who can view, edit, and approve timesheets.
+                        </p>
+                        <button
+                          onClick={() => setShowPermissionModal(true)}
+                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                          data-testid="button-open-permissions"
+                        >
+                          <Shield className="w-4 h-4" />
+                          <span>Manage Permissions</span>
+                        </button>
+                      </div>
+
+                      {/* Correction Requests Card */}
+                      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-6">
+                        <div className="flex items-center space-x-3 mb-4">
+                          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
+                            <FileText className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white">Correction Requests</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Review timesheet corrections</p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                          Review and approve or reject employee timesheet correction requests with full audit trail.
+                        </p>
+                        <button
+                          onClick={() => setShowCorrectionRequestModal(true)}
+                          className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center space-x-2"
+                          data-testid="button-open-corrections"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>View Requests</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6 text-center">
+                      <Shield className="w-12 h-12 mx-auto mb-3 text-yellow-600 dark:text-yellow-400" />
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Access Restricted</h4>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Only HR and Product Owner roles can access permission management features.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Change Log Tab */}
               {activeTab === 'changelog' && (
                 <ChangeLogTab />
@@ -2102,6 +2181,16 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
           </div>
         )}
       </div>
+
+      {/* Permission Management Modal */}
+      {showPermissionModal && (
+        <PermissionManagementModal onClose={() => setShowPermissionModal(false)} />
+      )}
+
+      {/* Correction Request Modal */}
+      {showCorrectionRequestModal && (
+        <CorrectionRequestModal onClose={() => setShowCorrectionRequestModal(false)} />
+      )}
     </>
   );
 };

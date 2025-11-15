@@ -3,7 +3,7 @@ import {
   DollarSign, Calendar, Users, CheckCircle, AlertTriangle, Play, FileText, Download,
   Eye, Filter, Search, X, Clock, TrendingUp, AlertCircle, Zap, Brain,
   ArrowRight, ChevronRight, Shield, Target, RefreshCw, CheckSquare, XCircle,
-  Info, Edit2, Save, BarChart3, PieChart, TrendingDown, Heart, Calendar as CalendarIcon, Receipt, Globe
+  Info, Edit2, Save, BarChart3, PieChart, TrendingDown, Heart, Calendar as CalendarIcon, Receipt, Globe, Bell
 } from 'lucide-react';
 import { supabase } from '../../utils/supabaseClient';
 import { formatCurrency, Currency, sumByCurrency, getCurrencySymbol, getCurrencyFlag } from '../../utils/currencyUtils';
@@ -11,7 +11,9 @@ import { EmployeePayrollDetailModal } from './EmployeePayrollDetailModal';
 import { PayrollWizardModal } from './PayrollWizardModal';
 import LeaveManagementModal from './LeaveManagementModal';
 import AutoFixReviewModal from './AutoFixReviewModal';
+import CorrectionRequestModal from './CorrectionRequestModal';
 import { apiRequest, queryClient } from '../../lib/queryClient';
+import { useQuery } from '@tanstack/react-query';
 
 interface TimesheetEntry {
   date: string;
@@ -124,6 +126,14 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
   const [showWizard, setShowWizard] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [editingEntryIndex, setEditingEntryIndex] = useState<number | null>(null);
+  const [showCorrectionRequestModal, setShowCorrectionRequestModal] = useState(false);
+
+  // Query for pending correction requests
+  const { data: correctionRequests = [] } = useQuery<any[]>({
+    queryKey: ['/api/timesheet-corrections'],
+  });
+
+  const pendingCorrectionCount = correctionRequests?.filter((req: any) => req.status === 'Pending').length || 0;
   const [editedEntry, setEditedEntry] = useState<TimesheetEntry | null>(null);
   const [isSavingTimesheet, setIsSavingTimesheet] = useState(false);
   const [isSavingTimesheets, setIsSavingTimesheets] = useState(false);
@@ -786,16 +796,31 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">Payroll Management</h2>
             <p className="text-gray-600 dark:text-gray-400">AI-powered payroll processing with error detection</p>
           </div>
-          {onOpenStudioAI && (
-            <button
-              onClick={onOpenStudioAI}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium"
-              data-testid="button-open-studio-ai-payroll"
-            >
-              <Brain className="h-4 w-4 mr-1" />
-              Ask Studio AI
-            </button>
-          )}
+          <div className="flex items-center space-x-3">
+            {pendingCorrectionCount > 0 && (
+              <button
+                onClick={() => setShowCorrectionRequestModal(true)}
+                className="relative bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-400 px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium border border-orange-300 dark:border-orange-700"
+                data-testid="button-correction-requests"
+              >
+                <Bell className="h-4 w-4 mr-1" />
+                <span className="mr-2">Correction Requests</span>
+                <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-lg">
+                  {pendingCorrectionCount}
+                </span>
+              </button>
+            )}
+            {onOpenStudioAI && (
+              <button
+                onClick={onOpenStudioAI}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium"
+                data-testid="button-open-studio-ai-payroll"
+              >
+                <Brain className="h-4 w-4 mr-1" />
+                Ask Studio AI
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="p-8">
@@ -2744,6 +2769,11 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
           {notification.type === 'info' && <Info className="h-5 w-5 mr-2" />}
           <span>{notification.message}</span>
         </div>
+      )}
+
+      {/* Correction Request Modal */}
+      {showCorrectionRequestModal && (
+        <CorrectionRequestModal onClose={() => setShowCorrectionRequestModal(false)} />
       )}
       </>
     );
