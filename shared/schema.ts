@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json, smallint } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json, smallint, uniqueIndex } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
@@ -1283,7 +1283,9 @@ export const tutorialCertificates = pgTable('tutorial_certificates', {
   tutorialTitle: text('tutorial_title').notNull(), // Snapshot of tutorial title
   issueDate: timestamp('issue_date').defaultNow().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull()
-});
+}, (table) => ({
+  userTutorialUnique: uniqueIndex('tutorial_certificates_user_tutorial_idx').on(table.userId, table.tutorialId)
+}));
 
 // Tutorial Badges - Predefined achievement badges
 export const tutorialBadges = pgTable('tutorial_badges', {
@@ -1307,7 +1309,9 @@ export const userTutorialBadges = pgTable('user_tutorial_badges', {
   tutorialId: uuid('tutorial_id').references(() => tutorials.id, { onDelete: 'set null' }), // Optional - which tutorial earned this
   earnedAt: timestamp('earned_at').defaultNow().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull()
-});
+}, (table) => ({
+  userBadgeUnique: uniqueIndex('user_tutorial_badges_user_badge_idx').on(table.userId, table.badgeId)
+}));
 
 // Insert schemas for tutorials
 export const insertTutorialSchema = createInsertSchema(tutorials).omit({

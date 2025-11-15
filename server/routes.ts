@@ -16,7 +16,10 @@ import {
   paycheckFunFacts,
   tutorials,
   tutorialSteps,
-  tutorialCompletions
+  tutorialCompletions,
+  tutorialCertificates,
+  tutorialBadges,
+  userTutorialBadges
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { seedProductionDatabase } from './seed-production.js';
@@ -3839,13 +3842,347 @@ export function registerRoutes(app: Express) {
       const tutorialCount = 4;
       console.log(`[Tutorials] Successfully seeded ${tutorialCount} tutorials with steps`);
 
+      // Seed tutorial badges
+      console.log('[Badges] Seeding tutorial achievement badges...');
+      const existingBadges = await db.query.tutorialBadges.findMany();
+      
+      if (existingBadges.length === 0) {
+        await db.insert(tutorialBadges).values([
+          {
+            name: 'First Steps',
+            description: 'Complete your first tutorial',
+            iconName: 'BookOpen',
+            iconColor: '#10b981',
+            category: 'completion',
+            requirement: 'Complete 1 tutorial',
+            sortOrder: 1
+          },
+          {
+            name: 'Tutorial Novice',
+            description: 'Complete 3 tutorials',
+            iconName: 'GraduationCap',
+            iconColor: '#3b82f6',
+            category: 'completion',
+            requirement: 'Complete 3 tutorials',
+            sortOrder: 2
+          },
+          {
+            name: 'Tutorial Enthusiast',
+            description: 'Complete 5 tutorials',
+            iconName: 'Trophy',
+            iconColor: '#f59e0b',
+            category: 'completion',
+            requirement: 'Complete 5 tutorials',
+            sortOrder: 3
+          },
+          {
+            name: 'Tutorial Expert',
+            description: 'Complete 10 tutorials',
+            iconName: 'Crown',
+            iconColor: '#8b5cf6',
+            category: 'mastery',
+            requirement: 'Complete 10 tutorials',
+            sortOrder: 4
+          },
+          {
+            name: 'Payroll Master',
+            description: 'Complete all payroll tutorials',
+            iconName: 'DollarSign',
+            iconColor: '#06b6d4',
+            category: 'mastery',
+            requirement: 'Complete all payroll tutorials',
+            sortOrder: 5
+          },
+          {
+            name: 'Hiring Guru',
+            description: 'Complete all hiring tutorials',
+            iconName: 'Users',
+            iconColor: '#ec4899',
+            category: 'mastery',
+            requirement: 'Complete all hiring tutorials',
+            sortOrder: 6
+          },
+          {
+            name: 'AI Explorer',
+            description: 'Complete the Studio AI tutorial',
+            iconName: 'Sparkles',
+            iconColor: '#a855f7',
+            category: 'special',
+            requirement: 'Complete the Studio AI tutorial',
+            sortOrder: 7
+          }
+        ]);
+        console.log('[Badges] Successfully seeded 7 achievement badges');
+      } else {
+        console.log(`[Badges] Badges already exist (${existingBadges.length}). Skipping seeding.`);
+      }
+
       res.json({
-        message: `Successfully seeded ${tutorialCount} tutorials with comprehensive step-by-step guides`,
-        count: tutorialCount
+        message: `Successfully seeded ${tutorialCount} tutorials with comprehensive step-by-step guides and achievement badges`,
+        count: tutorialCount,
+        badgesSeeded: existingBadges.length === 0 ? 7 : 0
       });
     } catch (error: any) {
       console.error('[Tutorials] Seed error:', error);
       res.status(500).json({ error: 'Failed to seed tutorials', details: error.message });
+    }
+  });
+
+  // Generate certificate for completed tutorial
+  app.post('/api/tutorials/:id/certificate', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const tutorialId = req.params.id;
+
+      // Check if tutorial is completed
+      const completion = await db.query.tutorialCompletions.findFirst({
+        where: and(
+          eq(tutorialCompletions.userId, userId),
+          eq(tutorialCompletions.tutorialId, tutorialId),
+          eq(tutorialCompletions.isCompleted, true)
+        )
+      });
+
+      if (!completion) {
+        return res.status(400).json({ error: 'Tutorial not completed yet' });
+      }
+
+      // Check if certificate already exists
+      const existing = await db.query.tutorialCertificates.findFirst({
+        where: and(
+          eq(tutorialCertificates.userId, userId),
+          eq(tutorialCertificates.tutorialId, tutorialId)
+        )
+      });
+
+      if (existing) {
+        return res.json(existing);
+      }
+
+      // Get tutorial and user info for certificate
+      const tutorial = await db.query.tutorials.findFirst({
+        where: eq(tutorials.id, tutorialId)
+      });
+
+      const user = await db.query.profiles.findFirst({
+        where: eq(profiles.id, userId)
+      });
+
+      if (!tutorial || !user) {
+        return res.status(404).json({ error: 'Tutorial or user not found' });
+      }
+
+      // Generate unique certificate number
+      const year = new Date().getFullYear();
+      const randomNum = Math.floor(Math.random() * 999999).toString().padStart(6, '0');
+      const certificateNumber = `CERT-${year}-${randomNum}`;
+
+      // Create certificate
+      const [certificate] = await db.insert(tutorialCertificates).values({
+        userId,
+        tutorialId,
+        certificateNumber,
+        userName: `${user.firstName} ${user.lastName}`,
+        tutorialTitle: tutorial.title
+      }).returning();
+
+      res.json(certificate);
+    } catch (error: any) {
+      console.error('[Certificates] Error generating certificate:', error);
+      res.status(500).json({ error: 'Failed to generate certificate', details: error.message });
+    }
+  });
+
+  // Get all available badges
+  app.get('/api/tutorials/badges', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const badges = await db.query.tutorialBadges.findMany({
+        where: eq(tutorialBadges.isActive, true),
+        orderBy: (tutorialBadges, { asc }) => [asc(tutorialBadges.sortOrder)]
+      });
+
+      res.json(badges);
+    } catch (error: any) {
+      console.error('[Badges] Error fetching badges:', error);
+      res.status(500).json({ error: 'Failed to fetch badges', details: error.message });
+    }
+  });
+
+  // Get badges earned by current user
+  app.get('/api/users/me/badges', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const userBadges = await db.query.userTutorialBadges.findMany({
+        where: eq(userTutorialBadges.userId, userId),
+        orderBy: (userTutorialBadges, { desc }) => [desc(userTutorialBadges.earnedAt)]
+      });
+
+      // Fetch badge and tutorial details separately
+      const badgeIds = userBadges.map(ub => ub.badgeId);
+      const tutorialIds = userBadges.map(ub => ub.tutorialId).filter((id): id is string => id !== null);
+
+      const badges = badgeIds.length > 0 
+        ? await db.query.tutorialBadges.findMany({
+            where: inArray(tutorialBadges.id, badgeIds)
+          })
+        : [];
+
+      const tutorialsData = tutorialIds.length > 0
+        ? await db.query.tutorials.findMany({
+            where: inArray(tutorials.id, tutorialIds)
+          })
+        : [];
+
+      // Create lookup maps
+      const badgeMap = new Map(badges.map(b => [b.id, b]));
+      const tutorialMap = new Map(tutorialsData.map(t => [t.id, t]));
+
+      // Merge data
+      const result = userBadges.map(ub => ({
+        ...ub,
+        badge: badgeMap.get(ub.badgeId) || null,
+        tutorial: ub.tutorialId ? tutorialMap.get(ub.tutorialId) || null : null
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[Badges] Error fetching user badges:', error);
+      res.status(500).json({ error: 'Failed to fetch user badges', details: error.message });
+    }
+  });
+
+  // Check and award badges based on tutorial completion
+  app.post('/api/tutorials/badges/check', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const { tutorialId } = req.body;
+
+      // Get all completed tutorials for user
+      const completedTutorialRecords = await db.query.tutorialCompletions.findMany({
+        where: and(
+          eq(tutorialCompletions.userId, userId),
+          eq(tutorialCompletions.isCompleted, true)
+        )
+      });
+
+      const completionCount = completedTutorialRecords.length;
+
+      // Fetch tutorial details separately
+      const completedTutorialIds = completedTutorialRecords.map(c => c.tutorialId);
+      const tutorialsData = completedTutorialIds.length > 0
+        ? await db.query.tutorials.findMany({
+            where: inArray(tutorials.id, completedTutorialIds)
+          })
+        : [];
+
+      // Create tutorial lookup map
+      const tutorialMap = new Map(tutorialsData.map(t => [t.id, t]));
+
+      // Merge completion records with tutorial data
+      const completedTutorials = completedTutorialRecords.map(c => ({
+        ...c,
+        tutorial: tutorialMap.get(c.tutorialId)!
+      }));
+      const newlyAwardedBadges = [];
+
+      // Get all badges
+      const allBadges = await db.query.tutorialBadges.findMany({
+        where: eq(tutorialBadges.isActive, true)
+      });
+
+      // Get user's existing badges
+      const existingBadges = await db.query.userTutorialBadges.findMany({
+        where: eq(userTutorialBadges.userId, userId)
+      });
+
+      const existingBadgeIds = new Set(existingBadges.map(b => b.badgeId));
+
+      // Check each badge requirement
+      for (const badge of allBadges) {
+        if (existingBadgeIds.has(badge.id)) {
+          continue; // Already earned
+        }
+
+        let shouldAward = false;
+
+        // Milestone badges based on total completions
+        if (badge.name === 'First Steps' && completionCount >= 1) {
+          shouldAward = true;
+        } else if (badge.name === 'Tutorial Novice' && completionCount >= 3) {
+          shouldAward = true;
+        } else if (badge.name === 'Tutorial Enthusiast' && completionCount >= 5) {
+          shouldAward = true;
+        } else if (badge.name === 'Tutorial Expert' && completionCount >= 10) {
+          shouldAward = true;
+        }
+
+        // Category-specific badges
+        if (badge.name === 'Payroll Master') {
+          const payrollTutorials = completedTutorials.filter(c => c.tutorial.category === 'payroll');
+          const totalPayrollTutorials = await db.query.tutorials.findMany({
+            where: eq(tutorials.category, 'payroll')
+          });
+          if (payrollTutorials.length > 0 && payrollTutorials.length === totalPayrollTutorials.length) {
+            shouldAward = true;
+          }
+        }
+
+        if (badge.name === 'Hiring Guru') {
+          const hiringTutorials = completedTutorials.filter(c => c.tutorial.category === 'hiring');
+          const totalHiringTutorials = await db.query.tutorials.findMany({
+            where: eq(tutorials.category, 'hiring')
+          });
+          if (hiringTutorials.length > 0 && hiringTutorials.length === totalHiringTutorials.length) {
+            shouldAward = true;
+          }
+        }
+
+        if (badge.name === 'AI Explorer') {
+          const aiTutorial = completedTutorials.find(c => c.tutorial.title.includes('Studio AI'));
+          if (aiTutorial) {
+            shouldAward = true;
+          }
+        }
+
+        // Award badge if criteria met
+        if (shouldAward) {
+          const [newBadge] = await db.insert(userTutorialBadges).values({
+            userId,
+            badgeId: badge.id,
+            tutorialId: tutorialId || null
+          }).returning();
+
+          newlyAwardedBadges.push({
+            ...newBadge,
+            badge
+          });
+        }
+      }
+
+      res.json({
+        newlyAwarded: newlyAwardedBadges,
+        totalBadges: existingBadges.length + newlyAwardedBadges.length
+      });
+    } catch (error: any) {
+      console.error('[Badges] Error checking badges:', error);
+      res.status(500).json({ error: 'Failed to check badges', details: error.message });
     }
   });
 }

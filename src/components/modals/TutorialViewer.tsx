@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, CheckCircle, Circle, BookOpen, Clock, Award, PlayCircle } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CheckCircle, Circle, BookOpen, Clock, Award, PlayCircle, Download, Sparkles } from 'lucide-react';
 import type { Tutorial, TutorialStep, TutorialCompletion } from '../../../shared/schema';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '../../lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 interface TutorialWithSteps extends Tutorial {
   steps: TutorialStep[];
@@ -18,6 +19,7 @@ interface TutorialViewerProps {
 const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, onAction }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const { toast } = useToast();
 
   // Fetch tutorial with steps and progress
   const { data: tutorial, isLoading } = useQuery<TutorialWithSteps>({
@@ -36,6 +38,39 @@ const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, on
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tutorials', tutorialId] });
       queryClient.invalidateQueries({ queryKey: ['/api/tutorials'] });
+    }
+  });
+
+  // Generate certificate mutation
+  const generateCertificateMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/tutorials/${tutorialId}/certificate`, {
+        method: 'POST'
+      });
+    },
+    onSuccess: (data: any) => {
+      console.log('Certificate generated:', data);
+    }
+  });
+
+  // Check and award badges mutation
+  const checkBadgesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('/api/tutorials/badges/check', {
+        method: 'POST',
+        body: JSON.stringify({ tutorialId })
+      });
+    },
+    onSuccess: (data: any) => {
+      if (data.newlyAwarded && data.newlyAwarded.length > 0) {
+        data.newlyAwarded.forEach((badge: any) => {
+          toast({
+            title: '🎉 Badge Earned!',
+            description: `You earned the "${badge.badge.name}" badge!`,
+            duration: 5000
+          });
+        });
+      }
     }
   });
 
@@ -75,6 +110,17 @@ const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, on
         completedSteps: newCompletedSteps,
         isCompleted
       });
+
+      // If tutorial just completed, generate certificate and check badges
+      if (isCompleted) {
+        generateCertificateMutation.mutate();
+        checkBadgesMutation.mutate();
+        toast({
+          title: '🎓 Tutorial Completed!',
+          description: 'Congratulations! You can now download your certificate.',
+          duration: 5000
+        });
+      }
     }
   };
 
@@ -286,15 +332,30 @@ const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, on
         {/* Footer navigation */}
         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900">
           <div className="flex items-center justify-between">
-            <button
-              onClick={handlePrevStep}
-              disabled={currentStepIndex === 0}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              data-testid="button-prev-step"
-            >
-              <ChevronLeft className="h-5 w-5" />
-              Previous
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handlePrevStep}
+                disabled={currentStepIndex === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                data-testid="button-prev-step"
+              >
+                <ChevronLeft className="h-5 w-5" />
+                Previous
+              </button>
+
+              {/* Certificate download button - only shown when tutorial is completed */}
+              {progressPercentage === 100 && (
+                <button
+                  onClick={() => generateCertificateMutation.mutate()}
+                  disabled={generateCertificateMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 transition-colors"
+                  data-testid="button-download-certificate"
+                >
+                  <Download className="h-5 w-5" />
+                  {generateCertificateMutation.isPending ? 'Generating...' : 'Download Certificate'}
+                </button>
+              )}
+            </div>
 
             <div className="flex items-center gap-3">
               {!completedSteps.includes(currentStep?.stepNumber || 0) && (
