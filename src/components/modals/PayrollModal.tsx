@@ -1023,7 +1023,14 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) 
                           <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg inline-block">
                             <XCircle className="h-4 w-4" />
                             <span className="font-medium">Timesheet Pending Manager Approval</span>
-                            <button className="ml-2 text-blue-600 hover:text-blue-700 underline text-xs">
+                            <button 
+                              onClick={() => {
+                                // TODO: Implement send reminder functionality
+                                console.log('Send reminder to manager for', emp.name);
+                              }}
+                              className="ml-2 text-blue-600 hover:text-blue-700 underline text-xs"
+                              data-testid="button-send-reminder"
+                            >
                               Send Reminder
                             </button>
                           </div>
