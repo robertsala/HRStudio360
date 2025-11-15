@@ -1212,6 +1212,95 @@ export type InsertDashboardWidgetPreset = z.infer<typeof insertDashboardWidgetPr
 export type UserDashboardPreference = typeof userDashboardPreferences.$inferSelect;
 export type InsertUserDashboardPreference = z.infer<typeof insertUserDashboardPreferenceSchema>;
 
+// Tutorial System - Knowledge Base Tutorials
+export const tutorialCategoryEnum = pgEnum('tutorial_category', [
+  'getting-started',
+  'payroll',
+  'hiring',
+  'employee-management',
+  'performance',
+  'benefits',
+  'analytics',
+  'ai-features'
+]);
+
+export const tutorialDifficultyEnum = pgEnum('tutorial_difficulty', [
+  'beginner',
+  'intermediate',
+  'advanced'
+]);
+
+export const tutorials = pgTable('tutorials', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  category: tutorialCategoryEnum('category').notNull(),
+  difficulty: tutorialDifficultyEnum('difficulty').notNull(),
+  estimatedMinutes: integer('estimated_minutes').notNull(),
+  roleAccess: text('role_access').array().notNull(), // Array of roles: ['HR', 'Manager', 'Employee', 'Product Owner']
+  tags: text('tags').array(),
+  thumbnailUrl: text('thumbnail_url'),
+  isPublished: boolean('is_published').default(true).notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+export const tutorialSteps = pgTable('tutorial_steps', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  tutorialId: uuid('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  stepNumber: integer('step_number').notNull(),
+  title: text('title').notNull(),
+  content: text('content').notNull(), // Markdown or HTML content
+  actionType: text('action_type'), // 'open-modal', 'navigate', 'none', etc.
+  actionTarget: text('action_target'), // Modal name or URL
+  actionLabel: text('action_label'), // "Try it now" button text
+  imageUrl: text('image_url'),
+  videoUrl: text('video_url'),
+  checklist: text('checklist').array(), // Array of checklist items for this step
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+export const tutorialCompletions = pgTable('tutorial_completions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: uuid('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  currentStepNumber: integer('current_step_number').default(1).notNull(),
+  completedSteps: integer('completed_steps').array().default(sql`ARRAY[]::integer[]`).notNull(),
+  isCompleted: boolean('is_completed').default(false).notNull(),
+  completedAt: timestamp('completed_at'),
+  lastAccessedAt: timestamp('last_accessed_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// Insert schemas for tutorials
+export const insertTutorialSchema = createInsertSchema(tutorials).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertTutorialStepSchema = createInsertSchema(tutorialSteps).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertTutorialCompletionSchema = createInsertSchema(tutorialCompletions).omit({
+  id: true,
+  createdAt: true,
+  lastAccessedAt: true
+});
+
+// Select types for tutorials
+export type Tutorial = typeof tutorials.$inferSelect;
+export type InsertTutorial = z.infer<typeof insertTutorialSchema>;
+
+export type TutorialStep = typeof tutorialSteps.$inferSelect;
+export type InsertTutorialStep = z.infer<typeof insertTutorialStepSchema>;
+
+export type TutorialCompletion = typeof tutorialCompletions.$inferSelect;
+export type InsertTutorialCompletion = z.infer<typeof insertTutorialCompletionSchema>;
+
 // User Permissions type
 export interface UserPermissions {
   department: string | null;
