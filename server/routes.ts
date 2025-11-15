@@ -6143,4 +6143,94 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fetch permission audit trail', details: error.message });
     }
   });
+
+  // ========== AI-POWERED FEATURES ==========
+
+  // POST /api/permissions/ai/suggest - Get AI permission suggestions for a role
+  app.post('/api/permissions/ai/suggest', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { role, description } = req.body;
+      if (!role) {
+        return res.status(400).json({ error: 'role is required' });
+      }
+
+      const { aiPermissionService } = await import('./ai-permission-service.js');
+      const suggestions = await aiPermissionService.suggestPermissionsForRole(role, description);
+
+      res.json(suggestions);
+    } catch (error: any) {
+      console.error('Error getting AI permission suggestions:', error);
+      res.status(500).json({ error: 'Failed to get AI suggestions', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/ai/template - Generate complete template suggestion
+  app.post('/api/permissions/ai/template', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { role, description } = req.body;
+      if (!role) {
+        return res.status(400).json({ error: 'role is required' });
+      }
+
+      const { aiPermissionService } = await import('./ai-permission-service.js');
+      const template = await aiPermissionService.generateTemplate(role, description);
+
+      if (!template) {
+        return res.status(404).json({ error: 'No template suggestions available' });
+      }
+
+      res.json(template);
+    } catch (error: any) {
+      console.error('Error generating AI template:', error);
+      res.status(500).json({ error: 'Failed to generate AI template', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/ai/risk-analysis - Analyze permission combination risk
+  app.post('/api/permissions/ai/risk-analysis', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { permissionIds } = req.body;
+      if (!permissionIds || !Array.isArray(permissionIds)) {
+        return res.status(400).json({ error: 'permissionIds array is required' });
+      }
+
+      const { aiPermissionService } = await import('./ai-permission-service.js');
+      const analysis = await aiPermissionService.analyzePermissionRisk(permissionIds);
+
+      res.json(analysis);
+    } catch (error: any) {
+      console.error('Error analyzing permission risk:', error);
+      res.status(500).json({ error: 'Failed to analyze permission risk', details: error.message });
+    }
+  });
+
+  // POST /api/permissions/ai/hierarchy - Suggest role hierarchy
+  app.post('/api/permissions/ai/hierarchy', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { roles } = req.body;
+      if (!roles || !Array.isArray(roles)) {
+        return res.status(400).json({ error: 'roles array is required' });
+      }
+
+      const { aiPermissionService } = await import('./ai-permission-service.js');
+      const suggestions = await aiPermissionService.suggestRoleHierarchy(roles);
+
+      res.json(suggestions);
+    } catch (error: any) {
+      console.error('Error suggesting role hierarchy:', error);
+      res.status(500).json({ error: 'Failed to suggest role hierarchy', details: error.message });
+    }
+  });
 }
