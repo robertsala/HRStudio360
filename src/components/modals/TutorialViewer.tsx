@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, CheckCircle, Circle, BookOpen, Clock, Award, PlayCircle } from 'lucide-react';
 import { Tutorial, TutorialStep, TutorialCompletion } from '@shared/schema';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@lib/queryClient';
+import { queryClient, apiRequest } from '../../lib/queryClient';
 
 interface TutorialWithSteps extends Tutorial {
   steps: TutorialStep[];
