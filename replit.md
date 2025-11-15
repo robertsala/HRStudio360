@@ -6,6 +6,17 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes
 
+### v3.8.0 - AI Payroll Assistant (November 15, 2025)
+- ✅ Extended Studio AI capabilities to Payroll module with GPT-4o integration
+- Created 3 AI functions in server/ai-agent.ts: validatePayrollRun, analyzeExpenses, chatWithPayrollAI
+- Added 3 secure API endpoints under /api/ai-payroll/* with HR/Product Owner RBAC
+- PayrollModal enhanced with purple gradient "Ask Studio AI" button matching recruitment UX
+- AI validates payroll calculations, detects errors, analyzes expense compliance, and provides conversational assistance
+- All endpoints protected with role-based authorization (HR and Product Owner only)
+- Advisory recommendations only - manual approval required for all actions
+- Audit logging for all AI interactions to ensure compliance
+- Reuses existing OpenAI client and EnterpriseChatModal for consistent experience
+
 ### v3.7.0 - Knowledge Base Relocation to Training Module (November 15, 2025)
 - ✅ Moved Knowledge Base from dashboard to Training section as dedicated tab
 - Knowledge Base now accessible via Training modal → Knowledge Base tab
@@ -55,7 +66,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation. Fully populated with 20 historical entries documenting all major features from v1.0.0 to v3.2.0. Production seeding endpoint available at `/api/changelog/seed`.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
 -   **Dashboard Customization (v3.7.0)**: Fully integrated role-based customizable dashboard widgets system. Widget registry defines 11 widgets with role-based visibility (Employee: 6, Manager: 9, HR: 10, Product Owner: 11). Knowledge Base relocated to Training module as dedicated tab for cleaner dashboard. Frontend uses `useDashboardWidgets` hook with centralized `renderWidget()` for backend-controlled visibility. API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Compliance Alerts stub added for future implementation. All widgets wrapped and integrated with role-based access control. Seeding endpoint at `/api/dashboard/widgets/seed`.
--   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search. The "Studio AI" agent operates autonomously, performing actions like candidate screening and generating insights.
+-   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, AI-powered employee search, and AI Payroll Assistant. The "Studio AI" agent operates autonomously across recruitment and payroll modules, performing actions like candidate screening, payroll validation, expense analysis, and generating insights. Payroll AI features include error detection in payroll runs, expense compliance checking, and conversational assistance for HR teams. All AI capabilities restricted to authorized roles (HR/Product Owner) with audit logging for compliance.
 -   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries. Component extraction pattern used for reusability (e.g., `JobPostingsPanel` extracted from `JobManagementModal`).
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.
 -   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized `logger` utility, `apiErrors` for parsing and user-friendly messages, and TanStack Query's smart retry logic.
