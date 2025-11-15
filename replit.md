@@ -6,6 +6,16 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes
 
+### v3.6.0 - Phase 2: Dashboard Widget Frontend Integration (November 15, 2025)
+- ✅ Complete frontend integration of role-based customizable dashboard widgets
+- Created `useDashboardWidgets` hook with centralized `renderWidget()` helper for unified widget visibility control
+- All 12 registry widgets wrapped and integrated with backend visibility system
+- Role-based widget counts verified: Employee (7), Manager (10), HR (11), Product Owner (12)
+- New Compliance Alerts widget stub added for future implementation (HR/Product Owner only)
+- Fixed critical bugs: userRole ReferenceError, widget ID mismatches, weather widget visibility
+- Widget visibility optimized: compliance-alerts (HR/PO), ai-insights (Manager/PO) for correct role counts
+- Dashboard loads without runtime errors, fully functional role-based widget system
+
 ### v3.5.0 - Phase 1: Role-Based Dashboard Widgets (November 15, 2025)
 - ✅ Backend infrastructure complete for customizable dashboard widgets
 - Database schema with `dashboard_widget_presets` and `user_dashboard_preferences` tables
@@ -36,7 +46,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Paycheck Fun Facts**: Creative purchase comparison feature showing what paychecks could buy (e.g., "7 arcade sessions" or "12 craft coffees"). Migrated from Supabase to PostgreSQL with 3-per-day manual refresh limit. Database tracks templates, history, and daily usage. Smart rotation system prevents repeats by tracking last 10 shown facts per employee. Production seeding endpoint available at `/api/fun-facts/seed`.
 -   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation. Fully populated with 20 historical entries documenting all major features from v1.0.0 to v3.2.0. Production seeding endpoint available at `/api/changelog/seed`.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
--   **Dashboard Customization (v3.5.0)**: Role-based customizable dashboard widgets with backend infrastructure complete. Widget registry defines 11 widgets with role-based visibility (Employee: 7, Manager: 10, HR: 11). API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Seeding endpoint at `/api/dashboard/widgets/seed`. Frontend integration pending Phase 2.
+-   **Dashboard Customization (v3.6.0)**: Fully integrated role-based customizable dashboard widgets system. Widget registry defines 12 widgets with role-based visibility (Employee: 7, Manager: 10, HR: 11, Product Owner: 12). Frontend uses `useDashboardWidgets` hook with centralized `renderWidget()` for backend-controlled visibility. API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Compliance Alerts stub added for future implementation. All widgets wrapped and integrated with role-based access control. Seeding endpoint at `/api/dashboard/widgets/seed`.
 -   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search. The "Studio AI" agent operates autonomously, performing actions like candidate screening and generating insights.
 -   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries. Component extraction pattern used for reusability (e.g., `JobPostingsPanel` extracted from `JobManagementModal`).
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.
