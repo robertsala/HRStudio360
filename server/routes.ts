@@ -13,14 +13,17 @@ import {
   authCredentials,
   passwordResetTokens,
   passwordAuditLog,
-  paycheckFunFacts
+  paycheckFunFacts,
+  tutorials,
+  tutorialSteps,
+  tutorialCompletions
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { seedProductionDatabase } from './seed-production.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
 import rateLimit from 'express-rate-limit';
 import { db } from './db.js';
-import { eq } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import { ObjectStorageService, ObjectNotFoundError } from './objectStorage.js';
 import { ObjectPermission } from './objectAcl.js';
 import {
@@ -3383,6 +3386,305 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('[AI Payroll] Chat error:', error);
       res.status(500).json({ error: 'Failed to process chat request', details: error.message });
+    }
+  });
+
+  // Tutorial System API Endpoints
+
+  // Get all tutorials filtered by user's role
+  app.get('/api/tutorials', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      // Get user's profile to determine role
+      const userProfile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, userId)
+      });
+
+      if (!userProfile) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const userRole = userProfile.role || 'Employee';
+
+      // Fetch all published tutorials that the user has access to
+      const allTutorials = await db.query.tutorials.findMany({
+        where: and(
+          eq(tutorials.isPublished, true)
+        ),
+        orderBy: [asc(tutorials.sortOrder), asc(tutorials.createdAt)]
+      });
+
+      // Filter tutorials by role access
+      const accessibleTutorials = allTutorials.filter(tutorial => 
+        tutorial.roleAccess.includes(userRole)
+      );
+
+      // Get user's progress for these tutorials
+      const tutorialIds = accessibleTutorials.map(t => t.id);
+      const userProgress = await db.query.tutorialCompletions.findMany({
+        where: and(
+          eq(tutorialCompletions.userId, userId),
+          inArray(tutorialCompletions.tutorialId, tutorialIds)
+        )
+      });
+
+      // Merge tutorials with progress
+      const tutorialsWithProgress = accessibleTutorials.map(tutorial => {
+        const progress = userProgress.find(p => p.tutorialId === tutorial.id);
+        return {
+          ...tutorial,
+          progress: progress || null
+        };
+      });
+
+      res.json(tutorialsWithProgress);
+    } catch (error: any) {
+      console.error('[Tutorials] Error fetching tutorials:', error);
+      res.status(500).json({ error: 'Failed to fetch tutorials', details: error.message });
+    }
+  });
+
+  // Get a specific tutorial with all steps
+  app.get('/api/tutorials/:id', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const tutorialId = req.params.id;
+
+      // Get user's role
+      const userProfile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, userId)
+      });
+
+      if (!userProfile) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const userRole = userProfile.role || 'Employee';
+
+      // Fetch tutorial with steps
+      const tutorial = await db.query.tutorials.findFirst({
+        where: eq(tutorials.id, tutorialId)
+      });
+
+      if (!tutorial) {
+        return res.status(404).json({ error: 'Tutorial not found' });
+      }
+
+      // Check if user has access to this tutorial
+      if (!tutorial.roleAccess.includes(userRole)) {
+        return res.status(403).json({ error: 'You do not have access to this tutorial' });
+      }
+
+      // Get tutorial steps
+      const steps = await db.query.tutorialSteps.findMany({
+        where: eq(tutorialSteps.tutorialId, tutorialId),
+        orderBy: [asc(tutorialSteps.stepNumber)]
+      });
+
+      // Get user's progress
+      const progress = await db.query.tutorialCompletions.findFirst({
+        where: and(
+          eq(tutorialCompletions.userId, userId),
+          eq(tutorialCompletions.tutorialId, tutorialId)
+        )
+      });
+
+      // Update last accessed time if progress exists
+      if (progress) {
+        await db.update(tutorialCompletions)
+          .set({ lastAccessedAt: new Date() })
+          .where(eq(tutorialCompletions.id, progress.id));
+      }
+
+      res.json({
+        ...tutorial,
+        steps,
+        progress: progress || null
+      });
+    } catch (error: any) {
+      console.error('[Tutorials] Error fetching tutorial:', error);
+      res.status(500).json({ error: 'Failed to fetch tutorial', details: error.message });
+    }
+  });
+
+  // Get user's progress for a tutorial
+  app.get('/api/tutorials/:id/progress', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const tutorialId = req.params.id;
+
+      const progress = await db.query.tutorialCompletions.findFirst({
+        where: and(
+          eq(tutorialCompletions.userId, userId),
+          eq(tutorialCompletions.tutorialId, tutorialId)
+        )
+      });
+
+      res.json(progress || null);
+    } catch (error: any) {
+      console.error('[Tutorials] Error fetching progress:', error);
+      res.status(500).json({ error: 'Failed to fetch progress', details: error.message });
+    }
+  });
+
+  // Update user's progress on a tutorial
+  app.post('/api/tutorials/:id/progress', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const tutorialId = req.params.id;
+      const { currentStepNumber, completedSteps, isCompleted } = req.body;
+
+      // Check if progress record exists
+      const existingProgress = await db.query.tutorialCompletions.findFirst({
+        where: and(
+          eq(tutorialCompletions.userId, userId),
+          eq(tutorialCompletions.tutorialId, tutorialId)
+        )
+      });
+
+      if (existingProgress) {
+        // Update existing progress
+        const updateData: any = {
+          lastAccessedAt: new Date()
+        };
+
+        if (currentStepNumber !== undefined) {
+          updateData.currentStepNumber = currentStepNumber;
+        }
+
+        if (completedSteps !== undefined) {
+          updateData.completedSteps = completedSteps;
+        }
+
+        if (isCompleted !== undefined) {
+          updateData.isCompleted = isCompleted;
+          if (isCompleted && !existingProgress.completedAt) {
+            updateData.completedAt = new Date();
+          }
+        }
+
+        await db.update(tutorialCompletions)
+          .set(updateData)
+          .where(eq(tutorialCompletions.id, existingProgress.id));
+
+        const updatedProgress = await db.query.tutorialCompletions.findFirst({
+          where: eq(tutorialCompletions.id, existingProgress.id)
+        });
+
+        res.json(updatedProgress);
+      } else {
+        // Create new progress record
+        const newProgress = await db.insert(tutorialCompletions).values({
+          userId,
+          tutorialId,
+          currentStepNumber: currentStepNumber || 1,
+          completedSteps: completedSteps || [],
+          isCompleted: isCompleted || false,
+          completedAt: isCompleted ? new Date() : null
+        }).returning();
+
+        res.json(newProgress[0]);
+      }
+    } catch (error: any) {
+      console.error('[Tutorials] Error updating progress:', error);
+      res.status(500).json({ error: 'Failed to update progress', details: error.message });
+    }
+  });
+
+  // Seed tutorials (admin only)
+  app.post('/api/tutorials/seed', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      // Check if user has admin permissions
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Only HR and Product Owners can seed tutorials' });
+      }
+
+      console.log('[Tutorials] Seeding database with initial tutorials...');
+
+      // Check if tutorials already exist
+      const existingTutorials = await db.query.tutorials.findMany();
+      if (existingTutorials.length > 0) {
+        return res.json({ 
+          message: 'Tutorials already exist. Skipping seeding.',
+          count: existingTutorials.length 
+        });
+      }
+
+      // Seed tutorial data will be added in next task
+      const tutorialData = [
+        {
+          title: 'Getting Started with HRStudio360',
+          description: 'Learn the basics of navigating HRStudio360 and setting up your profile.',
+          category: 'getting-started' as const,
+          difficulty: 'beginner' as const,
+          estimatedMinutes: 10,
+          roleAccess: ['Employee', 'Manager', 'HR', 'Product Owner'],
+          tags: ['basics', 'onboarding', 'setup'],
+          sortOrder: 1
+        },
+        {
+          title: 'Running Your First Payroll',
+          description: 'Step-by-step guide to processing payroll using the guided wizard.',
+          category: 'payroll' as const,
+          difficulty: 'intermediate' as const,
+          estimatedMinutes: 20,
+          roleAccess: ['HR', 'Product Owner'],
+          tags: ['payroll', 'wizard', 'processing'],
+          sortOrder: 2
+        },
+        {
+          title: 'Managing the Hiring Pipeline',
+          description: 'Learn how to post jobs, review candidates, and manage the recruitment process.',
+          category: 'hiring' as const,
+          difficulty: 'intermediate' as const,
+          estimatedMinutes: 15,
+          roleAccess: ['HR', 'Manager', 'Product Owner'],
+          tags: ['hiring', 'recruitment', 'candidates'],
+          sortOrder: 3
+        },
+        {
+          title: 'Using Studio AI for Recruitment',
+          description: 'Discover how to leverage AI-powered insights for candidate screening and hiring decisions.',
+          category: 'ai-features' as const,
+          difficulty: 'advanced' as const,
+          estimatedMinutes: 25,
+          roleAccess: ['HR', 'Product Owner'],
+          tags: ['ai', 'recruitment', 'automation'],
+          sortOrder: 4
+        }
+      ];
+
+      const createdTutorials = await db.insert(tutorials).values(tutorialData).returning();
+
+      res.json({
+        message: `Successfully seeded ${createdTutorials.length} tutorials`,
+        tutorials: createdTutorials
+      });
+    } catch (error: any) {
+      console.error('[Tutorials] Seed error:', error);
+      res.status(500).json({ error: 'Failed to seed tutorials', details: error.message });
     }
   });
 }
