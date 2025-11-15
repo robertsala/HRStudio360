@@ -2199,7 +2199,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post('/api/fun-facts/seed', async (req, res) => {
+  app.get('/api/fun-facts/seed', async (req, res) => {
     try {
       const existingCount = await db.select().from(paycheckFunFacts);
       
