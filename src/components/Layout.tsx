@@ -242,7 +242,6 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
     { id: 'reports', label: t('sidebar.reports'), icon: FileText, action: () => onOpenModal?.('reports') },
     { id: 'training', label: t('sidebar.training'), icon: GraduationCap, action: () => onOpenModal?.('training') },
     { id: 'offboarding', label: t('sidebar.offboarding'), icon: UserX, action: () => onOpenModal?.('offboarding') },
-    { id: 'offers', label: t('sidebar.offerManagement'), icon: FileText, action: () => onOpenModal?.('offerManagement') },
     { id: 'settings', label: t('sidebar.settings'), icon: Settings, action: () => onOpenModal?.('systemSettings') }
   ];
 
