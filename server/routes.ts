@@ -12,7 +12,8 @@ import {
   profiles,
   authCredentials,
   passwordResetTokens,
-  passwordAuditLog
+  passwordAuditLog,
+  paycheckFunFacts
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { seedProductionDatabase } from './seed-production.js';
@@ -2194,6 +2195,54 @@ export function registerRoutes(app: Express) {
       res.json(usageInfo);
     } catch (error: any) {
       console.error('Error getting daily usage info:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/fun-facts/seed', async (req, res) => {
+    try {
+      const existingCount = await db.select().from(paycheckFunFacts);
+      
+      if (existingCount.length > 0) {
+        return res.json({ 
+          message: 'Fun fact templates already exist', 
+          count: existingCount.length,
+          skipped: true 
+        });
+      }
+
+      const templates = [
+        { category: 'animals', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could adopt {sheep} sheep with this paycheck. Welcome to shepherding!', enabled: true },
+        { category: 'animals', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'With this paycheck, you could buy {chickens} chickens, {guineaPigs} guinea pigs, and start your own mini farm!', enabled: true },
+        { category: 'education', minAmount: '0.00', maxAmount: '100000.00', factTemplate: "That's {books} books for your library!", enabled: true },
+        { category: 'education', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'Enough for {onlineCourses} online courses!', enabled: true },
+        { category: 'entertainment', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could get {streamingMonths} months of streaming services!', enabled: true },
+        { category: 'entertainment', minAmount: '0.00', maxAmount: '100000.00', factTemplate: "That's {concertTickets} concert tickets. Time to rock out!", enabled: true },
+        { category: 'entertainment', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could buy {gamingConsoles} gaming consoles!', enabled: true },
+        { category: 'food', minAmount: '0.00', maxAmount: '100000.00', factTemplate: "This paycheck buys {coffee} cups of coffee. That's a lot of caffeine!", enabled: true },
+        { category: 'food', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'Enough for {avocadoToast} avocado toasts. Millennial dream!', enabled: true },
+        { category: 'food', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'That could buy {pizzas} pizzas. Pizza party for everyone!', enabled: true },
+        { category: 'quirky', minAmount: '0.00', maxAmount: '100000.00', factTemplate: "That's enough to buy {telescopes} professional-grade telescopes. Stargazing party!", enabled: true },
+        { category: 'quirky', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could buy {rubberDucks} rubber ducks. For debugging, of course!', enabled: true },
+        { category: 'quirky', minAmount: '0.00', maxAmount: '100000.00', factTemplate: "That's {fountainPens} fountain pens for your collection!", enabled: true },
+        { category: 'sports', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could buy {bicycles} bicycles!', enabled: true },
+        { category: 'sports', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'That covers {gymMonths} months of gym membership!', enabled: true },
+        { category: 'technology', minAmount: '0.00', maxAmount: '100000.00', factTemplate: "That's enough for {smartphones} smartphones!", enabled: true },
+        { category: 'technology', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could buy {laptops} laptops with that!', enabled: true },
+        { category: 'technology', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'Enough for {cloudStorageMonths} months of cloud storage!', enabled: true },
+        { category: 'travel', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'You could travel {miles} miles with this paycheck!', enabled: true },
+        { category: 'travel', minAmount: '0.00', maxAmount: '100000.00', factTemplate: 'This could pay for {bnbNights} nights in an Airbnb!', enabled: true }
+      ];
+
+      await db.insert(paycheckFunFacts).values(templates);
+
+      res.json({ 
+        message: 'Successfully seeded fun fact templates', 
+        count: templates.length,
+        seeded: true 
+      });
+    } catch (error: any) {
+      console.error('Error seeding fun facts:', error);
       res.status(500).json({ error: error.message });
     }
   });
