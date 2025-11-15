@@ -1620,6 +1620,74 @@ export const timesheetChangeAudit = pgTable('timesheet_change_audit', {
   changedAt: timestamp('changed_at').defaultNow()
 });
 
+// **PHASE 3: ADVANCED ACCESS CONTROL FEATURES**
+
+// Permission Templates - Reusable permission sets for quick role setup
+export const permissionTemplates = pgTable('permission_templates', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').unique().notNull(), // e.g., 'Standard Manager', 'Department Lead'
+  description: text('description'), // What this template includes
+  targetRole: text('target_role'), // Suggested role (optional)
+  permissionIds: uuid('permission_ids').array().notNull(), // Array of permission IDs
+  isSystemTemplate: boolean('is_system_template').default(false), // Can't be deleted
+  createdBy: uuid('created_by').references(() => profiles.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Role Hierarchy - Parent-child relationships for permission inheritance
+export const roleHierarchy = pgTable('role_hierarchy', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  role: text('role').unique().notNull(), // Child role
+  parentRole: text('parent_role'), // Parent role (null for top-level roles)
+  inheritsPermissions: boolean('inherits_permissions').default(true),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Time-Based Permission Grants - Temporary elevated access with auto-expiration
+export const timeBasedPermissionGrants = pgTable('time_based_permission_grants', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  permissionId: uuid('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
+  grantedBy: uuid('granted_by').references(() => profiles.id).notNull(),
+  reason: text('reason').notNull(), // Why temporary access is needed
+  startTime: timestamp('start_time').defaultNow(),
+  endTime: timestamp('end_time').notNull(), // Auto-revoke after this time
+  isActive: boolean('is_active').default(true),
+  revokedBy: uuid('revoked_by').references(() => profiles.id),
+  revokedAt: timestamp('revoked_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Permission Request Workflows - Employee-initiated permission requests
+export const permissionRequests = pgTable('permission_requests', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  requestedById: uuid('requested_by_id').references(() => profiles.id).notNull(),
+  permissionIds: uuid('permission_ids').array().notNull(), // Requested permissions
+  justification: text('justification').notNull(), // Why these permissions are needed
+  requestType: text('request_type').notNull(), // 'temporary' or 'permanent'
+  duration: integer('duration'), // Hours for temporary access (null for permanent)
+  status: correctionStatusEnum('status').default('Pending').notNull(), // Reuse existing enum
+  reviewedBy: uuid('reviewed_by').references(() => profiles.id),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewNotes: text('review_notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Permission Change Audit - Track all permission changes for compliance
+export const permissionChangeAudit = pgTable('permission_change_audit', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  targetType: text('target_type').notNull(), // 'role' or 'user'
+  targetId: text('target_id').notNull(), // Role name or user ID
+  changeType: text('change_type').notNull(), // 'grant', 'revoke', 'template_apply'
+  permissionIds: uuid('permission_ids').array().notNull(),
+  changedBy: uuid('changed_by').references(() => profiles.id).notNull(),
+  reason: text('reason'), // Optional justification
+  metadata: json('metadata'), // Additional context (e.g., template ID, request ID)
+  changedAt: timestamp('changed_at').defaultNow()
+});
+
 // Insert schemas
 export const insertTaxJurisdictionSchema = createInsertSchema(taxJurisdictions).omit({
   id: true,
@@ -1703,3 +1771,41 @@ export const insertTimesheetChangeAuditSchema = createInsertSchema(timesheetChan
 });
 export type InsertTimesheetChangeAudit = z.infer<typeof insertTimesheetChangeAuditSchema>;
 export type TimesheetChangeAudit = typeof timesheetChangeAudit.$inferSelect;
+
+// Phase 3: Insert schemas for advanced access control features
+export const insertPermissionTemplateSchema = createInsertSchema(permissionTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertPermissionTemplate = z.infer<typeof insertPermissionTemplateSchema>;
+export type PermissionTemplate = typeof permissionTemplates.$inferSelect;
+
+export const insertRoleHierarchySchema = createInsertSchema(roleHierarchy).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertRoleHierarchy = z.infer<typeof insertRoleHierarchySchema>;
+export type RoleHierarchy = typeof roleHierarchy.$inferSelect;
+
+export const insertTimeBasedPermissionGrantSchema = createInsertSchema(timeBasedPermissionGrants).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTimeBasedPermissionGrant = z.infer<typeof insertTimeBasedPermissionGrantSchema>;
+export type TimeBasedPermissionGrant = typeof timeBasedPermissionGrants.$inferSelect;
+
+export const insertPermissionRequestSchema = createInsertSchema(permissionRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertPermissionRequest = z.infer<typeof insertPermissionRequestSchema>;
+export type PermissionRequest = typeof permissionRequests.$inferSelect;
+
+export const insertPermissionChangeAuditSchema = createInsertSchema(permissionChangeAudit).omit({
+  id: true,
+  changedAt: true
+});
+export type InsertPermissionChangeAudit = z.infer<typeof insertPermissionChangeAuditSchema>;
+export type PermissionChangeAudit = typeof permissionChangeAudit.$inferSelect;
