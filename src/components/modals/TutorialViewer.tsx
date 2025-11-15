@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, CheckCircle, Circle, BookOpen, Clock, Award, PlayCircle, Download, Sparkles } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CheckCircle, Circle, BookOpen, Clock, Award, PlayCircle, Download } from 'lucide-react';
 import type { Tutorial, TutorialStep, TutorialCompletion } from '../../../shared/schema';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '../../lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
 
 interface TutorialWithSteps extends Tutorial {
   steps: TutorialStep[];
@@ -19,7 +18,7 @@ interface TutorialViewerProps {
 const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, onAction }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const { toast } = useToast();
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Fetch tutorial with steps and progress
   const { data: tutorial, isLoading } = useQuery<TutorialWithSteps>({
@@ -64,11 +63,11 @@ const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, on
     onSuccess: (data: any) => {
       if (data.newlyAwarded && data.newlyAwarded.length > 0) {
         data.newlyAwarded.forEach((badge: any) => {
-          toast({
-            title: '🎉 Badge Earned!',
-            description: `You earned the "${badge.badge.name}" badge!`,
-            duration: 5000
+          setToast({
+            message: `🎉 Badge Earned! ${badge.badge.name}`,
+            type: 'success'
           });
+          setTimeout(() => setToast(null), 5000);
         });
       }
     }
@@ -115,11 +114,11 @@ const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, on
       if (isCompleted) {
         generateCertificateMutation.mutate();
         checkBadgesMutation.mutate();
-        toast({
-          title: '🎓 Tutorial Completed!',
-          description: 'Congratulations! You can now download your certificate.',
-          duration: 5000
+        setToast({
+          message: '🎓 Tutorial Completed! You can now download your certificate.',
+          type: 'success'
         });
+        setTimeout(() => setToast(null), 5000);
       }
     }
   };
@@ -392,6 +391,22 @@ const TutorialViewer: React.FC<TutorialViewerProps> = ({ tutorialId, onClose, on
           </div>
         </div>
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-[60] animate-in slide-in-from-bottom-2">
+          <div className={`rounded-lg px-6 py-4 shadow-lg flex items-center gap-3 ${
+            toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+          }`}>
+            {toast.type === 'success' ? (
+              <CheckCircle className="h-5 w-5" />
+            ) : (
+              <Award className="h-5 w-5" />
+            )}
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
