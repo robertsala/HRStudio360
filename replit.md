@@ -6,7 +6,8 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+- **Communication style**: Simple, everyday language.
+- **Change Log**: Automatically add entries to the change log whenever completing new features, fixes, improvements, or system changes.
 
 ## System Architecture
 
