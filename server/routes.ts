@@ -9,6 +9,8 @@ import {
   insertChangeLogSchema, insertHistoricalChangeSchema, insertChangeNotificationSchema,
   insertEarnedBadgeSchema, insertCelebrationHistorySchema, insertCelebrationNotificationSchema,
   insertReviewCycleSchema,
+  insertTaxJurisdictionSchema, insertReciprocalAgreementSchema,
+  insertEmployeeTaxConfigurationSchema, insertAutoFixAuditLogSchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -4183,6 +4185,436 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('[Badges] Error checking badges:', error);
       res.status(500).json({ error: 'Failed to check badges', details: error.message });
+    }
+  });
+
+  // Tax Jurisdiction Management Routes
+  // RBAC: Only HR department and Product Owner can manage tax jurisdictions
+  
+  app.get('/api/tax-jurisdictions', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const jurisdictions = await storage.getTaxJurisdictions();
+      res.json(jurisdictions);
+    } catch (error: any) {
+      console.error('Error fetching tax jurisdictions:', error);
+      res.status(500).json({ error: 'Failed to fetch tax jurisdictions', details: error.message });
+    }
+  });
+
+  app.get('/api/tax-jurisdictions/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const jurisdiction = await storage.getTaxJurisdictionById(req.params.id);
+      if (!jurisdiction) {
+        return res.status(404).json({ error: 'Tax jurisdiction not found' });
+      }
+
+      res.json(jurisdiction);
+    } catch (error: any) {
+      console.error('Error fetching tax jurisdiction:', error);
+      res.status(500).json({ error: 'Failed to fetch tax jurisdiction', details: error.message });
+    }
+  });
+
+  app.post('/api/tax-jurisdictions', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create tax jurisdictions' 
+        });
+      }
+
+      const validated = insertTaxJurisdictionSchema.parse(req.body);
+      const jurisdiction = await storage.createTaxJurisdiction(validated);
+      res.status(201).json(jurisdiction);
+    } catch (error: any) {
+      console.error('Error creating tax jurisdiction:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to create tax jurisdiction', details: error.message });
+    }
+  });
+
+  app.put('/api/tax-jurisdictions/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can update tax jurisdictions' 
+        });
+      }
+
+      const existing = await storage.getTaxJurisdictionById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Tax jurisdiction not found' });
+      }
+
+      const validated = insertTaxJurisdictionSchema.partial().parse(req.body);
+      const updated = await storage.updateTaxJurisdiction(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating tax jurisdiction:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to update tax jurisdiction', details: error.message });
+    }
+  });
+
+  app.delete('/api/tax-jurisdictions/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can delete tax jurisdictions' 
+        });
+      }
+
+      const existing = await storage.getTaxJurisdictionById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Tax jurisdiction not found' });
+      }
+
+      await storage.deleteTaxJurisdiction(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting tax jurisdiction:', error);
+      res.status(500).json({ error: 'Failed to delete tax jurisdiction', details: error.message });
+    }
+  });
+
+  // Reciprocal Agreement Routes
+  // RBAC: Only HR department and Product Owner can manage reciprocal agreements
+
+  app.get('/api/reciprocal-agreements', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const agreements = await storage.getReciprocalAgreements();
+      res.json(agreements);
+    } catch (error: any) {
+      console.error('Error fetching reciprocal agreements:', error);
+      res.status(500).json({ error: 'Failed to fetch reciprocal agreements', details: error.message });
+    }
+  });
+
+  app.get('/api/reciprocal-agreements/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const agreement = await storage.getReciprocalAgreementById(req.params.id);
+      if (!agreement) {
+        return res.status(404).json({ error: 'Reciprocal agreement not found' });
+      }
+
+      res.json(agreement);
+    } catch (error: any) {
+      console.error('Error fetching reciprocal agreement:', error);
+      res.status(500).json({ error: 'Failed to fetch reciprocal agreement', details: error.message });
+    }
+  });
+
+  app.post('/api/reciprocal-agreements', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create reciprocal agreements' 
+        });
+      }
+
+      const validated = insertReciprocalAgreementSchema.parse(req.body);
+      const agreement = await storage.createReciprocalAgreement(validated);
+      res.status(201).json(agreement);
+    } catch (error: any) {
+      console.error('Error creating reciprocal agreement:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to create reciprocal agreement', details: error.message });
+    }
+  });
+
+  app.put('/api/reciprocal-agreements/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can update reciprocal agreements' 
+        });
+      }
+
+      const existing = await storage.getReciprocalAgreementById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Reciprocal agreement not found' });
+      }
+
+      const validated = insertReciprocalAgreementSchema.partial().parse(req.body);
+      const updated = await storage.updateReciprocalAgreement(req.params.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating reciprocal agreement:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to update reciprocal agreement', details: error.message });
+    }
+  });
+
+  app.delete('/api/reciprocal-agreements/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can delete reciprocal agreements' 
+        });
+      }
+
+      const existing = await storage.getReciprocalAgreementById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Reciprocal agreement not found' });
+      }
+
+      await storage.deleteReciprocalAgreement(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting reciprocal agreement:', error);
+      res.status(500).json({ error: 'Failed to delete reciprocal agreement', details: error.message });
+    }
+  });
+
+  // Employee Tax Configuration Routes
+  // HR/Product Owner can manage all configs, employees can view their own
+
+  app.get('/api/employee-tax-config/:employeeId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { employeeId } = req.params;
+      
+      const employee = await storage.getEmployeeById(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission && employee.userId !== userId) {
+        return res.status(403).json({ 
+          error: 'Forbidden: You can only view your own tax configuration' 
+        });
+      }
+
+      const config = await storage.getEmployeeTaxConfiguration(employeeId);
+      if (!config) {
+        return res.status(404).json({ error: 'Tax configuration not found for this employee' });
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error('Error fetching employee tax configuration:', error);
+      res.status(500).json({ error: 'Failed to fetch employee tax configuration', details: error.message });
+    }
+  });
+
+  app.post('/api/employee-tax-config/:employeeId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { employeeId } = req.params;
+
+      const employee = await storage.getEmployeeById(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create tax configurations' 
+        });
+      }
+
+      const existing = await storage.getEmployeeTaxConfiguration(employeeId);
+      if (existing) {
+        return res.status(400).json({ 
+          error: 'Tax configuration already exists for this employee. Use PUT to update.' 
+        });
+      }
+
+      const validated = insertEmployeeTaxConfigurationSchema.parse({
+        ...req.body,
+        employeeId
+      });
+
+      const config = await storage.createEmployeeTaxConfiguration(validated);
+      res.status(201).json(config);
+    } catch (error: any) {
+      console.error('Error creating employee tax configuration:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to create employee tax configuration', details: error.message });
+    }
+  });
+
+  app.put('/api/employee-tax-config/:employeeId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { employeeId } = req.params;
+
+      const employee = await storage.getEmployeeById(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can update tax configurations' 
+        });
+      }
+
+      const existing = await storage.getEmployeeTaxConfiguration(employeeId);
+      if (!existing) {
+        return res.status(404).json({ 
+          error: 'Tax configuration not found. Use POST to create one.' 
+        });
+      }
+
+      const validated = insertEmployeeTaxConfigurationSchema.partial().parse(req.body);
+      const updated = await storage.updateEmployeeTaxConfiguration(existing.id, validated);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating employee tax configuration:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to update employee tax configuration', details: error.message });
+    }
+  });
+
+  // Auto-fix Audit Log Routes
+  // GET: Available to all authenticated users
+  // POST: Only HR/Product Owner can create audit logs (when approving auto-fixes)
+
+  app.get('/api/auto-fix-audit', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const logs = await storage.getAutoFixAuditLogs();
+      res.json(logs);
+    } catch (error: any) {
+      console.error('Error fetching auto-fix audit logs:', error);
+      res.status(500).json({ error: 'Failed to fetch auto-fix audit logs', details: error.message });
+    }
+  });
+
+  app.get('/api/auto-fix-audit/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const log = await storage.getAutoFixAuditLogById(req.params.id);
+      if (!log) {
+        return res.status(404).json({ error: 'Auto-fix audit log not found' });
+      }
+
+      res.json(log);
+    } catch (error: any) {
+      console.error('Error fetching auto-fix audit log:', error);
+      res.status(500).json({ error: 'Failed to fetch auto-fix audit log', details: error.message });
+    }
+  });
+
+  app.post('/api/auto-fix-audit', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create auto-fix audit logs' 
+        });
+      }
+
+      const validated = insertAutoFixAuditLogSchema.parse({
+        ...req.body,
+        approvedBy: userId
+      });
+
+      const log = await storage.createAutoFixAuditLog(validated);
+      res.status(201).json(log);
+    } catch (error: any) {
+      console.error('Error creating auto-fix audit log:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to create auto-fix audit log', details: error.message });
     }
   });
 }

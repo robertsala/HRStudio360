@@ -37,6 +37,11 @@ export const profiles = pgTable('profiles', {
   locationState: text('location_state'),
   locationZipCode: text('location_zip_code'),
   locationManualOverride: boolean('location_manual_override').default(false),
+  // Tax jurisdiction fields
+  workLocationState: text('work_location_state'), // State where employee performs work
+  workLocationCity: text('work_location_city'), // City for local taxes
+  residenceState: text('residence_state'), // State where employee lives (for tax purposes)
+  residenceCity: text('residence_city'), // City of residence
   canAccessOrgChart: boolean('can_access_org_chart').default(false),
   managerId: uuid('manager_id').references((): any => profiles.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow(),
@@ -1439,3 +1444,108 @@ export interface AnalyticsSummary {
   timeRange: string;
   generatedAt: string;
 }
+
+// Tax Jurisdiction Management
+export const taxJurisdictions = pgTable('tax_jurisdictions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  jurisdictionType: text('jurisdiction_type').notNull(), // 'federal', 'state', 'local'
+  jurisdictionName: text('jurisdiction_name').notNull(), // e.g., 'California', 'New York City'
+  stateCode: text('state_code'), // Two-letter state code
+  cityName: text('city_name'), // For local taxes
+  federalIncomeTaxRate: numeric('federal_income_tax_rate', { precision: 5, scale: 4 }), // 0.2200 = 22%
+  stateIncomeTaxRate: numeric('state_income_tax_rate', { precision: 5, scale: 4 }),
+  localIncomeTaxRate: numeric('local_income_tax_rate', { precision: 5, scale: 4 }),
+  socialSecurityRate: numeric('social_security_rate', { precision: 5, scale: 4 }), // FICA
+  medicareRate: numeric('medicare_rate', { precision: 5, scale: 4 }), // FICA
+  additionalMedicareRate: numeric('additional_medicare_rate', { precision: 5, scale: 4 }), // High earners
+  unemploymentTaxRate: numeric('unemployment_tax_rate', { precision: 5, scale: 4 }),
+  isActive: boolean('is_active').default(true),
+  effectiveDate: date('effective_date').notNull(),
+  expirationDate: date('expiration_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Reciprocal Tax Agreements between states
+export const reciprocalAgreements = pgTable('reciprocal_agreements', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  workStateCode: text('work_state_code').notNull(), // State where employee works
+  residenceStateCode: text('residence_state_code').notNull(), // State where employee lives
+  agreementType: text('agreement_type').notNull(), // 'full_reciprocity', 'partial_reciprocity'
+  description: text('description'),
+  isActive: boolean('is_active').default(true),
+  effectiveDate: date('effective_date').notNull(),
+  expirationDate: date('expiration_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Employee Tax Configuration
+export const employeeTaxConfiguration = pgTable('employee_tax_configuration', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'cascade' }).notNull(),
+  workLocationState: text('work_location_state'), // State where employee performs work
+  workLocationCity: text('work_location_city'), // City for local tax
+  residenceState: text('residence_state'), // State where employee lives
+  residenceCity: text('residence_city'),
+  federalFilingStatus: text('federal_filing_status'), // 'single', 'married', 'head_of_household'
+  federalAllowances: integer('federal_allowances').default(0),
+  stateFilingStatus: text('state_filing_status'),
+  stateAllowances: integer('state_allowances').default(0),
+  additionalWithholding: numeric('additional_withholding', { precision: 10, scale: 2 }).default('0'),
+  exemptFromFederal: boolean('exempt_from_federal').default(false),
+  exemptFromState: boolean('exempt_from_state').default(false),
+  exemptFromLocal: boolean('exempt_from_local').default(false),
+  reciprocalAgreementApplies: boolean('reciprocal_agreement_applies').default(false),
+  reciprocalAgreementId: uuid('reciprocal_agreement_id').references(() => reciprocalAgreements.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Auto-fix Audit Log
+export const autoFixAuditLog = pgTable('auto_fix_audit_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  fixType: text('fix_type').notNull(), // 'timesheet_approval', 'tax_calculation', etc.
+  affectedEmployeeIds: uuid('affected_employee_ids').array().notNull(),
+  beforeState: json('before_state'), // JSON snapshot of data before fix
+  afterState: json('after_state'), // JSON snapshot of data after fix
+  approvedBy: uuid('approved_by').references(() => profiles.id).notNull(),
+  approvedAt: timestamp('approved_at').defaultNow(),
+  reason: text('reason'),
+  notificationsSent: json('notifications_sent'), // Track who was notified
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Insert schemas
+export const insertTaxJurisdictionSchema = createInsertSchema(taxJurisdictions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertTaxJurisdiction = z.infer<typeof insertTaxJurisdictionSchema>;
+export type TaxJurisdiction = typeof taxJurisdictions.$inferSelect;
+
+export const insertReciprocalAgreementSchema = createInsertSchema(reciprocalAgreements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertReciprocalAgreement = z.infer<typeof insertReciprocalAgreementSchema>;
+export type ReciprocalAgreement = typeof reciprocalAgreements.$inferSelect;
+
+export const insertEmployeeTaxConfigurationSchema = createInsertSchema(employeeTaxConfiguration).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertEmployeeTaxConfiguration = z.infer<typeof insertEmployeeTaxConfigurationSchema>;
+export type EmployeeTaxConfiguration = typeof employeeTaxConfiguration.$inferSelect;
+
+export const insertAutoFixAuditLogSchema = createInsertSchema(autoFixAuditLog).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertAutoFixAuditLog = z.infer<typeof insertAutoFixAuditLogSchema>;
+export type AutoFixAuditLog = typeof autoFixAuditLog.$inferSelect;

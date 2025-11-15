@@ -41,7 +41,8 @@ import {
   reviewCycles,
   jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments,
   paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage,
-  dashboardWidgetPresets, userDashboardPreferences
+  dashboardWidgetPresets, userDashboardPreferences,
+  taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -251,6 +252,33 @@ export interface IStorage {
   getDashboardWidgetPresets(): Promise<DashboardWidgetPreset[]>;
   bulkCreateDashboardWidgetPresets(presets: InsertDashboardWidgetPreset[]): Promise<DashboardWidgetPreset[]>;
   getUserDashboardPreferences(userId: string): Promise<UserDashboardPreference[]>;
+
+  // Tax Jurisdictions
+  getTaxJurisdictions(): Promise<import('../shared/schema.js').TaxJurisdiction[]>;
+  getTaxJurisdictionById(id: string): Promise<import('../shared/schema.js').TaxJurisdiction | undefined>;
+  getTaxJurisdictionByState(stateCode: string): Promise<import('../shared/schema.js').TaxJurisdiction | undefined>;
+  getTaxJurisdictionByCity(stateCode: string, cityName: string): Promise<import('../shared/schema.js').TaxJurisdiction | undefined>;
+  createTaxJurisdiction(jurisdiction: import('../shared/schema.js').InsertTaxJurisdiction): Promise<import('../shared/schema.js').TaxJurisdiction>;
+  updateTaxJurisdiction(id: string, jurisdiction: Partial<import('../shared/schema.js').InsertTaxJurisdiction>): Promise<import('../shared/schema.js').TaxJurisdiction | undefined>;
+  deleteTaxJurisdiction(id: string): Promise<void>;
+
+  // Reciprocal Agreements
+  getReciprocalAgreements(): Promise<import('../shared/schema.js').ReciprocalAgreement[]>;
+  getReciprocalAgreementById(id: string): Promise<import('../shared/schema.js').ReciprocalAgreement | undefined>;
+  getReciprocalAgreementByStates(workState: string, residenceState: string): Promise<import('../shared/schema.js').ReciprocalAgreement | undefined>;
+  createReciprocalAgreement(agreement: import('../shared/schema.js').InsertReciprocalAgreement): Promise<import('../shared/schema.js').ReciprocalAgreement>;
+  updateReciprocalAgreement(id: string, agreement: Partial<import('../shared/schema.js').InsertReciprocalAgreement>): Promise<import('../shared/schema.js').ReciprocalAgreement | undefined>;
+  deleteReciprocalAgreement(id: string): Promise<void>;
+
+  // Employee Tax Configuration
+  getEmployeeTaxConfiguration(employeeId: string): Promise<import('../shared/schema.js').EmployeeTaxConfiguration | undefined>;
+  createEmployeeTaxConfiguration(config: import('../shared/schema.js').InsertEmployeeTaxConfiguration): Promise<import('../shared/schema.js').EmployeeTaxConfiguration>;
+  updateEmployeeTaxConfiguration(id: string, config: Partial<import('../shared/schema.js').InsertEmployeeTaxConfiguration>): Promise<import('../shared/schema.js').EmployeeTaxConfiguration | undefined>;
+
+  // Auto-fix Audit Log
+  getAutoFixAuditLogs(): Promise<import('../shared/schema.js').AutoFixAuditLog[]>;
+  getAutoFixAuditLogById(id: string): Promise<import('../shared/schema.js').AutoFixAuditLog | undefined>;
+  createAutoFixAuditLog(log: import('../shared/schema.js').InsertAutoFixAuditLog): Promise<import('../shared/schema.js').AutoFixAuditLog>;
 }
 
 // Database storage implementation
@@ -1646,6 +1674,145 @@ export class DbStorage implements IStorage {
       .from(userDashboardPreferences)
       .where(eq(userDashboardPreferences.userId, userId))
       .orderBy(userDashboardPreferences.displayOrder);
+  }
+
+  // Tax Jurisdictions
+  async getTaxJurisdictions(): Promise<import('../shared/schema.js').TaxJurisdiction[]> {
+    return await db.select()
+      .from(taxJurisdictions)
+      .where(eq(taxJurisdictions.isActive, true))
+      .orderBy(taxJurisdictions.jurisdictionType, taxJurisdictions.jurisdictionName);
+  }
+
+  async getTaxJurisdictionById(id: string): Promise<import('../shared/schema.js').TaxJurisdiction | undefined> {
+    const result = await db.select().from(taxJurisdictions).where(eq(taxJurisdictions.id, id));
+    return result[0];
+  }
+
+  async getTaxJurisdictionByState(stateCode: string): Promise<import('../shared/schema.js').TaxJurisdiction | undefined> {
+    const result = await db.select()
+      .from(taxJurisdictions)
+      .where(
+        and(
+          eq(taxJurisdictions.stateCode, stateCode),
+          eq(taxJurisdictions.jurisdictionType, 'state'),
+          eq(taxJurisdictions.isActive, true)
+        )
+      );
+    return result[0];
+  }
+
+  async getTaxJurisdictionByCity(stateCode: string, cityName: string): Promise<import('../shared/schema.js').TaxJurisdiction | undefined> {
+    const result = await db.select()
+      .from(taxJurisdictions)
+      .where(
+        and(
+          eq(taxJurisdictions.stateCode, stateCode),
+          eq(taxJurisdictions.cityName, cityName),
+          eq(taxJurisdictions.jurisdictionType, 'local'),
+          eq(taxJurisdictions.isActive, true)
+        )
+      );
+    return result[0];
+  }
+
+  async createTaxJurisdiction(jurisdiction: import('../shared/schema.js').InsertTaxJurisdiction): Promise<import('../shared/schema.js').TaxJurisdiction> {
+    const result = await db.insert(taxJurisdictions).values(jurisdiction).returning();
+    return result[0];
+  }
+
+  async updateTaxJurisdiction(id: string, jurisdiction: Partial<import('../shared/schema.js').InsertTaxJurisdiction>): Promise<import('../shared/schema.js').TaxJurisdiction | undefined> {
+    const result = await db.update(taxJurisdictions)
+      .set({ ...jurisdiction, updatedAt: new Date() })
+      .where(eq(taxJurisdictions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTaxJurisdiction(id: string): Promise<void> {
+    await db.delete(taxJurisdictions).where(eq(taxJurisdictions.id, id));
+  }
+
+  // Reciprocal Agreements
+  async getReciprocalAgreements(): Promise<import('../shared/schema.js').ReciprocalAgreement[]> {
+    return await db.select()
+      .from(reciprocalAgreements)
+      .where(eq(reciprocalAgreements.isActive, true))
+      .orderBy(reciprocalAgreements.workStateCode, reciprocalAgreements.residenceStateCode);
+  }
+
+  async getReciprocalAgreementById(id: string): Promise<import('../shared/schema.js').ReciprocalAgreement | undefined> {
+    const result = await db.select().from(reciprocalAgreements).where(eq(reciprocalAgreements.id, id));
+    return result[0];
+  }
+
+  async getReciprocalAgreementByStates(workState: string, residenceState: string): Promise<import('../shared/schema.js').ReciprocalAgreement | undefined> {
+    const result = await db.select()
+      .from(reciprocalAgreements)
+      .where(
+        and(
+          eq(reciprocalAgreements.workStateCode, workState),
+          eq(reciprocalAgreements.residenceStateCode, residenceState),
+          eq(reciprocalAgreements.isActive, true)
+        )
+      );
+    return result[0];
+  }
+
+  async createReciprocalAgreement(agreement: import('../shared/schema.js').InsertReciprocalAgreement): Promise<import('../shared/schema.js').ReciprocalAgreement> {
+    const result = await db.insert(reciprocalAgreements).values(agreement).returning();
+    return result[0];
+  }
+
+  async updateReciprocalAgreement(id: string, agreement: Partial<import('../shared/schema.js').InsertReciprocalAgreement>): Promise<import('../shared/schema.js').ReciprocalAgreement | undefined> {
+    const result = await db.update(reciprocalAgreements)
+      .set({ ...agreement, updatedAt: new Date() })
+      .where(eq(reciprocalAgreements.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteReciprocalAgreement(id: string): Promise<void> {
+    await db.delete(reciprocalAgreements).where(eq(reciprocalAgreements.id, id));
+  }
+
+  // Employee Tax Configuration
+  async getEmployeeTaxConfiguration(employeeId: string): Promise<import('../shared/schema.js').EmployeeTaxConfiguration | undefined> {
+    const result = await db.select()
+      .from(employeeTaxConfiguration)
+      .where(eq(employeeTaxConfiguration.employeeId, employeeId));
+    return result[0];
+  }
+
+  async createEmployeeTaxConfiguration(config: import('../shared/schema.js').InsertEmployeeTaxConfiguration): Promise<import('../shared/schema.js').EmployeeTaxConfiguration> {
+    const result = await db.insert(employeeTaxConfiguration).values(config).returning();
+    return result[0];
+  }
+
+  async updateEmployeeTaxConfiguration(id: string, config: Partial<import('../shared/schema.js').InsertEmployeeTaxConfiguration>): Promise<import('../shared/schema.js').EmployeeTaxConfiguration | undefined> {
+    const result = await db.update(employeeTaxConfiguration)
+      .set({ ...config, updatedAt: new Date() })
+      .where(eq(employeeTaxConfiguration.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Auto-fix Audit Log
+  async getAutoFixAuditLogs(): Promise<import('../shared/schema.js').AutoFixAuditLog[]> {
+    return await db.select()
+      .from(autoFixAuditLog)
+      .orderBy(desc(autoFixAuditLog.createdAt))
+      .limit(100);
+  }
+
+  async getAutoFixAuditLogById(id: string): Promise<import('../shared/schema.js').AutoFixAuditLog | undefined> {
+    const result = await db.select().from(autoFixAuditLog).where(eq(autoFixAuditLog.id, id));
+    return result[0];
+  }
+
+  async createAutoFixAuditLog(log: import('../shared/schema.js').InsertAutoFixAuditLog): Promise<import('../shared/schema.js').AutoFixAuditLog> {
+    const result = await db.insert(autoFixAuditLog).values(log).returning();
+    return result[0];
   }
 }
 
