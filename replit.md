@@ -4,120 +4,47 @@
 
 HR Studio 360 is an AI-powered Human Resources management platform designed to streamline the entire employee lifecycle, from recruitment to offboarding. It offers comprehensive HR functionality, including hiring, employee management, payroll, performance reviews, benefits administration, time tracking, and analytics. The platform features a modular dashboard with over 40 specialized components, emphasizing user experience with celebration systems, real-time chat, and extensive customization. The project aims to provide an end-to-end HR solution, enhancing efficiency and employee engagement, and includes an enterprise-grade Applicant Tracking System (ATS) and an autonomous AI agent, "Studio AI," for tasks like candidate screening and hiring insights.
 
-## Recent Changes
-
-### v3.9.0 - Enhanced Payroll Review & Guided Wizard (November 15, 2025)
-- ✅ Created EmployeePayrollDetailModal with 3-tab interface (Overview, Timesheet, Calculations)
-- Review/Edit buttons in PayrollModal now fully functional with modal-based editing workflow
-- Employees can be reviewed and edited individually before proceeding to AI analysis
-- Built comprehensive PayrollWizardModal with 5-step guided workflow:
-  1. Review Timesheets - Verify hours, overtime, and manager approvals
-  2. Process Expenses - Review expense claims and documentation
-  3. Handle Leave Requests - Process PTO, sick leave, and unpaid leave
-  4. Review Calculations - Validate gross pay, taxes, deductions, net pay
-  5. Finalize & Submit - Final checks and payroll submission
-- Wizard integrated into PayrollModal with "Start Guided Payroll" launcher button
-- Each wizard step includes:
-  - Contextual checklists and guidance
-  - Key metrics and statistics
-  - Studio AI assistance button for AI-powered help
-  - Progress tracking with visual indicators
-- Employee detail modal features:
-  - Editable hourly rates and hours with automatic payroll recalculation
-  - Comprehensive timesheet detail view with daily breakdown
-  - Full payroll calculations breakdown showing gross pay formula
-  - Warning and approval status indicators
-- Both modals properly integrated with Studio AI via onOpenStudioAI callback
-- User can now choose between guided wizard mode or manual payroll processing
-- Improved user experience addresses step-by-step payroll workflow requirements
-
-### v3.8.0 - AI Payroll Assistant with Context-Aware Studio AI (November 15, 2025)
-- ✅ Extended Studio AI capabilities to Payroll module with GPT-4o integration
-- Created 3 AI functions in server/ai-agent.ts: validatePayrollRun, analyzeExpenses, chatWithPayrollAI
-- Added 3 secure API endpoints under /api/ai-payroll/* with HR/Product Owner RBAC
-- PayrollModal enhanced with purple gradient "Ask Studio AI" button matching recruitment UX
-- AI validates payroll calculations, detects errors, analyzes expense compliance, and provides conversational assistance
-- All endpoints protected with role-based authorization (HR and Product Owner only)
-- **Context-Aware AI**: StudioAIChatModal now adapts based on module context (recruitment vs payroll)
-  - Payroll context shows payroll-specific capabilities and routes to /api/ai-payroll/chat
-  - Recruitment context shows hiring capabilities and routes to /api/ai-agent/chat
-  - Welcome messages and placeholders dynamically update based on context
-  - Message history resets when switching between contexts to prevent confusion
-- Dashboard manages studioAIContext state to track current AI mode
-- All 5 entry points (PayrollModal, HiringModal, JobManagementModal, dashboard widgets) properly set context before opening AI chat
-- Advisory recommendations only - manual approval required for all actions
-- Audit logging for all AI interactions to ensure compliance
-
-### v3.7.0 - Knowledge Base Relocation to Training Module (November 15, 2025)
-- ✅ Moved Knowledge Base from dashboard to Training section as dedicated tab
-- Knowledge Base now accessible via Training modal → Knowledge Base tab
-- Cleaner dashboard interface with reduced widget clutter
-- Updated widget counts: Employee (6), Manager (9), HR (10), Product Owner (11)
-- Knowledge Base features fully preserved in new location (search, featured/popular/recent articles)
-- Training modal enhanced with 5 tabs: Programs, Assessments, Certifications, Analytics, Knowledge Base
-
-### v3.6.0 - Phase 2: Dashboard Widget Frontend Integration (November 15, 2025)
-- ✅ Complete frontend integration of role-based customizable dashboard widgets
-- Created `useDashboardWidgets` hook with centralized `renderWidget()` helper for unified widget visibility control
-- All 12 registry widgets wrapped and integrated with backend visibility system
-- Role-based widget counts verified: Employee (7), Manager (10), HR (11), Product Owner (12)
-- New Compliance Alerts widget stub added for future implementation (HR/Product Owner only)
-- Fixed critical bugs: userRole ReferenceError, widget ID mismatches, weather widget visibility
-- Widget visibility optimized: compliance-alerts (HR/PO), ai-insights (Manager/PO) for correct role counts
-- Dashboard loads without runtime errors, fully functional role-based widget system
-
-### v3.5.0 - Phase 1: Role-Based Dashboard Widgets (November 15, 2025)
-- ✅ Backend infrastructure complete for customizable dashboard widgets
-- Database schema with `dashboard_widget_presets` and `user_dashboard_preferences` tables
-- Widget registry system defining 11 dashboard widgets with role-based visibility
-- Role-based defaults: Employee (7 widgets), Manager (10 widgets), HR (11 widgets)
-- API endpoint `/api/dashboard/widgets` with merge logic (user prefs → role presets → registry defaults)
-- isActive flag support allowing admins to deactivate widgets without code changes
-- Architecture ready for Phase 2 (customization UI) and Phase 3 (visual improvements)
-
 ## User Preferences
 
-- **Communication style**: Simple, everyday language.
-- **Change Log**: Automatically add entries to the change log whenever completing new features, fixes, improvements, or system changes.
+-   **Communication style**: Simple, everyday language.
+-   **Change Log**: Automatically add entries to the change log whenever completing new features, fixes, improvements, or system changes.
 
 ## System Architecture
 
 ### UI/UX Decisions
 
-The frontend is a React 18 single-page application (SPA) with a modal-based interface. It uses Tailwind CSS for styling with dark mode support. Optimistic UI updates are employed for perceived performance.
+The frontend is a React 18 single-page application (SPA) with a modal-based interface. It uses Tailwind CSS for styling with dark mode support. Optimistic UI updates are employed for perceived performance. The UI features a modular dashboard with role-based customizable widgets and a celebration system.
 
 ### Technical Implementations
 
 -   **Frontend**: Built with React 18, TypeScript, and Vite. Uses React Context for state management, Wouter for routing, and TanStack Query v5 for data fetching. Internationalization is supported via i18next.
 -   **Backend**: Express.js server providing a RESTful API, using Drizzle ORM for type-safe database interactions.
 -   **Data Storage**: PostgreSQL database (Neon-backed) with schema defined by Drizzle ORM.
--   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Demo account access is passwordless.
--   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, and presence tracking. Celebration badges and notifications are in migration.
--   **Paycheck Fun Facts**: Creative purchase comparison feature showing what paychecks could buy (e.g., "7 arcade sessions" or "12 craft coffees"). Migrated from Supabase to PostgreSQL with 3-per-day manual refresh limit. Database tracks templates, history, and daily usage. Smart rotation system prevents repeats by tracking last 10 shown facts per employee. Production seeding endpoint available at `/api/fun-facts/seed`.
--   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation. Fully populated with 20 historical entries documenting all major features from v1.0.0 to v3.2.0. Production seeding endpoint available at `/api/changelog/seed`.
--   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
--   **Dashboard Customization (v3.7.0)**: Fully integrated role-based customizable dashboard widgets system. Widget registry defines 11 widgets with role-based visibility (Employee: 6, Manager: 9, HR: 10, Product Owner: 11). Knowledge Base relocated to Training module as dedicated tab for cleaner dashboard. Frontend uses `useDashboardWidgets` hook with centralized `renderWidget()` for backend-controlled visibility. API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. Database supports widget presets and user preferences with `isActive` flag for admin control. Compliance Alerts stub added for future implementation. All widgets wrapped and integrated with role-based access control. Seeding endpoint at `/api/dashboard/widgets/seed`.
--   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), it includes an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, AI-powered employee search, and AI Payroll Assistant. The "Studio AI" agent operates autonomously across recruitment and payroll modules, performing actions like candidate screening, payroll validation, expense analysis, and generating insights. Payroll AI features include error detection in payroll runs, expense compliance checking, and conversational assistance for HR teams. All AI capabilities restricted to authorized roles (HR/Product Owner) with audit logging for compliance.
--   **Design Patterns**: Heavily uses a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries. Component extraction pattern used for reusability (e.g., `JobPostingsPanel` extracted from `JobManagementModal`).
+-   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Role-based access control (RBAC) is implemented for features and API endpoints.
+-   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, and presence tracking. Celebration badges and notifications are integrated.
+-   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), the "Studio AI" agent provides an AI Assistant, autonomous candidate screening, batch pipeline processing, hiring insights, AI-powered employee search, and an AI Payroll Assistant. It operates autonomously across recruitment and payroll modules, performing actions like candidate screening, payroll validation, expense analysis, and generating insights. AI capabilities are restricted to authorized roles (HR/Product Owner) with audit logging. The AI is context-aware, adapting its responses and routing based on the module currently in use.
+-   **Dashboard Customization**: A role-based customizable dashboard widget system allows personalized views. A widget registry defines available widgets with role-based visibility, and an API endpoint `/api/dashboard/widgets` merges user preferences, role presets, and registry defaults. The Knowledge Base is integrated into the Training module for a cleaner dashboard.
+-   **ATS Module**: Features a public career portal for job applications, including resume upload, AI-powered auto-fill, and object storage. The backend supports job postings, applications, candidates, interview stages, and offer letters. It includes a Kanban-style interface for pipeline management and contextual AI access for recruitment insights.
+-   **Payroll System**: Features a guided payroll wizard with a 5-step workflow for reviewing timesheets, expenses, leave requests, validating calculations, and final submission. An AI Payroll Assistant validates calculations, detects errors, analyzes expense compliance, and provides conversational assistance.
+-   **Tutorial System**: A comprehensive, role-based tutorial system integrated into the Training module's Knowledge Base, featuring step-by-step content, interactive checklists, progress tracking, and "Try it now" action buttons.
+-   **Design Patterns**: Utilizes a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries.
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.
--   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized `logger` utility, `apiErrors` for parsing and user-friendly messages, and TanStack Query's smart retry logic.
+-   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors` for user-friendly messages.
 -   **Production Monitoring**: Sentry integration for error tracking and performance monitoring.
 
 ### Feature Specifications
 
--   **ATS Module**: Public career portal for job browsing and application, including resume upload, AI-powered auto-fill, and object storage for files. Backend supports job postings, applications, candidates, interview stages, and offer letters across 11 new database tables and 20+ REST API endpoints.
-    -   **Job Posting Management**: Extracted reusable `JobPostingsPanel` component for unified job posting management. Used in both `JobManagementModal` (legacy) and available for future integration into `HiringModal` via tab navigation.
-    -   **Recruitment Interface**: `HiringModal` provides candidate pipeline management with kanban-style interface. Studio AI button provides contextual access to AI assistant for recruitment insights.
--   **Studio AI Agent**:
-    -   **Capabilities**: Autonomous candidate screening (scoring, strengths/gaps), batch pipeline processing, hiring insights, natural language conversations about HR/recruitment, and manually triggered daily autonomous screening workflows.
-    -   **User Interface**: Dedicated chat modal accessible from Dashboard, Job Management modal, and Hiring Pipeline modal via purple gradient "Ask Studio AI" buttons. Agent activity dashboard and prominent dashboard integration.
+-   **Studio AI Agent**: Capabilities include autonomous candidate screening (scoring, strengths/gaps), batch pipeline processing, hiring insights, and natural language conversations. Accessible via dedicated chat modals and dashboard integration.
+-   **Paycheck Fun Facts**: Creative purchase comparison feature showing what paychecks could buy, with a smart rotation system to prevent repeats.
+-   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation.
+-   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
 
 ## External Dependencies
 
 ### Third-Party Services
 
 -   **Resend**: Transactional email delivery.
--   **OpenAI**: AI functionalities (e.g., GPT-4o for Studio AI).
+-   **OpenAI**: AI functionalities (GPT-4o).
 -   **Neon**: PostgreSQL database hosting.
 -   **Sentry**: Error tracking and performance monitoring.
 
