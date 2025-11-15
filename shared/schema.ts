@@ -1273,6 +1273,42 @@ export const tutorialCompletions = pgTable('tutorial_completions', {
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
+// Tutorial Certificates - Issued completion certificates
+export const tutorialCertificates = pgTable('tutorial_certificates', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: uuid('tutorial_id').references(() => tutorials.id, { onDelete: 'cascade' }).notNull(),
+  certificateNumber: text('certificate_number').notNull().unique(), // e.g., "CERT-2025-001234"
+  userName: text('user_name').notNull(), // Snapshot of user's name at certificate issue
+  tutorialTitle: text('tutorial_title').notNull(), // Snapshot of tutorial title
+  issueDate: timestamp('issue_date').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// Tutorial Badges - Predefined achievement badges
+export const tutorialBadges = pgTable('tutorial_badges', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull().unique(), // e.g., "Tutorial Novice", "Payroll Master"
+  description: text('description').notNull(),
+  iconName: text('icon_name').notNull(), // lucide-react icon name
+  iconColor: text('icon_color').default('#3b82f6').notNull(), // hex color
+  category: text('category').notNull(), // 'completion', 'streak', 'mastery', 'special'
+  requirement: text('requirement').notNull(), // Human-readable requirement
+  sortOrder: integer('sort_order').default(0).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// User Tutorial Badges - Tracks earned badges
+export const userTutorialBadges = pgTable('user_tutorial_badges', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  badgeId: uuid('badge_id').references(() => tutorialBadges.id, { onDelete: 'cascade' }).notNull(),
+  tutorialId: uuid('tutorial_id').references(() => tutorials.id, { onDelete: 'set null' }), // Optional - which tutorial earned this
+  earnedAt: timestamp('earned_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 // Insert schemas for tutorials
 export const insertTutorialSchema = createInsertSchema(tutorials).omit({
   id: true,
@@ -1300,6 +1336,33 @@ export type InsertTutorialStep = z.infer<typeof insertTutorialStepSchema>;
 
 export type TutorialCompletion = typeof tutorialCompletions.$inferSelect;
 export type InsertTutorialCompletion = z.infer<typeof insertTutorialCompletionSchema>;
+
+// Insert schemas for certificates and badges
+export const insertTutorialCertificateSchema = createInsertSchema(tutorialCertificates).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertTutorialBadgeSchema = createInsertSchema(tutorialBadges).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertUserTutorialBadgeSchema = createInsertSchema(userTutorialBadges).omit({
+  id: true,
+  createdAt: true,
+  earnedAt: true
+});
+
+// Select types for certificates and badges
+export type TutorialCertificate = typeof tutorialCertificates.$inferSelect;
+export type InsertTutorialCertificate = z.infer<typeof insertTutorialCertificateSchema>;
+
+export type TutorialBadge = typeof tutorialBadges.$inferSelect;
+export type InsertTutorialBadge = z.infer<typeof insertTutorialBadgeSchema>;
+
+export type UserTutorialBadge = typeof userTutorialBadges.$inferSelect;
+export type InsertUserTutorialBadge = z.infer<typeof insertUserTutorialBadgeSchema>;
 
 // User Permissions type
 export interface UserPermissions {
