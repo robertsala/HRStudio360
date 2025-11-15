@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { X, Building, Users, Briefcase, Settings, Bell, Mail, Smartphone, Monitor, Clock, UserPlus, Trash2, Plus, Save, CheckCircle, FileText, DollarSign, Edit, Loader2 } from 'lucide-react';
 import ChangeLogTab from './ChangeLogTab';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
+import { queryClient, apiRequest } from '../../lib/queryClient';
+import { useToast } from '../../hooks/use-toast';
 import type { TaxJurisdiction, InsertTaxJurisdiction, ReciprocalAgreement, InsertReciprocalAgreement } from '@shared/schema';
 
 interface SystemSettingsModalProps {

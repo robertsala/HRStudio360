@@ -24,7 +24,7 @@ import {
   userTutorialBadges
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
-import { sendAutoFixNotificationEmail } from './notification-service.js';
+import { sendAutoFixNotificationEmail, notificationService } from './notification-service.js';
 import { seedProductionDatabase } from './seed-production.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
 import rateLimit from 'express-rate-limit';
@@ -3511,7 +3511,7 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: 'Only HR can approve auto-fixes' });
       }
 
-      const { fixId, fixData, reason } = req.body;
+      const { fixId, fixData, reason, employeePayrollData } = req.body;
       
       if (!fixId || !fixData) {
         return res.status(400).json({ error: 'Fix ID and data are required' });
@@ -3522,99 +3522,162 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'Approver profile not found' });
       }
 
-      // Create audit log entry
-      await storage.createAutoFixAuditLog({
-        fixType: fixData.type,
-        fixTitle: fixData.title,
-        affectedEmployeeIds: fixData.affectedEmployees.map((e: any) => e.id),
-        beforeState: JSON.stringify(fixData.beforeState),
-        afterState: JSON.stringify(fixData.afterState),
-        approverId: userId,
-        approverName: approver.name,
-        approvalReason: reason || 'Auto-fix approved',
-        status: 'approved'
-      });
-
-      // Send notifications to all stakeholders
       const affectedEmployeeIds = fixData.affectedEmployees.map((e: any) => e.id);
       
+      // For each affected employee, recalculate EVERYTHING from authoritative database records (don't trust client data)
+      const recalculatedStates = await Promise.all(
+        affectedEmployeeIds.map(async (empId: string) => {
+          const profile = await storage.getProfileById(empId);
+          const employee = await storage.getEmployeeById(empId);
+          if (!profile || !employee) return null;
+
+          // Get timesheet data from employeePayrollData (HR has already reviewed this)
+          const payrollData = employeePayrollData?.find((e: any) => e.id === empId);
+          
+          // Recalculate gross pay from authoritative employee record (not client data)
+          let authoritativeGrossPay: number;
+          if (employee.employeeType === 'Hourly') {
+            const regularHours = payrollData?.regularHours || 0;
+            const overtimeHours = payrollData?.overtimeHours || 0;
+            const hourlyRate = parseFloat(employee.hourlyRate || '0');
+            const overtimeRate = hourlyRate * 1.5;
+            authoritativeGrossPay = (regularHours * hourlyRate) + (overtimeHours * overtimeRate);
+          } else {
+            // Salaried - assume bi-weekly pay periods (26 per year)
+            authoritativeGrossPay = parseFloat(employee.salary || '0') / 26;
+          }
+
+          // Recalculate taxes using real tax calculator with authoritative gross pay
+          const taxBreakdown = await taxCalculator.calculateTaxes({
+            employeeId: empId,
+            grossPay: authoritativeGrossPay,
+            workLocationState: profile.state,
+            workLocationCity: profile.city,
+            residenceState: profile.state,
+            residenceCity: profile.city
+          });
+
+          return {
+            employeeId: empId,
+            employeeName: profile.name,
+            authoritativeGrossPay,
+            beforeTax: fixData.beforeState.taxes,
+            afterTax: taxBreakdown.totalTax,
+            netPay: authoritativeGrossPay - taxBreakdown.totalTax,
+            breakdown: taxBreakdown
+          };
+        })
+      );
+
+      const validRecalculated = recalculatedStates.filter(Boolean);
+      if (validRecalculated.length === 0) {
+        return res.status(400).json({ error: 'No valid employees found for fix' });
+      }
+
+      // Create audit log entry for EACH affected employee (not just the first one)
+      for (const recalc of validRecalculated) {
+        const actualAfterState = {
+          grossPay: recalc.authoritativeGrossPay,
+          taxes: recalc.afterTax,
+          netPay: recalc.netPay,
+          breakdown: recalc.breakdown
+        };
+
+        await storage.createAutoFixAuditLog({
+          fixType: fixData.type,
+          fixTitle: fixData.title,
+          affectedEmployeeIds: [recalc.employeeId], // One employee per audit log entry
+          beforeState: JSON.stringify(fixData.beforeState),
+          afterState: JSON.stringify(actualAfterState), // Use recalculated, not client data
+          approverId: userId,
+          approverName: approver.name,
+          approvalReason: reason || 'Auto-fix approved',
+          status: 'approved'
+        });
+      }
+
+      // Build recipients list for comprehensive notification service
+      const recipients: any[] = [];
+
       for (const empId of affectedEmployeeIds) {
         const employee = await storage.getProfileById(empId);
         if (!employee) continue;
 
-        // Send email notification
-        await sendAutoFixNotificationEmail({
-          to: employee.email,
-          employeeName: employee.name,
-          fixTitle: fixData.title,
-          fixType: fixData.type,
-          approverName: approver.name,
-          beforeState: fixData.beforeState,
-          afterState: fixData.afterState
-        });
-
-        // Create in-app notification
-        await storage.createNotification({
+        // Add employee as recipient
+        recipients.push({
           userId: empId,
-          type: 'auto_fix_approved',
-          title: 'Payroll Auto-Fix Applied',
-          message: `${fixData.title} was approved by ${approver.name}. Your payroll has been updated.`,
-          relatedEntityType: 'payroll',
-          relatedEntityId: fixId,
-          actionUrl: '/payroll',
-          read: false
+          email: employee.email,
+          name: employee.name,
+          role: 'employee'
         });
 
-        // Get manager and send notification
-        const manager = employee.managerId ? await storage.getProfileById(employee.managerId) : null;
-        if (manager) {
-          await sendAutoFixNotificationEmail({
-            to: manager.email,
-            employeeName: employee.name,
-            fixTitle: fixData.title,
-            fixType: fixData.type,
-            approverName: approver.name,
-            beforeState: fixData.beforeState,
-            afterState: fixData.afterState
-          });
+        // Add manager as recipient
+        if (employee.managerId) {
+          const manager = await storage.getProfileById(employee.managerId);
+          if (manager && !recipients.find(r => r.userId === manager.id)) {
+            recipients.push({
+              userId: manager.id,
+              email: manager.email,
+              name: manager.name,
+              role: 'manager'
+            });
+          }
+        }
+      }
 
-          await storage.createNotification({
-            userId: manager.id,
-            type: 'auto_fix_approved',
-            title: 'Payroll Auto-Fix Applied for Team Member',
-            message: `${fixData.title} was approved for ${employee.name}.`,
-            relatedEntityType: 'payroll',
-            relatedEntityId: fixId,
-            actionUrl: '/payroll',
-            read: false
+      // Add HR and Payroll team members
+      const allProfiles = await storage.getAllProfiles();
+      const hrAndPayroll = allProfiles.filter(p => 
+        (p.department === 'HR' || p.department === 'Payroll' || p.role === 'Product Owner') &&
+        p.id !== userId // Exclude approver
+      );
+
+      for (const teamMember of hrAndPayroll) {
+        if (!recipients.find(r => r.userId === teamMember.id)) {
+          recipients.push({
+            userId: teamMember.id,
+            email: teamMember.email,
+            name: teamMember.name,
+            role: teamMember.department === 'HR' ? 'hr' : 'payroll'
           });
         }
       }
 
-      // Notify HR team and payroll team
-      const hrProfiles = await storage.getAllProfiles();
-      const hrAndPayrollTeam = hrProfiles.filter(p => 
-        p.department === 'HR' || p.department === 'Payroll' || p.role === 'Product Owner'
+      // Generate changes summary from recalculated data
+      const changesSummary = validRecalculated.length > 0
+        ? `Tax calculation corrected: Before $${validRecalculated[0].beforeTax?.toLocaleString() || '0.00'}, After $${validRecalculated[0].afterTax.toLocaleString()}`
+        : fixData.title;
+
+      // Send comprehensive notifications to all stakeholders using NotificationService
+      const notificationResult = await notificationService.sendAutoFixApprovalNotifications(
+        {
+          fixType: fixData.type,
+          fixTitle: fixData.title,
+          affectedEmployees: fixData.affectedEmployees,
+          approvedBy: userId,
+          approvedByName: approver.name,
+          approvalReason: reason,
+          changesSummary
+        },
+        recipients
       );
 
-      for (const teamMember of hrAndPayrollTeam) {
-        if (teamMember.id === userId) continue; // Skip the approver
-
-        await storage.createNotification({
-          userId: teamMember.id,
-          type: 'auto_fix_approved',
-          title: 'Payroll Auto-Fix Approved',
-          message: `${approver.name} approved: ${fixData.title}`,
-          relatedEntityType: 'payroll',
-          relatedEntityId: fixId,
-          actionUrl: '/payroll',
-          read: false
-        });
-      }
+      console.log(`✅ Auto-fix approved: ${notificationResult.emailsSent.length} emails sent, ${notificationResult.inAppNotificationsSent.length} in-app notifications created`);
 
       res.json({
         success: true,
-        message: 'Auto-fix approved and notifications sent to all stakeholders'
+        message: 'Auto-fix approved and notifications sent to all stakeholders',
+        actualCorrections: validRecalculated.map(recalc => ({
+          employeeId: recalc.employeeId,
+          employeeName: recalc.employeeName,
+          grossPay: recalc.authoritativeGrossPay,
+          taxes: recalc.afterTax,
+          netPay: recalc.netPay
+        })), // Return actual recalculated values for ALL employees
+        notificationsSent: {
+          emails: notificationResult.emailsSent.length,
+          inApp: notificationResult.inAppNotificationsSent.length
+        }
       });
     } catch (error: any) {
       console.error('[Auto-Fix] Approval error:', error);
