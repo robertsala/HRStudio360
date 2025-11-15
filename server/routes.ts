@@ -42,6 +42,7 @@ import {
   analyzeExpenses,
   chatWithPayrollAI
 } from './ai-agent.js';
+import { taxCalculator } from './tax-calculator.js';
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -3414,47 +3415,82 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: 'Validation results and employees are required' });
       }
 
-      // Generate auto-fix suggestions based on critical issues
-      const autoFixSuggestions = validation.criticalIssues
-        .filter((issue: any) => issue.suggestion && issue.employeeId)
-        .map((issue: any, index: number) => {
-          const employee = employees.find((e: any) => e.id === issue.employeeId);
-          if (!employee) return null;
+      // Generate auto-fix suggestions based on critical issues using real tax calculations
+      const autoFixSuggestions = await Promise.all(
+        validation.criticalIssues
+          .filter((issue: any) => issue.suggestion && issue.employeeId)
+          .map(async (issue: any, index: number) => {
+            const employee = employees.find((e: any) => e.id === issue.employeeId);
+            if (!employee) return null;
 
-          return {
-            id: `autofix-${Date.now()}-${index}`,
-            title: `Fix: ${issue.issue}`,
-            type: 'tax_calculation',
-            severity: 'high',
-            affectedEmployees: [{
-              id: employee.id,
-              name: employee.name,
-              department: employee.department || 'N/A'
-            }],
-            beforeState: {
+            // Get employee profile for location data
+            const profile = await storage.getProfileById(employee.id);
+            if (!profile) return null;
+
+            // Calculate correct taxes using real tax calculator
+            const taxBreakdown = await taxCalculator.calculateTaxes({
+              employeeId: employee.id,
               grossPay: employee.grossPay,
-              taxes: employee.taxes,
-              netPay: employee.netPay
-            },
-            afterState: {
-              grossPay: employee.grossPay,
-              taxes: parseFloat((employee.grossPay * 0.22).toFixed(2)),
-              netPay: parseFloat((employee.grossPay * 0.78).toFixed(2))
-            },
-            explanation: issue.issue,
-            recommendation: issue.suggestion,
-            impact: [
-              `Employee: ${employee.name}`,
-              `Gross Pay: $${employee.grossPay}`,
-              `Corrected Tax Amount: $${(employee.grossPay * 0.22).toFixed(2)}`
-            ]
-          };
-        })
-        .filter(Boolean);
+              workLocationState: profile.state,
+              workLocationCity: profile.city,
+              residenceState: profile.state, // Assume same unless configured otherwise
+              residenceCity: profile.city
+            });
+
+            const correctedTotalTax = taxBreakdown.totalTax;
+            const correctedNetPay = employee.grossPay - correctedTotalTax;
+
+            return {
+              id: `autofix-${Date.now()}-${index}`,
+              title: `Fix: ${issue.issue}`,
+              type: 'tax_calculation',
+              severity: 'high',
+              affectedEmployees: [{
+                id: employee.id,
+                name: employee.name,
+                department: employee.department || 'N/A'
+              }],
+              beforeState: {
+                grossPay: employee.grossPay,
+                taxes: employee.taxes,
+                netPay: employee.netPay,
+                breakdown: 'Incorrect calculation'
+              },
+              afterState: {
+                grossPay: employee.grossPay,
+                taxes: correctedTotalTax,
+                netPay: correctedNetPay,
+                breakdown: {
+                  federalIncomeTax: taxBreakdown.federalIncomeTax,
+                  stateIncomeTax: taxBreakdown.stateIncomeTax,
+                  localIncomeTax: taxBreakdown.localIncomeTax,
+                  socialSecurity: taxBreakdown.socialSecurity,
+                  medicare: taxBreakdown.medicare,
+                  additionalMedicare: taxBreakdown.additionalMedicare
+                }
+              },
+              explanation: issue.issue,
+              recommendation: issue.suggestion,
+              taxExplanation: taxBreakdown.taxExplanation,
+              reciprocalAgreement: taxBreakdown.reciprocalAgreementApplied,
+              impact: [
+                `Employee: ${employee.name}`,
+                `Location: ${profile.city}, ${profile.state}`,
+                `Gross Pay: $${employee.grossPay.toLocaleString()}`,
+                `Incorrect Tax: $${employee.taxes?.toLocaleString() || '0.00'}`,
+                `Corrected Tax: $${correctedTotalTax.toLocaleString()}`,
+                `Tax Difference: ${correctedTotalTax > (employee.taxes || 0) ? '+' : ''}$${(correctedTotalTax - (employee.taxes || 0)).toFixed(2)}`
+              ]
+            };
+          })
+      );
+
+      // Filter out null results
+      const validSuggestions = autoFixSuggestions.filter(Boolean);
 
       res.json({
         success: true,
-        suggestions: autoFixSuggestions
+        suggestions: validSuggestions
       });
     } catch (error: any) {
       console.error('[AI Payroll] Auto-fix generation error:', error);
