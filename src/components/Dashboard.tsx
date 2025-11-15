@@ -574,7 +574,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
       case 'notifications':
         return <NotificationsModal onTakeAction={handleNotificationAction} onClose={closeInlineContent} />;
       case 'payroll':
-        return <PayrollModal onClose={closeInlineContent} />;
+        return <PayrollModal onClose={closeInlineContent} onOpenStudioAI={() => openModal('studioAIChat')} />;
       case 'timeAttendance':
         return <TimeAttendanceModal onClose={closeInlineContent} />;
       case 'employeeProfile':

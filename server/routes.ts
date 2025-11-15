@@ -28,7 +28,10 @@ import {
   batchScreenCandidates,
   chatWithStudioAI,
   generateHiringInsights,
-  runDailyScreeningWorkflow
+  runDailyScreeningWorkflow,
+  validatePayrollRun,
+  analyzeExpenses,
+  chatWithPayrollAI
 } from './ai-agent.js';
 
 export function registerRoutes(app: Express) {
@@ -3269,5 +3272,117 @@ export function registerRoutes(app: Express) {
       model: 'GPT-4o (via Replit AI Integrations)',
       version: '1.0.0-autonomous'
     });
+  });
+
+  /**
+   * PAYROLL AI ASSISTANT ENDPOINTS
+   * AI-powered payroll validation, expense analysis, and chat
+   */
+
+  // Validate payroll run for errors and compliance
+  app.post('/api/ai-payroll/validate', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      // Check if user has payroll permissions (HR or Product Owner)
+      const profile = await storage.getProfileById(userId);
+      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
+        return res.status(403).json({ error: 'Only HR can access payroll AI features' });
+      }
+
+      const { employees, payrollPeriod } = req.body;
+      
+      if (!employees || !Array.isArray(employees) || employees.length === 0) {
+        return res.status(400).json({ error: 'Employees array is required' });
+      }
+
+      if (!payrollPeriod) {
+        return res.status(400).json({ error: 'Payroll period is required' });
+      }
+
+      console.log(`[AI Payroll] Validating payroll for ${employees.length} employees`);
+      
+      const validation = await validatePayrollRun(employees, payrollPeriod);
+
+      res.json({
+        success: true,
+        validation
+      });
+    } catch (error: any) {
+      console.error('[AI Payroll] Validation error:', error);
+      res.status(500).json({ error: 'Failed to validate payroll', details: error.message });
+    }
+  });
+
+  // Analyze expenses for compliance and budget issues
+  app.post('/api/ai-payroll/analyze-expenses', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      // Check if user has payroll permissions
+      const profile = await storage.getProfileById(userId);
+      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
+        return res.status(403).json({ error: 'Only HR can access payroll AI features' });
+      }
+
+      const { expenses, budgetLimits } = req.body;
+      
+      if (!expenses || !Array.isArray(expenses)) {
+        return res.status(400).json({ error: 'Expenses array is required' });
+      }
+
+      console.log(`[AI Payroll] Analyzing ${expenses.length} expense reports`);
+      
+      const analysis = await analyzeExpenses(expenses, budgetLimits);
+
+      res.json({
+        success: true,
+        analysis
+      });
+    } catch (error: any) {
+      console.error('[AI Payroll] Expense analysis error:', error);
+      res.status(500).json({ error: 'Failed to analyze expenses', details: error.message });
+    }
+  });
+
+  // Chat with Payroll AI Assistant
+  app.post('/api/ai-payroll/chat', async (req, res) => {
+    const userId = requireAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      // Check if user has payroll permissions (HR or Product Owner)
+      const profile = await storage.getProfileById(userId);
+      if (profile?.department !== 'HR' && profile?.role !== 'Product Owner') {
+        return res.status(403).json({ error: 'Only HR can access payroll AI features' });
+      }
+
+      const { message, conversationHistory, payrollPeriod, employeeCount } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      console.log(`[AI Payroll] Chat request from user ${userId}`);
+      
+      const response = await chatWithPayrollAI(message, {
+        payrollPeriod,
+        employeeCount,
+        conversationHistory: conversationHistory || []
+      });
+
+      res.json({ response });
+    } catch (error: any) {
+      console.error('[AI Payroll] Chat error:', error);
+      res.status(500).json({ error: 'Failed to process chat request', details: error.message });
+    }
   });
 }

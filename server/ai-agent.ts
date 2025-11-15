@@ -315,3 +315,266 @@ export async function runDailyScreeningWorkflow(
     return { processed: 0, topCandidates: [], notificationsSent: 0 };
   }
 }
+
+/**
+ * PAYROLL AI ASSISTANT
+ * AI-powered payroll validation, expense analysis, and compliance checking
+ */
+
+const PAYROLL_SYSTEM_PROMPT = `You are Studio AI, an autonomous payroll assistant for HRStudio360.
+
+You help with:
+- Payroll validation and error detection
+- Expense report analysis
+- Leave request management
+- Tax and compliance checking
+- Payroll calculations verification
+
+Your personality: Meticulous, detail-oriented, and helpful.
+Your goal: Prevent payroll errors, ensure compliance, and save time.
+
+Provide clear, actionable recommendations with specific numbers when relevant.`;
+
+interface PayrollEmployee {
+  id: string;
+  name: string;
+  department: string;
+  employeeType: 'Hourly' | 'Salaried';
+  hourlyRate?: number;
+  salary?: number;
+  regularHours?: number;
+  overtimeHours?: number;
+  grossPay: number;
+  deductions: number;
+  taxes: number;
+  netPay: number;
+  status: string;
+  errors?: string[];
+  warnings?: string[];
+}
+
+interface PayrollValidationResult {
+  score: number; // 0-100 (100 = no issues)
+  criticalIssues: Array<{
+    employeeId: string;
+    employeeName: string;
+    issue: string;
+    suggestion: string;
+  }>;
+  warnings: Array<{
+    employeeId: string;
+    employeeName: string;
+    warning: string;
+    suggestion: string;
+  }>;
+  summary: string;
+  recommendations: string[];
+}
+
+/**
+ * Validate payroll run for errors and compliance issues
+ */
+export async function validatePayrollRun(
+  employees: PayrollEmployee[],
+  payrollPeriod: string
+): Promise<PayrollValidationResult> {
+  const prompt = `Validate this payroll run for errors and compliance issues:
+
+PAYROLL PERIOD: ${payrollPeriod}
+EMPLOYEE COUNT: ${employees.length}
+
+EMPLOYEES:
+${employees.map((emp, idx) => `
+${idx + 1}. ${emp.name} (${emp.department})
+   - Type: ${emp.employeeType}
+   ${emp.employeeType === 'Hourly' ? `- Rate: $${emp.hourlyRate}/hr` : `- Salary: $${emp.salary}`}
+   ${emp.regularHours ? `- Regular Hours: ${emp.regularHours}` : ''}
+   ${emp.overtimeHours ? `- Overtime Hours: ${emp.overtimeHours}` : ''}
+   - Gross Pay: $${emp.grossPay}
+   - Deductions: $${emp.deductions}
+   - Taxes: $${emp.taxes}
+   - Net Pay: $${emp.netPay}
+   - Status: ${emp.status}
+   ${emp.errors?.length ? `- Existing Errors: ${emp.errors.join(', ')}` : ''}
+   ${emp.warnings?.length ? `- Existing Warnings: ${emp.warnings.join(', ')}` : ''}
+`).join('\n')}
+
+Check for:
+1. Calculation errors (gross pay, net pay, overtime)
+2. Missing data or incomplete entries
+3. Duplicate entries
+4. Unusual overtime patterns
+5. Tax withholding issues
+6. Compliance concerns
+
+Provide assessment as JSON with:
+- score (0-100, where 100 = no issues)
+- criticalIssues (array of { employeeId, employeeName, issue, suggestion })
+- warnings (array of { employeeId, employeeName, warning, suggestion })
+- summary (brief overview)
+- recommendations (array of action items)
+
+Respond ONLY with valid JSON.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: PAYROLL_SYSTEM_PROMPT },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || '{}');
+    
+    return {
+      score: result.score || 100,
+      criticalIssues: result.criticalIssues || [],
+      warnings: result.warnings || [],
+      summary: result.summary || 'Payroll validation complete',
+      recommendations: result.recommendations || []
+    };
+  } catch (error) {
+    console.error('[AI Payroll] Validation error:', error);
+    return {
+      score: 50,
+      criticalIssues: [],
+      warnings: [],
+      summary: 'AI validation unavailable - manual review required',
+      recommendations: ['Manual payroll review recommended']
+    };
+  }
+}
+
+/**
+ * Analyze expenses for policy compliance and budget issues
+ */
+export async function analyzeExpenses(
+  expenses: Array<{
+    employeeId: string;
+    employeeName: string;
+    amount: number;
+    category: string;
+    hasReceipt: boolean;
+    date: string;
+  }>,
+  budgetLimits?: Record<string, number>
+): Promise<{
+  totalAmount: number;
+  flaggedExpenses: Array<{
+    employeeId: string;
+    employeeName: string;
+    reason: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
+  recommendations: string[];
+}> {
+  const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  
+  const prompt = `Analyze these expense reports:
+
+TOTAL EXPENSES: $${totalAmount}
+EXPENSE COUNT: ${expenses.length}
+
+EXPENSES:
+${expenses.map((exp, idx) => `
+${idx + 1}. ${exp.employeeName}
+   - Amount: $${exp.amount}
+   - Category: ${exp.category}
+   - Has Receipt: ${exp.hasReceipt ? 'Yes' : 'No'}
+   - Date: ${exp.date}
+`).join('\n')}
+
+${budgetLimits ? `BUDGET LIMITS:\n${Object.entries(budgetLimits).map(([cat, limit]) => `- ${cat}: $${limit}`).join('\n')}` : ''}
+
+Check for:
+1. Missing receipts
+2. Budget overruns
+3. Duplicate or suspicious expenses
+4. Policy violations
+
+Provide analysis as JSON with:
+- flaggedExpenses (array of { employeeId, employeeName, reason, severity })
+- recommendations (array of action items)
+
+Respond ONLY with valid JSON.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: PAYROLL_SYSTEM_PROMPT },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || '{}');
+    
+    return {
+      totalAmount,
+      flaggedExpenses: result.flaggedExpenses || [],
+      recommendations: result.recommendations || []
+    };
+  } catch (error) {
+    console.error('[AI Payroll] Expense analysis error:', error);
+    return {
+      totalAmount,
+      flaggedExpenses: [],
+      recommendations: ['Manual expense review recommended']
+    };
+  }
+}
+
+/**
+ * Chat with Payroll AI Assistant
+ */
+export async function chatWithPayrollAI(
+  message: string,
+  context?: {
+    payrollPeriod?: string;
+    employeeCount?: number;
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  }
+): Promise<string> {
+  try {
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      { role: 'system', content: PAYROLL_SYSTEM_PROMPT }
+    ];
+
+    // Add context if provided
+    if (context?.payrollPeriod || context?.employeeCount) {
+      const contextInfo = [
+        context.payrollPeriod ? `Current payroll period: ${context.payrollPeriod}` : '',
+        context.employeeCount ? `Processing ${context.employeeCount} employees` : ''
+      ].filter(Boolean).join('. ');
+      
+      if (contextInfo) {
+        messages.push({ role: 'system', content: contextInfo });
+      }
+    }
+
+    // Add conversation history if provided
+    if (context?.conversationHistory) {
+      messages.push(...context.conversationHistory);
+    }
+
+    // Add current message
+    messages.push({ role: 'user', content: message });
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages,
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    return response.choices[0].message.content || 'I apologize, but I was unable to generate a response.';
+  } catch (error) {
+    console.error('[AI Payroll] Chat error:', error);
+    return 'I apologize, but I encountered an error. Please try again or contact support if the issue persists.';
+  }
+}

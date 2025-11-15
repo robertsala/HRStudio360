@@ -63,9 +63,10 @@ interface AIInsight {
 
 interface PayrollModalProps {
   onClose?: () => void;
+  onOpenStudioAI?: () => void;
 }
 
-const PayrollModal: React.FC<PayrollModalProps> = ({ onClose }) => {
+const PayrollModal: React.FC<PayrollModalProps> = ({ onClose, onOpenStudioAI }) => {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('all');
   const [isLoadingCurrencies, setIsLoadingCurrencies] = useState(true);
@@ -469,6 +470,16 @@ const PayrollModal: React.FC<PayrollModalProps> = ({ onClose }) => {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">Payroll Management</h2>
             <p className="text-gray-600 dark:text-gray-400">AI-powered payroll processing with error detection</p>
           </div>
+          {onOpenStudioAI && (
+            <button
+              onClick={onOpenStudioAI}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg transition-all flex items-center text-sm shadow-md hover:shadow-lg font-medium"
+              data-testid="button-open-studio-ai-payroll"
+            >
+              <Brain className="h-4 w-4 mr-1" />
+              Ask Studio AI
+            </button>
+          )}
         </div>
 
         <div className="p-8">
