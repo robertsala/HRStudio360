@@ -552,7 +552,23 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
             employees={employees}
             onViewProfile={(employeeId) => {
               const employee = employees.find(e => e.id === employeeId);
-              setActiveEmployee(employee || null);
+              if (employee) {
+                // Transform employee to match ComprehensiveEmployeeProfileModal's expected structure
+                const transformedEmployee = {
+                  ...employee,
+                  salary: employee.annualSalary ? `$${employee.annualSalary.toLocaleString()}` : employee.hourlyRate ? `$${employee.hourlyRate}/hr` : 'N/A',
+                  emergencyContact: {
+                    name: 'Emergency Contact',
+                    relationship: 'Family',
+                    phone: '(555) 000-0000'
+                  },
+                  skills: [],
+                  certifications: []
+                };
+                setActiveEmployee(transformedEmployee);
+              } else {
+                setActiveEmployee(null);
+              }
               openModal('comprehensiveProfile');
             }}
             userRole={user?.role || 'employee'}
