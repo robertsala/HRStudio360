@@ -64,7 +64,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const canTerminateEmployees = isHRUser || isProductOwner;
 
   // Fallback employee data for when no employee prop is provided
-  const fallbackEmployee: Employee = {
+  const fallbackEmployee: Employee = React.useMemo(() => ({
     id: '124',
     name: 'Jennifer Martinez',
     email: 'jennifer.martinez@company.com',
@@ -88,16 +88,17 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     performanceRating: 4.1,
     ptoBalance: 16,
     sickLeaveBalance: 4
-  };
+  }), []);
 
-  const [formData, setFormData] = useState<Employee>(fallbackEmployee);
+  // Derive display employee from prop - this always reflects the current employee
+  const displayEmployee = React.useMemo(() => employee ?? fallbackEmployee, [employee, fallbackEmployee]);
 
-  // Update formData when modal opens or employee prop changes
+  const [formData, setFormData] = useState<Employee>(displayEmployee);
+
+  // Update formData when displayEmployee changes (e.g., when a different employee is selected)
   React.useEffect(() => {
-    if (isOpen) {
-      setFormData(employee || fallbackEmployee);
-    }
-  }, [isOpen, employee]);
+    setFormData(displayEmployee);
+  }, [displayEmployee]);
 
   // Handle ESC key press
   React.useEffect(() => {
