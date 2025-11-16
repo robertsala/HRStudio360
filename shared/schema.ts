@@ -1688,6 +1688,20 @@ export const permissionChangeAudit = pgTable('permission_change_audit', {
   changedAt: timestamp('changed_at').defaultNow()
 });
 
+// Employee Access Assignments - Maps individual employees to access levels
+export const employeeAccessAssignments = pgTable('employee_access_assignments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: text('employee_id').notNull(), // Employee ID from mockOrgChartEmployees
+  accessLevelId: text('access_level_id').notNull(), // References Supabase access_levels.id
+  assignedBy: uuid('assigned_by').references(() => profiles.id).notNull(),
+  assignedAt: timestamp('assigned_at').defaultNow(),
+  source: text('source').default('manual'), // 'manual' or 'ai_suggestion'
+  aiConfidence: text('ai_confidence'), // 'high', 'medium', 'low' if AI-assigned
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  employeeAccessIdx: uniqueIndex('employee_access_idx').on(table.employeeId)
+}));
+
 // Insert schemas
 export const insertTaxJurisdictionSchema = createInsertSchema(taxJurisdictions).omit({
   id: true,
@@ -1809,3 +1823,11 @@ export const insertPermissionChangeAuditSchema = createInsertSchema(permissionCh
 });
 export type InsertPermissionChangeAudit = z.infer<typeof insertPermissionChangeAuditSchema>;
 export type PermissionChangeAudit = typeof permissionChangeAudit.$inferSelect;
+
+export const insertEmployeeAccessAssignmentSchema = createInsertSchema(employeeAccessAssignments).omit({
+  id: true,
+  assignedAt: true,
+  updatedAt: true
+});
+export type InsertEmployeeAccessAssignment = z.infer<typeof insertEmployeeAccessAssignmentSchema>;
+export type EmployeeAccessAssignment = typeof employeeAccessAssignments.$inferSelect;
