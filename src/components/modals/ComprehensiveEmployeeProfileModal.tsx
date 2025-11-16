@@ -54,7 +54,8 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
 
   // Determine if current user is HR staff
   const isHRUser = user?.email?.includes('hr') || user?.email?.includes('HR') || 
-                   user?.email?.includes('human') || user?.email?.includes('emma.wilson');
+                   user?.email?.includes('human') || user?.email?.includes('emma.wilson') ||
+                   user?.email?.includes('robertsala');
   
   // Determine if current user is Product Owner (based on user context from Layout.tsx)
   const isProductOwner = user?.email && !user.email.includes('manager') && !user.email.includes('hr');
