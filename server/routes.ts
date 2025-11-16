@@ -6123,6 +6123,108 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ========== EMPLOYEE ACCESS ASSIGNMENTS ==========
+
+  // GET /api/employee-access/assignments - Get all assignments (HR/Product Owner only)
+  app.get('/api/employee-access/assignments', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const assignments = await storage.getEmployeeAccessAssignments();
+      res.json(assignments);
+    } catch (error: any) {
+      console.error('Error fetching employee access assignments:', error);
+      res.status(500).json({ error: 'Failed to fetch assignments', details: error.message });
+    }
+  });
+
+  // GET /api/employee-access/assignments/:employeeId - Get assignment for specific employee
+  app.get('/api/employee-access/assignments/:employeeId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { employeeId } = req.params;
+      const assignment = await storage.getEmployeeAccessAssignmentByEmployeeId(employeeId);
+      res.json(assignment || null);
+    } catch (error: any) {
+      console.error('Error fetching employee access assignment:', error);
+      res.status(500).json({ error: 'Failed to fetch assignment', details: error.message });
+    }
+  });
+
+  // POST /api/employee-access/assign - Assign access level to employee (HR/Product Owner only)
+  app.post('/api/employee-access/assign', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { employeeId, accessLevelId, source, aiConfidence } = req.body;
+
+      if (!employeeId || !accessLevelId) {
+        return res.status(400).json({ error: 'employeeId and accessLevelId are required' });
+      }
+
+      const assignment = await storage.assignEmployeeAccessLevel({
+        employeeId,
+        accessLevelId,
+        assignedBy: userId,
+        source: source || 'manual',
+        aiConfidence: aiConfidence || null
+      });
+
+      res.json(assignment);
+    } catch (error: any) {
+      console.error('Error assigning employee access level:', error);
+      res.status(500).json({ error: 'Failed to assign access level', details: error.message });
+    }
+  });
+
+  // POST /api/employee-access/bulk-assign - Bulk assign access levels (HR/Product Owner only)
+  app.post('/api/employee-access/bulk-assign', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { assignments } = req.body;
+
+      if (!assignments || !Array.isArray(assignments)) {
+        return res.status(400).json({ error: 'assignments array is required' });
+      }
+
+      // Add assignedBy to each assignment
+      const assignmentsWithUser = assignments.map(a => ({
+        ...a,
+        assignedBy: userId
+      }));
+
+      await storage.bulkAssignEmployeeAccessLevels(assignmentsWithUser);
+      res.json({ message: 'Access levels assigned successfully', count: assignments.length });
+    } catch (error: any) {
+      console.error('Error bulk assigning employee access levels:', error);
+      res.status(500).json({ error: 'Failed to bulk assign access levels', details: error.message });
+    }
+  });
+
+  // DELETE /api/employee-access/revoke/:employeeId - Revoke access level from employee (HR/Product Owner only)
+  app.delete('/api/employee-access/revoke/:employeeId', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { employeeId } = req.params;
+
+      await storage.revokeEmployeeAccessLevel(employeeId);
+      res.json({ message: 'Access level revoked successfully' });
+    } catch (error: any) {
+      console.error('Error revoking employee access level:', error);
+      res.status(500).json({ error: 'Failed to revoke access level', details: error.message });
+    }
+  });
+
   // ========== AUDIT TRAIL ==========
 
   // GET /api/permissions/audit - Get audit trail with filters (HR/Product Owner only)
