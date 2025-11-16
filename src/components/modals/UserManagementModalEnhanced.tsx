@@ -116,7 +116,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
 
   // React Query: Create new access level
   const createAccessLevelMutation = useMutation({
-    mutationFn: async (data: { name: string; code: string; description: string; priority: number }) => {
+    mutationFn: async (data: { name: string; description: string; priority: number }) => {
       return await apiRequest('/api/access-levels', {
         method: 'POST',
         body: JSON.stringify(data)
