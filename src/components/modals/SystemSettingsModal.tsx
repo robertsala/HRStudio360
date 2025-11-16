@@ -5,7 +5,7 @@ import PermissionManagementModal from './PermissionManagementModal';
 import CorrectionRequestModal from './CorrectionRequestModal';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '../../lib/queryClient';
-import type { TaxJurisdiction, InsertTaxJurisdiction, ReciprocalAgreement, InsertReciprocalAgreement } from '@shared/schema';
+import type { TaxJurisdiction, InsertTaxJurisdiction, ReciprocalAgreement, InsertReciprocalAgreement, AiTaxSuggestion, Employee } from '@shared/schema';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface SystemSettingsModalProps {
@@ -223,7 +223,7 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
   };
   
   // Tax Configuration State
-  const [taxConfigSubTab, setTaxConfigSubTab] = useState<'federal' | 'state' | 'local' | 'reciprocal'>('federal');
+  const [taxConfigSubTab, setTaxConfigSubTab] = useState<'federal' | 'state' | 'local' | 'reciprocal' | 'aiSuggestions'>('federal');
   const [showTaxJurisdictionForm, setShowTaxJurisdictionForm] = useState(false);
   const [editingTaxJurisdiction, setEditingTaxJurisdiction] = useState<TaxJurisdiction | null>(null);
   const [showReciprocalAgreementForm, setShowReciprocalAgreementForm] = useState(false);
@@ -240,6 +240,11 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
     effectiveDate: new Date().toISOString().split('T')[0]
   });
 
+  // AI Suggestions State
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [reviewingsuggestionId, setReviewingSuggestionId] = useState<string | null>(null);
+  const [reviewNotes, setReviewNotes] = useState<string>('');
+
   // Tax Jurisdictions Query
   const { data: taxJurisdictions = [], isLoading: isLoadingJurisdictions } = useQuery<TaxJurisdiction[]>({
     queryKey: ['/api/tax-jurisdictions'],
@@ -250,6 +255,18 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
   const { data: reciprocalAgreements = [], isLoading: isLoadingAgreements } = useQuery<ReciprocalAgreement[]>({
     queryKey: ['/api/reciprocal-agreements'],
     enabled: activeTab === 'taxConfig'
+  });
+
+  // AI Tax Suggestions Query
+  const { data: aiTaxSuggestions = [], isLoading: isLoadingAiSuggestions } = useQuery<AiTaxSuggestion[]>({
+    queryKey: ['/api/ai-tax-suggestions'],
+    enabled: activeTab === 'taxConfig' && taxConfigSubTab === 'aiSuggestions'
+  });
+
+  // Employees Query (for AI suggestion generation)
+  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<Employee[]>({
+    queryKey: ['/api/employees'],
+    enabled: activeTab === 'taxConfig' && taxConfigSubTab === 'aiSuggestions'
   });
 
   // Tax Jurisdiction Mutations
@@ -329,6 +346,42 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to delete reciprocal agreement', variant: 'destructive' });
+    }
+  });
+
+  // AI Tax Suggestion Mutations
+  const generateAiTaxSuggestionMutation = useMutation({
+    mutationFn: (employeeId: string) => apiRequest(`/api/ai-tax-suggestions/generate/${employeeId}`, 'POST', {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-tax-suggestions'] });
+      toast({ title: 'Success', description: 'AI tax suggestion generated successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to generate AI suggestion', variant: 'destructive' });
+    }
+  });
+
+  const approveAiTaxSuggestionMutation = useMutation({
+    mutationFn: ({ id, reviewNotes }: { id: string; reviewNotes?: string }) => 
+      apiRequest(`/api/ai-tax-suggestions/${id}`, 'PATCH', { status: 'approved', reviewNotes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-tax-suggestions'] });
+      toast({ title: 'Success', description: 'AI suggestion approved and applied' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to approve suggestion', variant: 'destructive' });
+    }
+  });
+
+  const rejectAiTaxSuggestionMutation = useMutation({
+    mutationFn: ({ id, reviewNotes }: { id: string; reviewNotes?: string }) => 
+      apiRequest(`/api/ai-tax-suggestions/${id}`, 'PATCH', { status: 'rejected', reviewNotes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-tax-suggestions'] });
+      toast({ title: 'Success', description: 'AI suggestion rejected' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reject suggestion', variant: 'destructive' });
     }
   });
 
@@ -1062,6 +1115,17 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
                       >
                         Reciprocal Agreements
                       </button>
+                      <button
+                        onClick={() => setTaxConfigSubTab('aiSuggestions')}
+                        data-testid="button-tax-subtab-ai-suggestions"
+                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                          taxConfigSubTab === 'aiSuggestions'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        AI Suggestions
+                      </button>
                     </nav>
                   </div>
 
@@ -1378,6 +1442,153 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
                           <p className="text-gray-500 dark:text-gray-400">No reciprocal agreements configured</p>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* AI Suggestions Sub-tab */}
+                  {taxConfigSubTab === 'aiSuggestions' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">AI Tax Configuration Suggestions</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Generate intelligent tax configuration recommendations powered by AI, based on employee work and residence states.
+                        </p>
+                      </div>
+
+                      {/* Generate Suggestion Section */}
+                      <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-6 border border-purple-200 dark:border-purple-800">
+                        <h5 className="font-semibold text-gray-900 dark:text-white mb-4">Generate New Suggestion</h5>
+                        <div className="flex gap-4">
+                          <select
+                            value={selectedEmployeeId}
+                            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                            className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-800"
+                            data-testid="select-employee-for-ai-suggestion"
+                          >
+                            <option value="">Select an employee...</option>
+                            {employees.map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.firstName} {emp.lastName} - {emp.state || 'No state'}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => {
+                              if (!selectedEmployeeId) {
+                                toast({ title: 'Error', description: 'Please select an employee', variant: 'destructive' });
+                                return;
+                              }
+                              generateAiTaxSuggestionMutation.mutate(selectedEmployeeId);
+                            }}
+                            disabled={!selectedEmployeeId || generateAiTaxSuggestionMutation.isPending}
+                            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition-colors flex items-center"
+                            data-testid="button-generate-ai-suggestion"
+                          >
+                            {generateAiTaxSuggestionMutation.isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              'Generate AI Suggestion'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Pending Suggestions */}
+                      <div>
+                        <h5 className="font-semibold text-gray-900 dark:text-white mb-4">Pending AI Suggestions</h5>
+                        {isLoadingAiSuggestions ? (
+                          <div className="flex justify-center py-12">
+                            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                          </div>
+                        ) : aiTaxSuggestions.filter(s => s.status === 'pending').length > 0 ? (
+                          <div className="space-y-4">
+                            {aiTaxSuggestions.filter(s => s.status === 'pending').map((suggestion) => {
+                              const employee = employees.find(e => e.id === suggestion.employeeId);
+                              const config = suggestion.suggestedConfig as any;
+                              return (
+                                <div key={suggestion.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                  <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                      <h6 className="font-semibold text-gray-900 dark:text-white">
+                                        {employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown Employee'}
+                                      </h6>
+                                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        Confidence: {suggestion.confidence}%
+                                      </p>
+                                    </div>
+                                    <span className="px-3 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-full text-xs font-medium">
+                                      Pending Review
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Work State Tax</p>
+                                      <p className="font-medium text-gray-900 dark:text-white">
+                                        {config?.workStateTax ? 'Required' : 'Not Required'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Residence State Tax</p>
+                                      <p className="font-medium text-gray-900 dark:text-white">
+                                        {config?.residenceStateTax ? 'Required' : 'Not Required'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Reciprocal Agreement</p>
+                                      <p className="font-medium text-gray-900 dark:text-white">
+                                        {config?.useReciprocalAgreement ? 'Yes' : 'No'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Federal Filing Status</p>
+                                      <p className="font-medium text-gray-900 dark:text-white">
+                                        {config?.federalWithholding?.filingStatus || 'N/A'}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {suggestion.reasoning && (
+                                    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded">
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">AI Reasoning</p>
+                                      <p className="text-sm text-gray-700 dark:text-gray-300">{suggestion.reasoning}</p>
+                                    </div>
+                                  )}
+
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => approveAiTaxSuggestionMutation.mutate({ id: suggestion.id })}
+                                      disabled={approveAiTaxSuggestionMutation.isPending}
+                                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                                      data-testid={`button-approve-suggestion-${suggestion.id}`}
+                                    >
+                                      {approveAiTaxSuggestionMutation.isPending ? 'Approving...' : 'Approve & Apply'}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const notes = prompt('Enter rejection notes (optional):');
+                                        rejectAiTaxSuggestionMutation.mutate({ id: suggestion.id, reviewNotes: notes || undefined });
+                                      }}
+                                      disabled={rejectAiTaxSuggestionMutation.isPending}
+                                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                                      data-testid={`button-reject-suggestion-${suggestion.id}`}
+                                    >
+                                      {rejectAiTaxSuggestionMutation.isPending ? 'Rejecting...' : 'Reject'}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <p className="text-gray-500 dark:text-gray-400">No pending AI suggestions</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

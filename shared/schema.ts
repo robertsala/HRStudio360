@@ -1508,14 +1508,13 @@ export const taxDataSources = pgTable('tax_data_sources', {
 // AI Tax Configuration Suggestions
 export const aiTaxSuggestions = pgTable('ai_tax_suggestions', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  suggestionType: text('suggestion_type').notNull(), // 'jurisdiction_create', 'jurisdiction_update', 'reciprocal_agreement'
-  targetEntityType: text('target_entity_type').notNull(), // 'tax_jurisdiction', 'reciprocal_agreement'
-  targetEntityId: uuid('target_entity_id'), // ID of existing entity (for updates)
-  suggestedData: json('suggested_data').notNull(), // The AI's recommended configuration
+  employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'cascade' }), // For employee-specific suggestions
+  suggestionType: text('suggestion_type').notNull(), // 'tax_jurisdiction', 'employee_tax_config'
+  suggestedConfig: json('suggested_config').notNull(), // The AI's recommended configuration
+  reasoning: text('reasoning'), // AI's explanation of the suggestion
   dataSourceIds: uuid('data_source_ids').array(), // References to taxDataSources used
-  aiReasoning: text('ai_reasoning'), // AI's explanation of the suggestion
-  confidenceScore: integer('confidence_score').notNull(), // 0-100
-  status: text('status').notNull().default('pending'), // 'pending', 'approved', 'rejected', 'modified'
+  confidence: integer('confidence').notNull(), // 0-100
+  status: text('status').notNull().default('pending'), // 'pending', 'approved', 'rejected'
   requestedBy: uuid('requested_by').references(() => profiles.id).notNull(),
   reviewedBy: uuid('reviewed_by').references(() => profiles.id),
   reviewedAt: timestamp('reviewed_at'),
