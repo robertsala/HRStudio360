@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, MapPin, Calendar, CreditCard as Edit3, Save, Camera, FileText, Award, Clock, UserX, Building, Briefcase, Star, TrendingUp, DollarSign, CheckCircle, AlertTriangle, Eye, Download, Send, Bell, CreditCard, TrendingUp as TrendingUpIcon, History, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, User, Mail, Phone, MapPin, Calendar, CreditCard as Edit3, Save, Camera, FileText, Award, Clock, UserX, Building, Briefcase, Star, TrendingUp, DollarSign, CheckCircle, AlertTriangle, Eye, Download, Send, Bell, CreditCard, TrendingUp as TrendingUpIcon, History, ChevronRight, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
@@ -46,6 +46,10 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const [performanceHistory, setPerformanceHistory] = useState<any[]>([]);
   const [isLoadingCompensation, setIsLoadingCompensation] = useState(false);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   // Determine if current user is HR staff
@@ -124,6 +128,78 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     setShowTerminationModal(false);
     // In a real app, this would update the employee status or trigger other workflows
   };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File size must be less than 5 MB');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please select an image file');
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+
+      const uploadResponse = await fetch('/api/objects/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const { url } = await uploadResponse.json();
+
+      const normalizeResponse = await fetch('/api/objects/normalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!normalizeResponse.ok) {
+        throw new Error('Failed to process image');
+      }
+
+      const { publicUrl } = await normalizeResponse.json();
+
+      setFormData({ ...formData, profileImage: publicUrl });
+      setShowImageUpload(false);
+      setUploadError(null);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleProfilePictureSelect = (pictureUrl: string) => {
+    setFormData({ ...formData, profileImage: pictureUrl });
+    setShowImageUpload(false);
+  };
+
+  const mockProfilePictures = [
+    'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+  ];
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -207,9 +283,16 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                       </span>
                     </div>
                   )}
-                  <button className="absolute -bottom-1 -right-1 bg-blue-50 dark:bg-blue-900/200 rounded-full p-1 hover:bg-blue-600 transition-colors">
-                    <Camera className="h-3 w-3 text-white" />
-                  </button>
+                  {isHRUser && (
+                    <button
+                      onClick={() => setShowImageUpload(true)}
+                      className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1 hover:bg-blue-600 transition-colors"
+                      title="Upload profile picture (HR only)"
+                      data-testid="button-hr-upload-profile-picture"
+                    >
+                      <Camera className="h-3 w-3 text-white" />
+                    </button>
+                  )}
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">{formData.name}</h2>
@@ -1103,6 +1186,121 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
           isOpen={showDirectDepositModal}
           onClose={() => setShowDirectDepositModal(false)}
         />
+      )}
+
+      {/* Profile Picture Upload Modal */}
+      {showImageUpload && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Upload Employee Profile Picture</h3>
+              <button
+                onClick={() => {
+                  setShowImageUpload(false);
+                  setUploadError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                data-testid="button-close-hr-profile-picture-modal"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Upload Error Message */}
+              {uploadError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center">
+                  <X className="h-5 w-5 text-red-600 dark:text-red-400 mr-3 flex-shrink-0" />
+                  <span className="text-red-800 dark:text-red-200 text-sm">{uploadError}</span>
+                </div>
+              )}
+
+              {/* Upload Your Own Picture */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Upload Profile Picture</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Maximum file size: 5 MB • Accepted formats: JPG, PNG, GIF, WebP
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                  className="hidden"
+                  data-testid="input-hr-profile-picture-file"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                  data-testid="button-hr-upload-employee-picture"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Choose File to Upload
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">or select from below</span>
+                </div>
+              </div>
+              
+              {/* Select from Options */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Select a Picture</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  {mockProfilePictures.map((pictureUrl, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleProfilePictureSelect(pictureUrl)}
+                      disabled={uploading}
+                      className="relative group disabled:opacity-50"
+                      data-testid={`button-hr-select-preset-picture-${index}`}
+                    >
+                      <img
+                        src={pictureUrl}
+                        alt={`Profile option ${index + 1}`}
+                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 group-hover:border-blue-500 transition-colors"
+                      />
+                      <div className="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all"></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Remove Picture Option */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    setFormData({ ...formData, profileImage: '' });
+                    setShowImageUpload(false);
+                    setUploadError(null);
+                  }}
+                  disabled={uploading}
+                  className="w-full text-center py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                  data-testid="button-hr-remove-profile-picture"
+                >
+                  Remove current picture (use initials)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
