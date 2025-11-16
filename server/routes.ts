@@ -45,6 +45,7 @@ import {
   chatWithPayrollAI
 } from './ai-agent.js';
 import { taxCalculator } from './tax-calculator.js';
+import { TaxDataService } from './tax-data-service.js';
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -4796,6 +4797,175 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error deleting reciprocal agreement:', error);
       res.status(500).json({ error: 'Failed to delete reciprocal agreement', details: error.message });
+    }
+  });
+
+  // Tax Data Service Routes - Authoritative tax data for AI
+  
+  app.get('/api/tax-data/federal', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const federalTaxData = TaxDataService.getFederalTaxData();
+      res.json(federalTaxData);
+    } catch (error: any) {
+      console.error('Error fetching federal tax data:', error);
+      res.status(500).json({ error: 'Failed to fetch federal tax data', details: error.message });
+    }
+  });
+
+  app.get('/api/tax-data/reciprocal-agreements', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const reciprocalData = TaxDataService.getReciprocalAgreements();
+      res.json({ agreements: reciprocalData });
+    } catch (error: any) {
+      console.error('Error fetching reciprocal agreement data:', error);
+      res.status(500).json({ error: 'Failed to fetch reciprocal agreement data', details: error.message });
+    }
+  });
+
+  app.get('/api/tax-data/sources', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { dataType, taxYear } = req.query;
+      let sources;
+      
+      if (dataType) {
+        sources = await storage.getTaxDataSourcesByType(
+          dataType as string,
+          taxYear ? parseInt(taxYear as string) : undefined
+        );
+      } else {
+        sources = await storage.getTaxDataSources();
+      }
+
+      res.json(sources);
+    } catch (error: any) {
+      console.error('Error fetching tax data sources:', error);
+      res.status(500).json({ error: 'Failed to fetch tax data sources', details: error.message });
+    }
+  });
+
+  app.post('/api/tax-data/sources/seed', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can seed tax data' 
+        });
+      }
+
+      const federalDataSource = TaxDataService.generateFederalTaxDataSource();
+      const reciprocalDataSource = TaxDataService.generateReciprocalAgreementsDataSource();
+
+      const created = await Promise.all([
+        storage.createTaxDataSource({ ...federalDataSource, verifiedBy: userId }),
+        storage.createTaxDataSource({ ...reciprocalDataSource, verifiedBy: userId })
+      ]);
+
+      res.status(201).json({
+        message: 'Tax data sources seeded successfully',
+        sources: created
+      });
+    } catch (error: any) {
+      console.error('Error seeding tax data sources:', error);
+      res.status(500).json({ error: 'Failed to seed tax data sources', details: error.message });
+    }
+  });
+
+  // AI Tax Suggestions Routes
+  
+  app.get('/api/ai-tax-suggestions', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { status } = req.query;
+      const suggestions = await storage.getAiTaxSuggestions(status as string | undefined);
+      res.json(suggestions);
+    } catch (error: any) {
+      console.error('Error fetching AI tax suggestions:', error);
+      res.status(500).json({ error: 'Failed to fetch AI tax suggestions', details: error.message });
+    }
+  });
+
+  app.post('/api/ai-tax-suggestions', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can create AI tax suggestions' 
+        });
+      }
+
+      const suggestion = await storage.createAiTaxSuggestion({
+        ...req.body,
+        requestedBy: userId
+      });
+
+      res.status(201).json(suggestion);
+    } catch (error: any) {
+      console.error('Error creating AI tax suggestion:', error);
+      res.status(500).json({ error: 'Failed to create AI tax suggestion', details: error.message });
+    }
+  });
+
+  app.patch('/api/ai-tax-suggestions/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can review AI tax suggestions' 
+        });
+      }
+
+      const existing = await storage.getAiTaxSuggestionById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'AI tax suggestion not found' });
+      }
+
+      const { status, reviewNotes } = req.body;
+      const updated = await storage.updateAiTaxSuggestion(req.params.id, {
+        status,
+        reviewNotes,
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+        appliedAt: status === 'approved' ? new Date() : undefined
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating AI tax suggestion:', error);
+      res.status(500).json({ error: 'Failed to update AI tax suggestion', details: error.message });
     }
   });
 
