@@ -6128,8 +6128,15 @@ export function registerRoutes(app: Express) {
   // GET /api/employee-access/assignments - Get all assignments (HR/Product Owner only)
   app.get('/api/employee-access/assignments', async (req, res) => {
     try {
-      const userId = await requireHROrProductOwner(req, res);
-      if (!userId) return;
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const userProfile = await storage.getProfileById(userId);
+      if (!userProfile || (userProfile.role !== 'HR' && userProfile.role !== 'Product Owner')) {
+        return res.status(403).json({ error: 'Unauthorized - HR or Product Owner role required' });
+      }
 
       const assignments = await storage.getEmployeeAccessAssignments();
       res.json(assignments);

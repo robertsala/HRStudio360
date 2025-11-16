@@ -3,6 +3,8 @@ import { X, Users, Shield, Save, Edit, CheckCircle, AlertCircle, UserPlus, Downl
 import { supabase } from '../../utils/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { mockOrgChartEmployees } from '../../data/mockOrgChartEmployees';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '../../lib/queryClient';
 
 interface UserManagementModalProps {
   onClose?: () => void;
@@ -49,6 +51,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
   const { user, startImpersonation } = useAuth();
   const [employees, setEmployees] = useState<EmployeeWithAccess[]>([]);
   const [accessLevels, setAccessLevels] = useState<AccessLevel[]>([]);
+  const [accessLevelsLoaded, setAccessLevelsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('All');
@@ -76,6 +79,38 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     can_manage_org_chart: false
   });
 
+  // React Query: Fetch all employee access assignments
+  const { data: assignments, isLoading: assignmentsLoading, error: assignmentsError, refetch: refetchAssignments } = useQuery<any[]>({
+    queryKey: ['/api/employee-access/assignments'],
+    enabled: !!user
+  });
+
+  // React Query: Assign individual access level
+  const assignAccessMutation = useMutation({
+    mutationFn: async (data: { employeeId: string; accessLevelId: string; source?: string; aiConfidence?: string }) => {
+      return await apiRequest('/api/employee-access/assign', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    onSuccess: async () => {
+      await refetchAssignments();
+    }
+  });
+
+  // React Query: Bulk assign access levels
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (data: { assignments: any[] }) => {
+      return await apiRequest('/api/employee-access/bulk-assign', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    onSuccess: async () => {
+      await refetchAssignments();
+    }
+  });
+
   useEffect(() => {
     loadData();
   }, []);
@@ -90,41 +125,86 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [onClose]);
 
+  // Recompute employees whenever assignments or access levels change
+  useEffect(() => {
+    // Wait for both datasets to be loaded (not just non-empty)
+    if (!accessLevelsLoaded || assignmentsLoading) {
+      return; // Still loading
+    }
+
+    // Handle assignments error
+    if (assignmentsError) {
+      console.error('Error loading assignments:', assignmentsError);
+      showToast('Failed to load access level assignments', 'error');
+      setLoading(false);
+      return;
+    }
+
+    // Build assignments map (handle empty assignments array)
+    const assignmentsMap: Record<string, string> = {};
+    if (assignments) {
+      assignments.forEach((assignment: any) => {
+        assignmentsMap[assignment.employeeId] = assignment.accessLevelId;
+      });
+    }
+
+    // Compute employees with their access levels
+    const employeesWithAccess: EmployeeWithAccess[] = mockOrgChartEmployees.map(emp => {
+      const assignedLevelId = assignmentsMap[emp.id];
+      const assignedLevel = assignedLevelId ? accessLevels.find(al => al.id === assignedLevelId) : undefined;
+
+      return {
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        department: emp.department,
+        role: emp.title,
+        accessLevel: assignedLevel,
+        hasAccount: false
+      };
+    });
+
+    setEmployees(employeesWithAccess);
+    setLoading(false);
+  }, [assignments, accessLevels, accessLevelsLoaded, assignmentsLoading, assignmentsError]);
+
   const loadData = async () => {
     try {
-      const { data: accessLevelsData, error: accessLevelsError } = await supabase
+      const { data: accessLevelsData, error: accessLevelsError} = await supabase
         .from('access_levels')
         .select('*')
         .order('priority', { ascending: false });
 
       if (accessLevelsError) throw accessLevelsError;
       setAccessLevels(accessLevelsData || []);
+      setAccessLevelsLoaded(true); // Mark as loaded even if empty
 
-      // Load access level assignments from localStorage
+      // ONE-TIME MIGRATION: Move localStorage data to database
       const storedAssignments = localStorage.getItem('employee_access_assignments');
-      const assignments: Record<string, string> = storedAssignments ? JSON.parse(storedAssignments) : {};
+      if (storedAssignments && user) {
+        try {
+          const localAssignments: Record<string, string> = JSON.parse(storedAssignments);
+          const assignmentsToMigrate = Object.entries(localAssignments).map(([employeeId, accessLevelId]) => ({
+            employeeId,
+            accessLevelId,
+            source: 'migration' as const
+          }));
 
-      // Use the same employee data source as Employee Directory
-      const employeesWithAccess: EmployeeWithAccess[] = mockOrgChartEmployees.map(emp => {
-        const assignedLevelId = assignments[emp.id];
-        const assignedLevel = assignedLevelId ? accessLevelsData?.find(al => al.id === assignedLevelId) : undefined;
-
-        return {
-          id: emp.id,
-          name: emp.name,
-          email: emp.email,
-          department: emp.department,
-          role: emp.title,
-          accessLevel: assignedLevel,
-          hasAccount: false
-        };
-      });
-
-      setEmployees(employeesWithAccess);
+          if (assignmentsToMigrate.length > 0) {
+            await bulkAssignMutation.mutateAsync({ assignments: assignmentsToMigrate });
+            localStorage.removeItem('employee_access_assignments'); // Clear after successful migration
+            console.log('✅ Migrated', assignmentsToMigrate.length, 'assignments from localStorage to database');
+            // Assignments will be refetched automatically by mutation's onSuccess
+          }
+        } catch (migrationError) {
+          console.error('⚠️ Migration failed:', migrationError);
+          showToast('Warning: Failed to migrate access level assignments', 'error');
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error);
-      showToast('Failed to load data', 'error');
-    } finally {
+      showToast('Failed to load access levels', 'error');
+      setAccessLevelsLoaded(true); // Still mark as loaded to prevent spinner lock
       setLoading(false);
     }
   };
@@ -241,31 +321,31 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     setAiProcessing(true);
 
     try {
-      // Load existing assignments from localStorage
-      const storedAssignments = localStorage.getItem('employee_access_assignments');
-      const assignments: Record<string, string> = storedAssignments ? JSON.parse(storedAssignments) : {};
+      // Filter high confidence suggestions
+      const highConfidenceAssignments = aiSuggestions
+        .filter(s => s.confidence === 'high' && s.suggestedAccessLevelId)
+        .map(s => ({
+          employeeId: s.employeeId,
+          accessLevelId: s.suggestedAccessLevelId,
+          source: 'ai_suggestion',
+          aiConfidence: 'high'
+        }));
 
-      // Apply only high confidence suggestions
-      let successCount = 0;
-      for (const suggestion of aiSuggestions) {
-        if (suggestion.confidence !== 'high') continue;
-        if (!suggestion.suggestedAccessLevelId) continue;
-
-        assignments[suggestion.employeeId] = suggestion.suggestedAccessLevelId;
-        successCount++;
+      if (highConfidenceAssignments.length === 0) {
+        setAiProcessing(false);
+        showToast('No high-confidence suggestions to apply', 'error');
+        return;
       }
 
-      // Save back to localStorage
-      localStorage.setItem('employee_access_assignments', JSON.stringify(assignments));
+      // Use bulk assign API
+      await bulkAssignMutation.mutateAsync({ assignments: highConfidenceAssignments });
 
       setAiProcessing(false);
       setShowAISuggestions(false);
       setShowFullReview(false);
 
-      if (successCount > 0) {
-        showToast(`AI assigned ${successCount} high-confidence access level${successCount > 1 ? 's' : ''} automatically`, 'success');
-        loadData();
-      }
+      showToast(`AI assigned ${highConfidenceAssignments.length} high-confidence access level${highConfidenceAssignments.length > 1 ? 's' : ''} automatically`, 'success');
+      loadData();
     } catch (error) {
       console.error('Error applying high confidence suggestions:', error);
       setAiProcessing(false);
@@ -277,31 +357,31 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     setAiProcessing(true);
 
     try {
-      // Load existing assignments from localStorage
-      const storedAssignments = localStorage.getItem('employee_access_assignments');
-      const assignments: Record<string, string> = storedAssignments ? JSON.parse(storedAssignments) : {};
+      // Filter selected suggestions
+      const selectedAssignments = aiSuggestions
+        .filter(s => selectedSuggestions.has(s.employeeId) && s.suggestedAccessLevelId)
+        .map(s => ({
+          employeeId: s.employeeId,
+          accessLevelId: s.suggestedAccessLevelId,
+          source: 'ai_suggestion',
+          aiConfidence: s.confidence
+        }));
 
-      // Apply selected suggestions
-      let successCount = 0;
-      for (const suggestion of aiSuggestions) {
-        if (!selectedSuggestions.has(suggestion.employeeId)) continue;
-        if (!suggestion.suggestedAccessLevelId) continue;
-
-        assignments[suggestion.employeeId] = suggestion.suggestedAccessLevelId;
-        successCount++;
+      if (selectedAssignments.length === 0) {
+        setAiProcessing(false);
+        showToast('No suggestions selected', 'error');
+        return;
       }
 
-      // Save back to localStorage
-      localStorage.setItem('employee_access_assignments', JSON.stringify(assignments));
+      // Use bulk assign API
+      await bulkAssignMutation.mutateAsync({ assignments: selectedAssignments });
 
       setAiProcessing(false);
       setShowAISuggestions(false);
       setShowFullReview(false);
 
-      if (successCount > 0) {
-        showToast(`Successfully assigned access levels to ${successCount} employee${successCount > 1 ? 's' : ''}`, 'success');
-        loadData();
-      }
+      showToast(`Successfully assigned access levels to ${selectedAssignments.length} employee${selectedAssignments.length > 1 ? 's' : ''}`, 'success');
+      loadData();
     } catch (error) {
       console.error('Error applying suggestions:', error);
       setAiProcessing(false);
@@ -321,15 +401,12 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     }
 
     try {
-      // Load existing assignments from localStorage
-      const storedAssignments = localStorage.getItem('employee_access_assignments');
-      const assignments: Record<string, string> = storedAssignments ? JSON.parse(storedAssignments) : {};
-
-      // Update the assignment
-      assignments[employeeId] = selectedAccessLevelId;
-
-      // Save back to localStorage
-      localStorage.setItem('employee_access_assignments', JSON.stringify(assignments));
+      // Use assign API
+      await assignAccessMutation.mutateAsync({
+        employeeId,
+        accessLevelId: selectedAccessLevelId,
+        source: 'manual'
+      });
 
       showToast('Access level saved successfully!', 'success');
       setEditingEmployeeId(null);
