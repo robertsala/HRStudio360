@@ -56,7 +56,7 @@ import {
   jobPostings, applications, resumeData, interviewStages, applicationActivityLog, applicationStageTransitions, teamAssignments,
   paycheckFunFacts, employeeFunFactHistory, dailyFunFactUsage,
   dashboardWidgetPresets, userDashboardPreferences,
-  taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog,
+  taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, taxDataSources, aiTaxSuggestions, autoFixAuditLog,
   timesheetEntries, timesheetApprovals, payrollLocks,
   permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit,
   permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit,
@@ -292,6 +292,19 @@ export interface IStorage {
   getEmployeeTaxConfiguration(employeeId: string): Promise<import('../shared/schema.js').EmployeeTaxConfiguration | undefined>;
   createEmployeeTaxConfiguration(config: import('../shared/schema.js').InsertEmployeeTaxConfiguration): Promise<import('../shared/schema.js').EmployeeTaxConfiguration>;
   updateEmployeeTaxConfiguration(id: string, config: Partial<import('../shared/schema.js').InsertEmployeeTaxConfiguration>): Promise<import('../shared/schema.js').EmployeeTaxConfiguration | undefined>;
+
+  // Tax Data Sources
+  getTaxDataSources(): Promise<import('../shared/schema.js').TaxDataSource[]>;
+  getTaxDataSourceById(id: string): Promise<import('../shared/schema.js').TaxDataSource | undefined>;
+  getTaxDataSourcesByType(dataType: string, taxYear?: number): Promise<import('../shared/schema.js').TaxDataSource[]>;
+  createTaxDataSource(source: import('../shared/schema.js').InsertTaxDataSource): Promise<import('../shared/schema.js').TaxDataSource>;
+  updateTaxDataSource(id: string, source: Partial<import('../shared/schema.js').InsertTaxDataSource>): Promise<import('../shared/schema.js').TaxDataSource | undefined>;
+
+  // AI Tax Suggestions
+  getAiTaxSuggestions(status?: string): Promise<import('../shared/schema.js').AiTaxSuggestion[]>;
+  getAiTaxSuggestionById(id: string): Promise<import('../shared/schema.js').AiTaxSuggestion | undefined>;
+  createAiTaxSuggestion(suggestion: import('../shared/schema.js').InsertAiTaxSuggestion): Promise<import('../shared/schema.js').AiTaxSuggestion>;
+  updateAiTaxSuggestion(id: string, suggestion: Partial<import('../shared/schema.js').InsertAiTaxSuggestion>): Promise<import('../shared/schema.js').AiTaxSuggestion | undefined>;
 
   // Auto-fix Audit Log
   getAutoFixAuditLogs(): Promise<import('../shared/schema.js').AutoFixAuditLog[]>;
@@ -1912,6 +1925,87 @@ export class DbStorage implements IStorage {
     const result = await db.update(employeeTaxConfiguration)
       .set({ ...config, updatedAt: new Date() })
       .where(eq(employeeTaxConfiguration.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Tax Data Sources
+  async getTaxDataSources(): Promise<import('../shared/schema.js').TaxDataSource[]> {
+    return await db.select()
+      .from(taxDataSources)
+      .where(eq(taxDataSources.isActive, true))
+      .orderBy(desc(taxDataSources.taxYear), taxDataSources.dataType);
+  }
+
+  async getTaxDataSourceById(id: string): Promise<import('../shared/schema.js').TaxDataSource | undefined> {
+    const result = await db.select().from(taxDataSources).where(eq(taxDataSources.id, id));
+    return result[0];
+  }
+
+  async getTaxDataSourcesByType(dataType: string, taxYear?: number): Promise<import('../shared/schema.js').TaxDataSource[]> {
+    if (taxYear) {
+      return await db.select()
+        .from(taxDataSources)
+        .where(
+          and(
+            eq(taxDataSources.dataType, dataType),
+            eq(taxDataSources.taxYear, taxYear),
+            eq(taxDataSources.isActive, true)
+          )
+        )
+        .orderBy(desc(taxDataSources.lastUpdated));
+    }
+    return await db.select()
+      .from(taxDataSources)
+      .where(
+        and(
+          eq(taxDataSources.dataType, dataType),
+          eq(taxDataSources.isActive, true)
+        )
+      )
+      .orderBy(desc(taxDataSources.taxYear), desc(taxDataSources.lastUpdated));
+  }
+
+  async createTaxDataSource(source: import('../shared/schema.js').InsertTaxDataSource): Promise<import('../shared/schema.js').TaxDataSource> {
+    const result = await db.insert(taxDataSources).values(source).returning();
+    return result[0];
+  }
+
+  async updateTaxDataSource(id: string, source: Partial<import('../shared/schema.js').InsertTaxDataSource>): Promise<import('../shared/schema.js').TaxDataSource | undefined> {
+    const result = await db.update(taxDataSources)
+      .set(source)
+      .where(eq(taxDataSources.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // AI Tax Suggestions
+  async getAiTaxSuggestions(status?: string): Promise<import('../shared/schema.js').AiTaxSuggestion[]> {
+    if (status) {
+      return await db.select()
+        .from(aiTaxSuggestions)
+        .where(eq(aiTaxSuggestions.status, status))
+        .orderBy(desc(aiTaxSuggestions.createdAt));
+    }
+    return await db.select()
+      .from(aiTaxSuggestions)
+      .orderBy(desc(aiTaxSuggestions.createdAt));
+  }
+
+  async getAiTaxSuggestionById(id: string): Promise<import('../shared/schema.js').AiTaxSuggestion | undefined> {
+    const result = await db.select().from(aiTaxSuggestions).where(eq(aiTaxSuggestions.id, id));
+    return result[0];
+  }
+
+  async createAiTaxSuggestion(suggestion: import('../shared/schema.js').InsertAiTaxSuggestion): Promise<import('../shared/schema.js').AiTaxSuggestion> {
+    const result = await db.insert(aiTaxSuggestions).values(suggestion).returning();
+    return result[0];
+  }
+
+  async updateAiTaxSuggestion(id: string, suggestion: Partial<import('../shared/schema.js').InsertAiTaxSuggestion>): Promise<import('../shared/schema.js').AiTaxSuggestion | undefined> {
+    const result = await db.update(aiTaxSuggestions)
+      .set(suggestion)
+      .where(eq(aiTaxSuggestions.id, id))
       .returning();
     return result[0];
   }
