@@ -71,6 +71,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
 
   // Employee state management
   const [employees, setEmployees] = React.useState(mockEmployees.slice(0, 247));
+  const [activeEmployee, setActiveEmployee] = React.useState<any | null>(null);
 
   // Announcements state (deprecated - for backwards compatibility only)
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
@@ -549,7 +550,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
         return (
           <EmployeeListModal
             employees={employees}
-            onViewProfile={(employeeId) => openModal('comprehensiveProfile')}
+            onViewProfile={(employeeId) => {
+              const employee = employees.find(e => e.id === employeeId);
+              setActiveEmployee(employee || null);
+              openModal('comprehensiveProfile');
+            }}
             userRole={user?.role || 'employee'}
             onClose={closeInlineContent}
             initialFilter={
@@ -646,7 +651,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
       case 'hrDataReporting':
         return <HRDataReportingModal isOpen={true} onClose={closeInlineContent} />;
       case 'comprehensiveProfile':
-        return <ComprehensiveEmployeeProfileModal isOpen={true} onClose={closeInlineContent} />;
+        return <ComprehensiveEmployeeProfileModal isOpen={true} onClose={closeInlineContent} employee={activeEmployee || undefined} />;
       case 'benefitsPay':
         return <BenefitsPayModal isOpen={true} onClose={closeInlineContent} />;
       case 'aiInsights':
