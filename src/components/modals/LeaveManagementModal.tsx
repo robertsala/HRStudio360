@@ -8,6 +8,7 @@ import type { LeaveRequest as DBLeaveRequest, LeaveBalance } from '../../../shar
 interface LeaveRequestWithEmployee {
   id: string;
   employeeId: string;
+  employeeNumber?: string; // The actual employee number (not UUID)
   employeeName: string;
   department?: string;
   manager?: string;
@@ -106,6 +107,7 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
       
       return {
         ...request,
+        employeeNumber: employee?.employeeId || undefined, // The actual employee number
         employeeName: fullName || 'Unknown Employee',
         department: employee?.profile?.department || undefined,
         manager: employee?.profile?.managerName || undefined,
@@ -803,7 +805,7 @@ const LeaveManagementModal: React.FC<LeaveManagementModalProps> = ({ onClose, in
                   </div>
                   <div>
                     <span className="font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Employee ID:</span>
-                    <p className="text-gray-900 dark:text-white dark:text-white">{selectedRequest.employeeId}</p>
+                    <p className="text-gray-900 dark:text-white dark:text-white">{selectedRequest.employeeNumber || 'N/A'}</p>
                   </div>
                   <div>
                     <span className="font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">Department:</span>

@@ -221,8 +221,6 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
   const getJobTitleCountByDepartment = (department: string) => {
     return jobTitles.filter(jt => jt.department === department).length;
   };
-
-  const { toast } = useToast();
   
   // Tax Configuration State
   const [taxConfigSubTab, setTaxConfigSubTab] = useState<'federal' | 'state' | 'local' | 'reciprocal'>('federal');
