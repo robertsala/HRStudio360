@@ -33,13 +33,26 @@ export interface FederalTaxData {
   supplementalWageRateOver1M: number;
 }
 
+/**
+ * Reciprocal Agreement Data Structure
+ * 
+ * PROVENANCE POLICY:
+ * - Provenance fields are OPTIONAL in the TypeScript contract for backward compatibility
+ * - However, all authoritative reciprocal agreements MUST include complete provenance
+ * - This ensures audit trail while maintaining schema flexibility
+ * 
+ * FUTURE IMPROVEMENTS (as suggested by architect review):
+ * 1. Add automated test/assertion to verify all seeded agreements include provenance
+ * 2. Consider formalizing provenance in structured storage (dedicated columns) for immutable audit trail
+ * 3. Add validation to prevent seeding agreements without provenance metadata
+ */
 export interface ReciprocalAgreementData {
   workState: string;
   workStateName: string;
   residenceStates: string[];
   exemptionForm: string;
   notes?: string;
-  // Provenance fields - SHOULD be provided for all agreements for audit/compliance
+  // Provenance fields - OPTIONAL in contract, REQUIRED in practice for authoritative data
   sourceUrl?: string; // Specific state DoR website for this agreement
   lastVerified?: string; // ISO date when agreement was last verified
   publicationReference?: string; // State form instructions or publication reference
