@@ -17,6 +17,7 @@ import type {
   ResumeData,
   JobPosting 
 } from '../shared/schema.js';
+import { TaxDataService } from './tax-data-service.js';
 
 // Initialize OpenAI with Replit AI Integrations
 const openai = new OpenAI({
@@ -32,6 +33,7 @@ export const AGENT_CAPABILITIES = {
   ANALYZE_SKILLS: 'analyze_skills',
   ANSWER_HR_QUESTIONS: 'answer_hr_questions',
   GENERATE_INSIGHTS: 'generate_insights',
+  SUGGEST_TAX_CONFIG: 'suggest_tax_config',
 } as const;
 
 // Agent personality and context
@@ -577,4 +579,223 @@ export async function chatWithPayrollAI(
     console.error('[AI Payroll] Chat error:', error);
     return 'I apologize, but I encountered an error. Please try again or contact support if the issue persists.';
   }
+}
+
+/**
+ * Tax Configuration AI System Prompt
+ */
+const TAX_SYSTEM_PROMPT = `You are Studio AI's Tax Configuration Expert, specialized in multi-state tax compliance.
+
+Your expertise includes:
+- Federal and state tax withholding regulations
+- State reciprocal agreements and exemptions
+- Tax jurisdiction optimization
+- Compliance with IRS Publication 15-T
+- State Department of Revenue regulations
+
+When suggesting tax configurations, you:
+1. Analyze employee work state vs residence state
+2. Check for reciprocal agreements to minimize withholding burden
+3. Consider special conditions (daily commute requirements, shareholder restrictions)
+4. Ensure compliance with both federal and state regulations
+5. Provide clear explanations with regulatory citations
+
+Your recommendations must be:
+- Accurate and based on authoritative data sources
+- Compliant with SOC 1/SOX and IRS Circular 230 requirements
+- Clearly documented with rationale
+- Subject to HR Admin review and approval
+
+IMPORTANT: Your suggestions are recommendations only. All tax configurations require human review and approval before being applied.`;
+
+/**
+ * Suggest optimal tax configuration for an employee
+ * Based on work state, residence state, and reciprocal agreements
+ */
+export async function suggestTaxConfiguration(employeeData: {
+  employeeId: string;
+  fullName: string;
+  workState: string;
+  residenceState: string;
+  filingStatus?: string;
+}): Promise<{
+  suggestion: {
+    workStateTax: boolean;
+    residenceStateTax: boolean;
+    useReciprocalAgreement: boolean;
+    reciprocalAgreementDetails?: {
+      workState: string;
+      residenceState: string;
+      exemptionForm: string;
+      sourceUrl: string;
+    };
+    federalWithholding: {
+      filingStatus: string;
+      recommendedAllowances: number;
+    };
+  };
+  reasoning: string;
+  complianceNotes: string[];
+  actionItems: string[];
+  confidence: number; // 0-100
+}> {
+  try {
+    // Get reciprocal agreement data
+    const reciprocalAgreements = TaxDataService.getReciprocalAgreements();
+    const federalTaxData = TaxDataService.getFederalTaxData();
+
+    // Check if there's a reciprocal agreement
+    const applicableAgreement = reciprocalAgreements.find(
+      agreement => 
+        agreement.workState === employeeData.workState &&
+        (agreement.residenceStates.includes(employeeData.residenceState) || 
+         agreement.residenceStates.includes('ALL'))
+    );
+
+    // Build context for AI
+    const context = {
+      employee: employeeData,
+      reciprocalAgreement: applicableAgreement || null,
+      workStateWithholdingRequired: !applicableAgreement,
+      residenceStateWithholdingRequired: true,
+      federalTaxYear: federalTaxData.taxYear
+    };
+
+    const prompt = `Analyze this employee's tax situation and suggest optimal tax configuration:
+
+Employee Information:
+- Name: ${employeeData.fullName}
+- Work State: ${employeeData.workState}
+- Residence State: ${employeeData.residenceState}
+- Filing Status: ${employeeData.filingStatus || 'Not specified'}
+
+Current Tax Year: ${federalTaxData.taxYear}
+
+${applicableAgreement ? `
+Reciprocal Agreement Found:
+- Work State: ${applicableAgreement.workState} (${applicableAgreement.workStateName})
+- Exemption Form: ${applicableAgreement.exemptionForm}
+- Agreement Details: ${applicableAgreement.notes || 'Standard reciprocal agreement'}
+- Source: ${applicableAgreement.sourceUrl}
+- Last Verified: ${applicableAgreement.lastVerified}
+- Special Conditions: ${applicableAgreement.verificationNotes || 'None'}
+` : `
+No Reciprocal Agreement:
+${employeeData.workState} and ${employeeData.residenceState} do not have a reciprocal tax agreement.
+Employee will be subject to withholding in both states.
+`}
+
+Task: Provide a comprehensive tax configuration recommendation that:
+1. Determines if work state withholding is required
+2. Determines if residence state withholding is required  
+3. Identifies if reciprocal agreement can be used
+4. Recommends federal withholding filing status
+5. Explains compliance requirements
+6. Lists action items for HR Admin
+
+Respond in JSON format:
+{
+  "workStateTax": boolean,
+  "residenceStateTax": boolean,
+  "useReciprocalAgreement": boolean,
+  "reciprocalDetails": { "form": "...", "instructions": "..." } or null,
+  "federalFilingStatus": "single|married_joint|married_separate|head_of_household",
+  "reasoning": "Detailed explanation",
+  "complianceNotes": ["note1", "note2"],
+  "actionItems": ["action1", "action2"],
+  "confidence": 0-100
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: TAX_SYSTEM_PROMPT },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2, // Low temperature for factual, consistent recommendations
+      response_format: { type: 'json_object' }
+    });
+
+    const aiResponse = JSON.parse(response.choices[0].message.content || '{}');
+
+    return {
+      suggestion: {
+        workStateTax: aiResponse.workStateTax,
+        residenceStateTax: aiResponse.residenceStateTax,
+        useReciprocalAgreement: aiResponse.useReciprocalAgreement,
+        reciprocalAgreementDetails: applicableAgreement ? {
+          workState: applicableAgreement.workState,
+          residenceState: employeeData.residenceState,
+          exemptionForm: applicableAgreement.exemptionForm,
+          sourceUrl: applicableAgreement.sourceUrl || ''
+        } : undefined,
+        federalWithholding: {
+          filingStatus: aiResponse.federalFilingStatus || 'single',
+          recommendedAllowances: 0 // Default to 0, can be customized
+        }
+      },
+      reasoning: aiResponse.reasoning || 'Tax configuration based on work and residence state analysis.',
+      complianceNotes: aiResponse.complianceNotes || [],
+      actionItems: aiResponse.actionItems || [],
+      confidence: aiResponse.confidence || 85
+    };
+  } catch (error) {
+    console.error('[AI Tax] Suggestion error:', error);
+    // Return a conservative default suggestion
+    return {
+      suggestion: {
+        workStateTax: true,
+        residenceStateTax: true,
+        useReciprocalAgreement: false,
+        federalWithholding: {
+          filingStatus: 'single',
+          recommendedAllowances: 0
+        }
+      },
+      reasoning: 'Error occurred during AI analysis. Conservative configuration suggested: withholding in both states.',
+      complianceNotes: [
+        'AI analysis failed - manual review required',
+        'Default configuration applies withholding in both work and residence states'
+      ],
+      actionItems: [
+        'Manually verify employee work and residence states',
+        'Check for applicable reciprocal agreements',
+        'Confirm federal filing status with employee'
+      ],
+      confidence: 50
+    };
+  }
+}
+
+/**
+ * Batch suggest tax configurations for multiple employees
+ * Useful for initial setup or annual review
+ */
+export async function batchSuggestTaxConfigurations(
+  employees: Array<{
+    employeeId: string;
+    fullName: string;
+    workState: string;
+    residenceState: string;
+    filingStatus?: string;
+  }>
+): Promise<Array<{
+  employeeId: string;
+  suggestion: any;
+  reasoning: string;
+  confidence: number;
+}>> {
+  const suggestions = await Promise.all(
+    employees.map(async (employee) => {
+      const result = await suggestTaxConfiguration(employee);
+      return {
+        employeeId: employee.employeeId,
+        suggestion: result.suggestion,
+        reasoning: result.reasoning,
+        confidence: result.confidence
+      };
+    })
+  );
+
+  return suggestions;
 }

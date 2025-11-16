@@ -46,6 +46,7 @@ import {
 } from './ai-agent.js';
 import { taxCalculator } from './tax-calculator.js';
 import { TaxDataService } from './tax-data-service.js';
+import { suggestTaxConfiguration, batchSuggestTaxConfigurations } from './ai-agent.js';
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -4966,6 +4967,139 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error updating AI tax suggestion:', error);
       res.status(500).json({ error: 'Failed to update AI tax suggestion', details: error.message });
+    }
+  });
+
+  // AI-Powered Tax Configuration Suggestions
+  
+  app.post('/api/ai-tax-suggestions/generate/:employeeId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can generate AI tax suggestions' 
+        });
+      }
+
+      const { employeeId } = req.params;
+      const employee = await storage.getEmployeeById(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      // Get employee profile for full name
+      const profile = await storage.getProfileById(employee.userId);
+      if (!profile) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+
+      // Generate AI suggestion
+      const aiResult = await suggestTaxConfiguration({
+        employeeId: employee.id,
+        fullName: profile.fullName,
+        workState: employee.state || 'Unknown',
+        residenceState: req.body.residenceState || employee.state || 'Unknown',
+        filingStatus: req.body.filingStatus
+      });
+
+      // Create AI tax suggestion record
+      const suggestion = await storage.createAiTaxSuggestion({
+        employeeId: employee.id,
+        suggestionType: 'tax_jurisdiction',
+        suggestedConfig: aiResult.suggestion,
+        reasoning: aiResult.reasoning,
+        confidence: aiResult.confidence,
+        dataSourceIds: [], // Will be populated with tax data source IDs
+        status: 'pending',
+        requestedBy: userId
+      });
+
+      res.status(201).json({
+        suggestion,
+        complianceNotes: aiResult.complianceNotes,
+        actionItems: aiResult.actionItems
+      });
+    } catch (error: any) {
+      console.error('Error generating AI tax suggestion:', error);
+      res.status(500).json({ error: 'Failed to generate AI tax suggestion', details: error.message });
+    }
+  });
+
+  app.post('/api/ai-tax-suggestions/generate-batch', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const hasPermission = await canManageAnnouncements(userId);
+      if (!hasPermission) {
+        return res.status(403).json({ 
+          error: 'Forbidden: Only HR department and Product Owners can generate AI tax suggestions' 
+        });
+      }
+
+      const { employeeIds } = req.body;
+      if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
+        return res.status(400).json({ error: 'employeeIds must be a non-empty array' });
+      }
+
+      // Get all employees
+      const employees = await Promise.all(
+        employeeIds.map(id => storage.getEmployeeById(id))
+      );
+
+      // Filter out any null results
+      const validEmployees = employees.filter(e => e !== null);
+      if (validEmployees.length === 0) {
+        return res.status(404).json({ error: 'No valid employees found' });
+      }
+
+      // Get profiles for full names
+      const employeeData = await Promise.all(
+        validEmployees.map(async (emp) => {
+          const profile = await storage.getProfileById(emp.userId);
+          return {
+            employeeId: emp.id,
+            fullName: profile?.fullName || 'Unknown',
+            workState: emp.state || 'Unknown',
+            residenceState: emp.state || 'Unknown', // TODO: Add residence state field to employee
+            filingStatus: undefined
+          };
+        })
+      );
+
+      // Generate batch suggestions
+      const aiResults = await batchSuggestTaxConfigurations(employeeData);
+
+      // Create suggestion records
+      const suggestions = await Promise.all(
+        aiResults.map(result => 
+          storage.createAiTaxSuggestion({
+            employeeId: result.employeeId,
+            suggestionType: 'tax_jurisdiction',
+            suggestedConfig: result.suggestion,
+            reasoning: result.reasoning,
+            confidence: result.confidence,
+            dataSourceIds: [],
+            status: 'pending',
+            requestedBy: userId
+          })
+        )
+      );
+
+      res.status(201).json({
+        count: suggestions.length,
+        suggestions
+      });
+    } catch (error: any) {
+      console.error('Error generating batch AI tax suggestions:', error);
+      res.status(500).json({ error: 'Failed to generate batch AI tax suggestions', details: error.message });
     }
   });
 
