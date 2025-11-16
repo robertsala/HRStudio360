@@ -1486,6 +1486,44 @@ export const reciprocalAgreements = pgTable('reciprocal_agreements', {
   updatedAt: timestamp('updated_at').defaultNow()
 });
 
+// Tax Data Sources - Track authoritative tax data sources
+export const taxDataSources = pgTable('tax_data_sources', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  sourceType: text('source_type').notNull(), // 'irs_publication', 'state_website', 'api_provider'
+  sourceName: text('source_name').notNull(), // e.g., 'IRS Publication 15-T', 'California FTB'
+  sourceUrl: text('source_url'), // URL to official documentation
+  dataType: text('data_type').notNull(), // 'federal_tax_brackets', 'state_tax_rates', 'reciprocal_agreements'
+  taxYear: integer('tax_year').notNull(), // 2025, 2026, etc.
+  dataVersion: text('data_version'), // Version or revision number
+  lastUpdated: timestamp('last_updated').notNull(),
+  lastVerified: timestamp('last_verified'),
+  dataPayload: json('data_payload').notNull(), // Structured tax data (rates, brackets, etc.)
+  confidenceScore: integer('confidence_score').default(100), // 0-100, how reliable is this data
+  verifiedBy: uuid('verified_by').references(() => profiles.id), // HR Admin who verified
+  notes: text('notes'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// AI Tax Configuration Suggestions
+export const aiTaxSuggestions = pgTable('ai_tax_suggestions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  suggestionType: text('suggestion_type').notNull(), // 'jurisdiction_create', 'jurisdiction_update', 'reciprocal_agreement'
+  targetEntityType: text('target_entity_type').notNull(), // 'tax_jurisdiction', 'reciprocal_agreement'
+  targetEntityId: uuid('target_entity_id'), // ID of existing entity (for updates)
+  suggestedData: json('suggested_data').notNull(), // The AI's recommended configuration
+  dataSourceIds: uuid('data_source_ids').array(), // References to taxDataSources used
+  aiReasoning: text('ai_reasoning'), // AI's explanation of the suggestion
+  confidenceScore: integer('confidence_score').notNull(), // 0-100
+  status: text('status').notNull().default('pending'), // 'pending', 'approved', 'rejected', 'modified'
+  requestedBy: uuid('requested_by').references(() => profiles.id).notNull(),
+  reviewedBy: uuid('reviewed_by').references(() => profiles.id),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewNotes: text('review_notes'),
+  appliedAt: timestamp('applied_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 // Employee Tax Configuration
 export const employeeTaxConfiguration = pgTable('employee_tax_configuration', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -1729,6 +1767,20 @@ export const insertReciprocalAgreementSchema = createInsertSchema(reciprocalAgre
 });
 export type InsertReciprocalAgreement = z.infer<typeof insertReciprocalAgreementSchema>;
 export type ReciprocalAgreement = typeof reciprocalAgreements.$inferSelect;
+
+export const insertTaxDataSourceSchema = createInsertSchema(taxDataSources).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertTaxDataSource = z.infer<typeof insertTaxDataSourceSchema>;
+export type TaxDataSource = typeof taxDataSources.$inferSelect;
+
+export const insertAiTaxSuggestionSchema = createInsertSchema(aiTaxSuggestions).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertAiTaxSuggestion = z.infer<typeof insertAiTaxSuggestionSchema>;
+export type AiTaxSuggestion = typeof aiTaxSuggestions.$inferSelect;
 
 export const insertEmployeeTaxConfigurationSchema = createInsertSchema(employeeTaxConfiguration).omit({
   id: true,
