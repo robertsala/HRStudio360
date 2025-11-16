@@ -167,7 +167,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     try {
       setUploading(true);
 
-      // Step 1: Get upload URL from backend
+      // Convert file to base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Send base64 data to backend
       const uploadResponse = await fetch('/api/objects/upload', {
         method: 'POST',
         headers: {
@@ -177,52 +185,19 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
           fileName: file.name,
           fileSize: file.size,
           fileType: file.type,
+          base64Data,
         }),
       });
 
       if (!uploadResponse.ok) {
         const error = await uploadResponse.json();
-        throw new Error(error.error || 'Failed to get upload URL');
+        throw new Error(error.error || 'Failed to upload image');
       }
 
-      const { uploadURL, uploadToken } = await uploadResponse.json();
+      const { imageUrl } = await uploadResponse.json();
 
-      // Step 2: Upload file to object storage
-      const uploadResult = await fetch(uploadURL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type,
-        },
-        body: file,
-      });
-
-      if (!uploadResult.ok) {
-        throw new Error('Failed to upload file');
-      }
-
-      // Step 3: Normalize the path and set ACL
-      const normalizeResponse = await fetch('/api/objects/normalize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rawPath: uploadURL.split('?')[0], // Remove query params
-          uploadToken,
-          aclPolicy: {
-            visibility: 'public', // Profile pictures should be public
-          },
-        }),
-      });
-
-      if (!normalizeResponse.ok) {
-        throw new Error('Failed to finalize upload');
-      }
-
-      const { normalizedPath } = await normalizeResponse.json();
-
-      // Step 4: Update profile with new picture URL
-      updateProfilePicture(normalizedPath);
+      // Update profile with new picture URL (base64 data URL)
+      updateProfilePicture(imageUrl);
       setShowImageUpload(false);
       
       // Reset file input

@@ -149,33 +149,36 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     try {
       setUploading(true);
 
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
+      // Convert file to base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
+      // Send base64 data to backend
       const uploadResponse = await fetch('/api/objects/upload', {
         method: 'POST',
-        body: uploadFormData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          base64Data,
+        }),
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
+        const error = await uploadResponse.json();
+        throw new Error(error.error || 'Failed to upload image');
       }
 
-      const { url } = await uploadResponse.json();
+      const { imageUrl } = await uploadResponse.json();
 
-      const normalizeResponse = await fetch('/api/objects/normalize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!normalizeResponse.ok) {
-        throw new Error('Failed to process image');
-      }
-
-      const { publicUrl } = await normalizeResponse.json();
-
-      setFormData({ ...formData, profileImage: publicUrl });
+      setFormData({ ...formData, profileImage: imageUrl });
       setShowImageUpload(false);
       setUploadError(null);
     } catch (error) {

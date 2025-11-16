@@ -103,7 +103,7 @@ export function registerRoutes(app: Express) {
     }
   }, 5 * 60 * 1000);
 
-  // Get presigned URL for uploading objects (authenticated)
+  // Upload profile picture as base64 (authenticated)
   app.post('/api/objects/upload', async (req, res) => {
     try {
       const userId = (req.session as any).userId;
@@ -112,11 +112,11 @@ export function registerRoutes(app: Express) {
       }
 
       // Server-side validation for file uploads
-      const { fileName, fileSize, fileType } = req.body;
+      const { fileName, fileSize, fileType, base64Data } = req.body;
       
       // Validate required fields
-      if (!fileName || !fileSize || !fileType) {
-        return res.status(400).json({ error: 'fileName, fileSize, and fileType are required' });
+      if (!fileName || !fileSize || !fileType || !base64Data) {
+        return res.status(400).json({ error: 'fileName, fileSize, fileType, and base64Data are required' });
       }
 
       // Validate file size (max 5MB for profile pictures)
@@ -130,29 +130,16 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: 'Only image files are allowed' });
       }
 
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      
-      // SECURITY: Extract canonical object path in `/objects/...` format
-      // Parse the presigned URL to get only the path component
-      const url = new URL(uploadURL);
-      const objectKey = url.pathname; // This gives us `/objects/uploads/...` format
-      
-      // Generate a secure upload token
-      const uploadToken = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Track this upload token with server-owned canonical key (expires in 1 hour)
-      issuedUploadTokens.set(uploadToken, {
-        userId,
-        objectKey, // Server-generated canonical key - never trust client input
-        uploadURL,
-        expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
-      });
-      
-      res.json({ uploadURL, uploadToken });
+      // Validate base64 format
+      if (!base64Data.startsWith('data:image/')) {
+        return res.status(400).json({ error: 'Invalid base64 image data' });
+      }
+
+      // Return the base64 data URL directly
+      res.json({ imageUrl: base64Data });
     } catch (error: any) {
-      console.error('Error getting upload URL:', error);
-      res.status(500).json({ error: 'Failed to get upload URL' });
+      console.error('Error processing upload:', error);
+      res.status(500).json({ error: 'Failed to process upload' });
     }
   });
 
