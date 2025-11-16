@@ -63,9 +63,36 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Combined authorization: HR staff OR Product Owner can terminate employees
   const canTerminateEmployees = isHRUser || isProductOwner;
 
-  const [formData, setFormData] = useState<Employee | null>(null);
+  // Fallback employee data for when no employee prop is provided
+  const fallbackEmployee: Employee = {
+    id: '124',
+    name: 'Jennifer Martinez',
+    email: 'jennifer.martinez@company.com',
+    phone: '+1 (555) 124-0001',
+    department: 'Customer Service',
+    role: 'Customer Service Representative',
+    status: 'Active' as const,
+    startDate: '2023-06-15',
+    location: 'Phoenix, AZ',
+    manager: 'Customer Service Manager',
+    salary: '$18.50/hr',
+    employeeId: 'EMP124',
+    profileImage: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    emergencyContact: {
+      name: 'Carlos Martinez',
+      relationship: 'Spouse',
+      phone: '+1 (555) 987-6543'
+    },
+    skills: ['Customer Service', 'Problem Solving', 'Communication', 'CRM Software'],
+    certifications: ['Customer Service Excellence', 'Conflict Resolution'],
+    performanceRating: 4.1,
+    ptoBalance: 16,
+    sickLeaveBalance: 4
+  };
 
-  // Initialize and update formData from employee prop
+  const [formData, setFormData] = useState<Employee>(employee || fallbackEmployee);
+
+  // Update formData when employee prop changes
   React.useEffect(() => {
     if (employee) {
       setFormData(employee);
@@ -89,8 +116,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     };
   }, [isOpen, onClose]);
 
-  // Don't render until we have employee data
-  if (!isOpen || !formData) return null;
+  if (!isOpen) return null;
 
   // Check if viewing own profile (compare emails)
   const isViewingOwnProfile = user?.email === formData.email;
