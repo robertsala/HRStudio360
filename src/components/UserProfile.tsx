@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -140,6 +143,98 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   const handleProfilePictureSelect = (pictureUrl: string) => {
     updateProfilePicture(pictureUrl);
     setShowImageUpload(false);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_SIZE) {
+      setUploadError('File size must be less than 5MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Step 1: Get upload URL from backend
+      const uploadResponse = await fetch('/api/objects/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+        }),
+      });
+
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        throw new Error(error.error || 'Failed to get upload URL');
+      }
+
+      const { uploadURL, uploadToken } = await uploadResponse.json();
+
+      // Step 2: Upload file to object storage
+      const uploadResult = await fetch(uploadURL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+      });
+
+      if (!uploadResult.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      // Step 3: Normalize the path and set ACL
+      const normalizeResponse = await fetch('/api/objects/normalize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rawPath: uploadURL.split('?')[0], // Remove query params
+          uploadToken,
+          aclPolicy: {
+            visibility: 'public', // Profile pictures should be public
+          },
+        }),
+      });
+
+      if (!normalizeResponse.ok) {
+        throw new Error('Failed to finalize upload');
+      }
+
+      const { normalizedPath } = await normalizeResponse.json();
+
+      // Step 4: Update profile with new picture URL
+      updateProfilePicture(normalizedPath);
+      setShowImageUpload(false);
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      setUploadError(err.message || 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -329,40 +424,105 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white">Choose Profile Picture</h3>
                   <button
-                    onClick={() => setShowImageUpload(false)}
+                    onClick={() => {
+                      setShowImageUpload(false);
+                      setUploadError(null);
+                    }}
                     className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                    data-testid="button-close-profile-picture-modal"
                   >
                     <X className="h-6 w-6" />
                   </button>
                 </div>
                 
-                <div className="space-y-4">
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">Select a profile picture from the options below:</p>
-                  
-                  <div className="grid grid-cols-3 gap-4">
-                    {mockProfilePictures.map((pictureUrl, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleProfilePictureSelect(pictureUrl)}
-                        className="relative group"
-                      >
-                        <img
-                          src={pictureUrl}
-                          alt={`Profile option ${index + 1}`}
-                          className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 group-hover:border-blue-500 transition-colors"
-                        />
-                        <div className="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all"></div>
-                      </button>
-                    ))}
+                <div className="space-y-6">
+                  {/* Upload Error Message */}
+                  {uploadError && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center">
+                      <X className="h-5 w-5 text-red-600 dark:text-red-400 mr-3 flex-shrink-0" />
+                      <span className="text-red-800 dark:text-red-200 text-sm">{uploadError}</span>
+                    </div>
+                  )}
+
+                  {/* Upload Your Own Picture */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Upload Your Own Picture</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Maximum file size: 5 MB • Accepted formats: JPG, PNG, GIF, WebP
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      className="hidden"
+                      data-testid="input-profile-picture-file"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                      data-testid="button-upload-profile-picture"
+                    >
+                      {uploading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          Choose File to Upload
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">or select from below</span>
+                    </div>
                   </div>
                   
-                  <div className="pt-4 border-t">
+                  {/* Select from Options */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Select a Picture</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      {mockProfilePictures.map((pictureUrl, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleProfilePictureSelect(pictureUrl)}
+                          disabled={uploading}
+                          className="relative group disabled:opacity-50"
+                          data-testid={`button-select-preset-picture-${index}`}
+                        >
+                          <img
+                            src={pictureUrl}
+                            alt={`Profile option ${index + 1}`}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 group-hover:border-blue-500 transition-colors"
+                          />
+                          <div className="absolute inset-0 bg-blue-600 bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all"></div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Remove Picture Option */}
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                     <button
                       onClick={() => {
                         updateProfilePicture('');
                         setShowImageUpload(false);
+                        setUploadError(null);
                       }}
-                      className="w-full text-center py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 transition-colors"
+                      disabled={uploading}
+                      className="w-full text-center py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                      data-testid="button-remove-profile-picture"
                     >
                       Remove current picture (use initials)
                     </button>
