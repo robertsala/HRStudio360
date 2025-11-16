@@ -6123,6 +6123,111 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ========== ACCESS LEVELS ==========
+
+  // GET /api/access-levels - Get all access levels (authenticated users)
+  app.get('/api/access-levels', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const levels = await storage.getAccessLevels();
+      res.json(levels);
+    } catch (error: any) {
+      console.error('Error fetching access levels:', error);
+      res.status(500).json({ error: 'Failed to fetch access levels', details: error.message });
+    }
+  });
+
+  // POST /api/access-levels - Create new access level (HR/Product Owner only)
+  app.post('/api/access-levels', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { name, description, priority } = req.body;
+
+      if (!name || !description) {
+        return res.status(400).json({ error: 'Name and description are required' });
+      }
+
+      // Canonical code generation on server
+      const code = name.toLowerCase().replace(/\s+/g, '_');
+
+      const accessLevel = await storage.createAccessLevel({
+        name,
+        code,
+        description,
+        priority: priority ?? 0
+      });
+
+      res.status(201).json(accessLevel);
+    } catch (error: any) {
+      console.error('Error creating access level:', error);
+      // Handle unique constraint violation
+      if (error.message?.includes('unique') || error.code === '23505') {
+        return res.status(409).json({ error: 'An access level with this name already exists' });
+      }
+      res.status(500).json({ error: 'Failed to create access level', details: error.message });
+    }
+  });
+
+  // PATCH /api/access-levels/:id - Update access level (HR/Product Owner only)
+  app.patch('/api/access-levels/:id', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+      const { name, code, description, priority } = req.body;
+
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (code !== undefined) updates.code = code;
+      if (description !== undefined) updates.description = description;
+      if (priority !== undefined) updates.priority = priority;
+
+      const accessLevel = await storage.updateAccessLevel(id, updates);
+      
+      if (!accessLevel) {
+        return res.status(404).json({ error: 'Access level not found' });
+      }
+
+      res.json(accessLevel);
+    } catch (error: any) {
+      console.error('Error updating access level:', error);
+      res.status(500).json({ error: 'Failed to update access level', details: error.message });
+    }
+  });
+
+  // DELETE /api/access-levels/:id - Delete access level (HR/Product Owner only)
+  app.delete('/api/access-levels/:id', async (req, res) => {
+    try {
+      const userId = await requireHROrProductOwner(req, res);
+      if (!userId) return;
+
+      const { id } = req.params;
+
+      // Check if any employees are assigned this access level
+      const assignments = await storage.getEmployeeAccessAssignments();
+      const hasAssignments = assignments.some(a => a.accessLevelId === id);
+
+      if (hasAssignments) {
+        return res.status(409).json({ 
+          error: 'Cannot delete this access level because employees are assigned to it. Please reassign employees first.' 
+        });
+      }
+
+      await storage.deleteAccessLevel(id);
+      res.json({ message: 'Access level deleted successfully' });
+    } catch (error: any) {
+      console.error('Error deleting access level:', error);
+      res.status(500).json({ error: 'Failed to delete access level', details: error.message });
+    }
+  });
+
   // ========== EMPLOYEE ACCESS ASSIGNMENTS ==========
 
   // GET /api/employee-access/assignments - Get all assignments (HR/Product Owner only)

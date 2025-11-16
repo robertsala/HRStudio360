@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, Shield, Save, Edit, CheckCircle, AlertCircle, UserPlus, Download, Filter, Sparkles, Plus, Settings, Eye } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { mockOrgChartEmployees } from '../../data/mockOrgChartEmployees';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -50,8 +49,6 @@ interface SuggestionSummary {
 const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) => {
   const { user, startImpersonation } = useAuth();
   const [employees, setEmployees] = useState<EmployeeWithAccess[]>([]);
-  const [accessLevels, setAccessLevels] = useState<AccessLevel[]>([]);
-  const [accessLevelsLoaded, setAccessLevelsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('All');
@@ -85,6 +82,12 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     enabled: !!user
   });
 
+  // React Query: Fetch all access levels
+  const { data: accessLevelsData, isLoading: accessLevelsLoading, error: accessLevelsError } = useQuery<AccessLevel[]>({
+    queryKey: ['/api/access-levels'],
+    enabled: !!user
+  });
+
   // React Query: Assign individual access level
   const assignAccessMutation = useMutation({
     mutationFn: async (data: { employeeId: string; accessLevelId: string; source?: string; aiConfidence?: string }) => {
@@ -111,9 +114,18 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     }
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // React Query: Create new access level
+  const createAccessLevelMutation = useMutation({
+    mutationFn: async (data: { name: string; code: string; description: string; priority: number }) => {
+      return await apiRequest('/api/access-levels', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/access-levels'] });
+    }
+  });
 
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -125,20 +137,54 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [onClose]);
 
+  // ONE-TIME MIGRATION: Move localStorage data to database on first mount
+  useEffect(() => {
+    const storedAssignments = localStorage.getItem('employee_access_assignments');
+    if (storedAssignments && user && !assignmentsLoading && assignments) {
+      try {
+        const localAssignments: Record<string, string> = JSON.parse(storedAssignments);
+        const assignmentsToMigrate = Object.entries(localAssignments).map(([employeeId, accessLevelId]) => ({
+          employeeId,
+          accessLevelId,
+          source: 'migration' as const
+        }));
+
+        if (assignmentsToMigrate.length > 0) {
+          bulkAssignMutation.mutateAsync({ assignments: assignmentsToMigrate }).then(() => {
+            localStorage.removeItem('employee_access_assignments');
+            console.log('✅ Migrated', assignmentsToMigrate.length, 'assignments from localStorage to database');
+          });
+        }
+      } catch (migrationError) {
+        console.error('⚠️ Migration failed:', migrationError);
+      }
+    }
+  }, [user, assignmentsLoading, assignments]);
+
   // Recompute employees whenever assignments or access levels change
   useEffect(() => {
-    // Wait for both datasets to be loaded (not just non-empty)
-    if (!accessLevelsLoaded || assignmentsLoading) {
+    // Wait for both datasets to be loaded
+    if (accessLevelsLoading || assignmentsLoading) {
       return; // Still loading
     }
 
-    // Handle assignments error
+    // Handle errors
     if (assignmentsError) {
       console.error('Error loading assignments:', assignmentsError);
       showToast('Failed to load access level assignments', 'error');
       setLoading(false);
       return;
     }
+
+    if (accessLevelsError) {
+      console.error('Error loading access levels:', accessLevelsError);
+      showToast('Failed to load access levels', 'error');
+      setLoading(false);
+      return;
+    }
+
+    // Use the data from React Query directly
+    const levels = accessLevelsData || [];
 
     // Build assignments map (handle empty assignments array)
     const assignmentsMap: Record<string, string> = {};
@@ -151,7 +197,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     // Compute employees with their access levels
     const employeesWithAccess: EmployeeWithAccess[] = mockOrgChartEmployees.map(emp => {
       const assignedLevelId = assignmentsMap[emp.id];
-      const assignedLevel = assignedLevelId ? accessLevels.find(al => al.id === assignedLevelId) : undefined;
+      const assignedLevel = assignedLevelId ? levels.find(al => al.id === assignedLevelId) : undefined;
 
       return {
         id: emp.id,
@@ -166,48 +212,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
 
     setEmployees(employeesWithAccess);
     setLoading(false);
-  }, [assignments, accessLevels, accessLevelsLoaded, assignmentsLoading, assignmentsError]);
-
-  const loadData = async () => {
-    try {
-      const { data: accessLevelsData, error: accessLevelsError} = await supabase
-        .from('access_levels')
-        .select('*')
-        .order('priority', { ascending: false });
-
-      if (accessLevelsError) throw accessLevelsError;
-      setAccessLevels(accessLevelsData || []);
-      setAccessLevelsLoaded(true); // Mark as loaded even if empty
-
-      // ONE-TIME MIGRATION: Move localStorage data to database
-      const storedAssignments = localStorage.getItem('employee_access_assignments');
-      if (storedAssignments && user) {
-        try {
-          const localAssignments: Record<string, string> = JSON.parse(storedAssignments);
-          const assignmentsToMigrate = Object.entries(localAssignments).map(([employeeId, accessLevelId]) => ({
-            employeeId,
-            accessLevelId,
-            source: 'migration' as const
-          }));
-
-          if (assignmentsToMigrate.length > 0) {
-            await bulkAssignMutation.mutateAsync({ assignments: assignmentsToMigrate });
-            localStorage.removeItem('employee_access_assignments'); // Clear after successful migration
-            console.log('✅ Migrated', assignmentsToMigrate.length, 'assignments from localStorage to database');
-            // Assignments will be refetched automatically by mutation's onSuccess
-          }
-        } catch (migrationError) {
-          console.error('⚠️ Migration failed:', migrationError);
-          showToast('Warning: Failed to migrate access level assignments', 'error');
-        }
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      showToast('Failed to load access levels', 'error');
-      setAccessLevelsLoaded(true); // Still mark as loaded to prevent spinner lock
-      setLoading(false);
-    }
-  };
+  }, [assignments, accessLevelsData, accessLevelsLoading, assignmentsLoading, assignmentsError, accessLevelsError]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -282,7 +287,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
         confidence = 'low';
       }
 
-      const accessLevel = accessLevels.find(al => al.name === suggestedLevel);
+      const accessLevel = (accessLevelsData || []).find(al => al.name === suggestedLevel);
       suggestedId = accessLevel?.id || '';
 
       return {
@@ -410,8 +415,6 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
 
       showToast('Access level saved successfully!', 'success');
       setEditingEmployeeId(null);
-
-      await loadData();
     } catch (error: any) {
       console.error('Error saving access level:', error);
       showToast('Failed to save access level', 'error');
@@ -430,20 +433,12 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     }
 
     try {
-      const code = newAccessLevel.name.toLowerCase().replace(/\s+/g, '_');
-
-      const { data, error } = await supabase
-        .from('access_levels')
-        .insert({
-          name: newAccessLevel.name,
-          code: code,
-          description: newAccessLevel.description,
-          priority: newAccessLevel.priority
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      // Code is generated server-side from name
+      await createAccessLevelMutation.mutateAsync({
+        name: newAccessLevel.name,
+        description: newAccessLevel.description,
+        priority: newAccessLevel.priority
+      });
 
       showToast(`Access level "${newAccessLevel.name}" created successfully!`, 'success');
       setShowCreateAccessLevel(false);
@@ -459,8 +454,6 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
         can_view_reports: false,
         can_manage_org_chart: false
       });
-
-      loadData();
     } catch (error) {
       console.error('Error creating access level:', error);
       showToast('Failed to create access level', 'error');
@@ -468,7 +461,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
   };
 
   const departments = ['All', ...Array.from(new Set(employees.map(emp => emp.department)))];
-  const accessLevelOptions = ['All', ...accessLevels.map(al => al.name)];
+  const accessLevelOptions = ['All', ...(accessLevelsData || []).map(al => al.name)];
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -599,7 +592,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
             </div>
           </div>
           <div className="space-y-2 text-sm text-blue-800">
-            {accessLevels.map(level => (
+            {(accessLevelsData || []).map(level => (
               <div key={level.id} className="flex items-start">
                 <span className={`px-2 py-1 rounded text-xs font-medium mr-2 ${getAccessLevelBadgeColor(level.priority)}`}>
                   {level.name}
@@ -961,7 +954,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="">Select Access Level</option>
-                        {accessLevels.map((level) => (
+                        {(accessLevelsData || []).map((level) => (
                           <option key={level.id} value={level.id}>
                             {level.name} - {level.description}
                           </option>

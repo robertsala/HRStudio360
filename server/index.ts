@@ -5,6 +5,7 @@ import { setupVite } from './vite';
 import { createServer } from 'http';
 import { initSentry, setupExpressErrorHandler } from './lib/sentry';
 import { ChatWebSocketServer } from './websocket';
+import { storage } from './storage';
 
 // Initialize Sentry for backend error tracking
 initSentry();
@@ -79,10 +80,13 @@ const wsServer = new ChatWebSocketServer(server, sessionMiddleware);
 app.set('wsServer', wsServer);
 
 // Setup Vite dev server
-setupVite(app, server).then(() => {
+setupVite(app, server).then(async () => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
+  
+  // Bootstrap: Ensure default access levels exist
+  await storage.ensureDefaultAccessLevels();
   
   // Setup Sentry error handler AFTER all routes (v10+ API)
   setupExpressErrorHandler(app);

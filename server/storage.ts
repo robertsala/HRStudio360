@@ -42,6 +42,7 @@ import type {
   TimeBasedPermissionGrant, InsertTimeBasedPermissionGrant,
   PermissionRequest, InsertPermissionRequest,
   PermissionChangeAudit, InsertPermissionChangeAudit,
+  AccessLevel, InsertAccessLevel,
   EmployeeAccessAssignment, InsertEmployeeAccessAssignment
 } from '../shared/schema.js';
 import { 
@@ -59,7 +60,7 @@ import {
   timesheetEntries, timesheetApprovals, payrollLocks,
   permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit,
   permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit,
-  employeeAccessAssignments
+  accessLevels, employeeAccessAssignments
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -381,6 +382,13 @@ export interface IStorage {
   // Bulk Operations
   bulkAssignPermissions(role: string, permissionIds: string[], assignedBy: string, reason?: string): Promise<void>;
   bulkRevokePermissions(role: string, permissionIds: string[], revokedBy: string, reason?: string): Promise<void>;
+
+  // Access Levels
+  getAccessLevels(): Promise<import('../shared/schema.js').AccessLevel[]>;
+  getAccessLevelById(id: string): Promise<import('../shared/schema.js').AccessLevel | undefined>;
+  createAccessLevel(accessLevel: import('../shared/schema.js').InsertAccessLevel): Promise<import('../shared/schema.js').AccessLevel>;
+  updateAccessLevel(id: string, accessLevel: Partial<import('../shared/schema.js').InsertAccessLevel>): Promise<import('../shared/schema.js').AccessLevel | undefined>;
+  deleteAccessLevel(id: string): Promise<void>;
 
   // Employee Access Assignments
   getEmployeeAccessAssignments(): Promise<import('../shared/schema.js').EmployeeAccessAssignment[]>;
@@ -2672,6 +2680,34 @@ export class DbStorage implements IStorage {
     });
   }
 
+  // Access Levels
+  async getAccessLevels(): Promise<AccessLevel[]> {
+    return db.select().from(accessLevels).orderBy(desc(accessLevels.priority));
+  }
+
+  async getAccessLevelById(id: string): Promise<AccessLevel | undefined> {
+    const result = await db.select().from(accessLevels).where(eq(accessLevels.id, id));
+    return result[0];
+  }
+
+  async createAccessLevel(accessLevel: InsertAccessLevel): Promise<AccessLevel> {
+    const result = await db.insert(accessLevels).values(accessLevel).returning();
+    return result[0];
+  }
+
+  async updateAccessLevel(id: string, accessLevel: Partial<InsertAccessLevel>): Promise<AccessLevel | undefined> {
+    const result = await db
+      .update(accessLevels)
+      .set({ ...accessLevel, updatedAt: new Date() })
+      .where(eq(accessLevels.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAccessLevel(id: string): Promise<void> {
+    await db.delete(accessLevels).where(eq(accessLevels.id, id));
+  }
+
   // Employee Access Assignments
   async getEmployeeAccessAssignments(): Promise<EmployeeAccessAssignment[]> {
     return db.select().from(employeeAccessAssignments);
@@ -2734,6 +2770,69 @@ export class DbStorage implements IStorage {
         }
       }
     });
+  }
+
+  // Bootstrap Helper: Ensure default access levels exist
+  async ensureDefaultAccessLevels(): Promise<void> {
+    const existing = await this.getAccessLevels();
+    
+    if (existing.length > 0) {
+      console.log(`✅ Access levels already seeded (${existing.length} levels exist)`);
+      return;
+    }
+
+    console.log('🌱 Seeding default access levels...');
+
+    const defaultAccessLevels: InsertAccessLevel[] = [
+      {
+        name: 'CEO',
+        code: 'ceo',
+        description: 'Chief Executive Officer - Complete organizational access',
+        priority: 100
+      },
+      {
+        name: 'C-Suite Executive',
+        code: 'c_suite_exec',
+        description: 'C-level executive - Strategic access to all departments',
+        priority: 90
+      },
+      {
+        name: 'Department Head',
+        code: 'dept_head',
+        description: 'VP/Director - Full access to department data and team management',
+        priority: 70
+      },
+      {
+        name: 'Manager',
+        code: 'manager',
+        description: 'Manager - Access to direct reports and team data',
+        priority: 50
+      },
+      {
+        name: 'HR Administrator',
+        code: 'hr_admin',
+        description: 'HR Administrator - Full HR system access',
+        priority: 80
+      },
+      {
+        name: 'HR Staff',
+        code: 'hr_staff',
+        description: 'HR Staff - Access to employee data and compensation',
+        priority: 60
+      },
+      {
+        name: 'Employee',
+        code: 'employee',
+        description: 'Standard employee - Basic access to own data',
+        priority: 10
+      }
+    ];
+
+    for (const level of defaultAccessLevels) {
+      await this.createAccessLevel(level);
+    }
+
+    console.log(`✅ Seeded ${defaultAccessLevels.length} default access levels`);
   }
 }
 

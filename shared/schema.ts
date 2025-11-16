@@ -1688,11 +1688,22 @@ export const permissionChangeAudit = pgTable('permission_change_audit', {
   changedAt: timestamp('changed_at').defaultNow()
 });
 
+// Access Levels - Defines available access levels for employees
+export const accessLevels = pgTable('access_levels', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull().unique(), // Display name (e.g., "CEO", "C-Suite Executive")
+  code: text('code').notNull().unique(), // Machine-readable code (e.g., "ceo", "c_suite_exec")
+  description: text('description').notNull(),
+  priority: integer('priority').notNull().default(0), // Higher = more access
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
 // Employee Access Assignments - Maps individual employees to access levels
 export const employeeAccessAssignments = pgTable('employee_access_assignments', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   employeeId: text('employee_id').notNull(), // Employee ID from mockOrgChartEmployees
-  accessLevelId: text('access_level_id').notNull(), // References Supabase access_levels.id
+  accessLevelId: uuid('access_level_id').references(() => accessLevels.id).notNull(),
   assignedBy: uuid('assigned_by').references(() => profiles.id).notNull(),
   assignedAt: timestamp('assigned_at').defaultNow(),
   source: text('source').default('manual'), // 'manual' or 'ai_suggestion'
@@ -1823,6 +1834,14 @@ export const insertPermissionChangeAuditSchema = createInsertSchema(permissionCh
 });
 export type InsertPermissionChangeAudit = z.infer<typeof insertPermissionChangeAuditSchema>;
 export type PermissionChangeAudit = typeof permissionChangeAudit.$inferSelect;
+
+export const insertAccessLevelSchema = createInsertSchema(accessLevels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertAccessLevel = z.infer<typeof insertAccessLevelSchema>;
+export type AccessLevel = typeof accessLevels.$inferSelect;
 
 export const insertEmployeeAccessAssignmentSchema = createInsertSchema(employeeAccessAssignments).omit({
   id: true,
