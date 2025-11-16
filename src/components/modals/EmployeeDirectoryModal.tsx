@@ -33,7 +33,9 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  
+  // Derive modal visibility from selectedEmployee to avoid race condition
+  const showProfileModal = selectedEmployee !== null;
   const { getPresenceStatus } = useUserPresence(employees.map(e => e.id));
 
   // Fetch employees from database
@@ -93,7 +95,7 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (showProfileModal) {
-          setShowProfileModal(false);
+          setSelectedEmployee(null);
         } else {
           onClose();
         }
@@ -316,7 +318,6 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
                     className="bg-white dark:bg-gray-800 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg hover:border-blue-300 transition-all duration-200 cursor-pointer transform hover:-translate-y-1 relative overflow-hidden"
                     onClick={() => {
                       setSelectedEmployee(employee);
-                      setShowProfileModal(true);
                     }}
                   >
                     {badgeInfo && badgeInfo.isMilestone && (
@@ -420,7 +421,6 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
                       className="bg-white dark:bg-gray-800 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition-all duration-200 cursor-pointer relative"
                       onClick={() => {
                         setSelectedEmployee(employee);
-                        setShowProfileModal(true);
                       }}
                     >
                       <div className="flex items-center justify-between">
@@ -514,7 +514,6 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
             key={selectedEmployee.id}
             isOpen={showProfileModal}
             onClose={() => {
-              setShowProfileModal(false);
               setSelectedEmployee(null);
             }}
             employee={{
