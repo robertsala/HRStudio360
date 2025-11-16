@@ -89,6 +89,13 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     sickLeaveBalance: 4
   });
 
+  // Update formData when employee prop changes
+  React.useEffect(() => {
+    if (employee) {
+      setFormData(employee);
+    }
+  }, [employee]);
+
   // Check if viewing own profile (compare emails)
   const isViewingOwnProfile = user?.email === formData.email;
 
@@ -347,10 +354,10 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                 )}
                 <button
                   onClick={onClose}
-                  className="text-blue-100 hover:text-white transition-colors flex items-center space-x-2"
+                  className="text-blue-100 hover:text-white transition-colors"
                   title="Press Esc to close"
+                  data-testid="button-close-modal"
                 >
-                  <span className="text-sm">Press Esc</span>
                   <X className="h-6 w-6" />
                 </button>
               </div>
