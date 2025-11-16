@@ -90,14 +90,14 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     sickLeaveBalance: 4
   };
 
-  const [formData, setFormData] = useState<Employee>(employee || fallbackEmployee);
+  const [formData, setFormData] = useState<Employee>(fallbackEmployee);
 
-  // Update formData when employee prop changes
+  // Update formData when modal opens or employee prop changes
   React.useEffect(() => {
-    if (employee) {
-      setFormData(employee);
+    if (isOpen) {
+      setFormData(employee || fallbackEmployee);
     }
-  }, [employee]);
+  }, [isOpen, employee]);
 
   // Handle ESC key press
   React.useEffect(() => {
