@@ -263,9 +263,9 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
     enabled: activeTab === 'taxConfig' && taxConfigSubTab === 'aiSuggestions'
   });
 
-  // Employees Query (for AI suggestion generation)
-  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<Employee[]>({
-    queryKey: ['/api/employees'],
+  // Employees Query (for AI suggestion generation) - using directory to get profile data
+  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<any[]>({
+    queryKey: ['/api/employees/directory'],
     enabled: activeTab === 'taxConfig' && taxConfigSubTab === 'aiSuggestions'
   });
 
@@ -1468,7 +1468,7 @@ const SystemSettingsModal: React.FC<SystemSettingsModalProps> = ({ onClose, init
                             <option value="">Select an employee...</option>
                             {employees.map((emp) => (
                               <option key={emp.id} value={emp.id}>
-                                {emp.firstName} {emp.lastName} - {emp.state || 'No state'}
+                                {emp.profile?.firstName || 'Unknown'} {emp.profile?.lastName || ''} - {emp.state || 'No state'}
                               </option>
                             ))}
                           </select>
