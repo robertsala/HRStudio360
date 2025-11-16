@@ -49,6 +49,9 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Paycheck Fun Facts**: Creative purchase comparison feature with a smart rotation system.
 -   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
+-   **Profile Picture Management**: Dual upload system for profile pictures:
+    -   **User Self-Service**: Employees can upload their own profile pictures through UserProfile modal with 5MB limit validation, image type checking, and progress indicators.
+    -   **HR Administrative Upload**: HR staff can upload profile pictures for any employee through ComprehensiveEmployeeProfileModal, supporting Security Department workflow where onsite photos are emailed to HR for upload. Both systems use existing object storage service with public ACL for display.
 
 ## External Dependencies
 
