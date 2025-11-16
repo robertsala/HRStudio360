@@ -41,7 +41,8 @@ import type {
   RoleHierarchy, InsertRoleHierarchy,
   TimeBasedPermissionGrant, InsertTimeBasedPermissionGrant,
   PermissionRequest, InsertPermissionRequest,
-  PermissionChangeAudit, InsertPermissionChangeAudit
+  PermissionChangeAudit, InsertPermissionChangeAudit,
+  EmployeeAccessAssignment, InsertEmployeeAccessAssignment
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -57,7 +58,8 @@ import {
   taxJurisdictions, reciprocalAgreements, employeeTaxConfiguration, autoFixAuditLog,
   timesheetEntries, timesheetApprovals, payrollLocks,
   permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit,
-  permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit
+  permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit,
+  employeeAccessAssignments
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -379,6 +381,13 @@ export interface IStorage {
   // Bulk Operations
   bulkAssignPermissions(role: string, permissionIds: string[], assignedBy: string, reason?: string): Promise<void>;
   bulkRevokePermissions(role: string, permissionIds: string[], revokedBy: string, reason?: string): Promise<void>;
+
+  // Employee Access Assignments
+  getEmployeeAccessAssignments(): Promise<import('../shared/schema.js').EmployeeAccessAssignment[]>;
+  getEmployeeAccessAssignmentByEmployeeId(employeeId: string): Promise<import('../shared/schema.js').EmployeeAccessAssignment | undefined>;
+  assignEmployeeAccessLevel(assignment: import('../shared/schema.js').InsertEmployeeAccessAssignment): Promise<import('../shared/schema.js').EmployeeAccessAssignment>;
+  revokeEmployeeAccessLevel(employeeId: string): Promise<void>;
+  bulkAssignEmployeeAccessLevels(assignments: import('../shared/schema.js').InsertEmployeeAccessAssignment[]): Promise<void>;
 }
 
 // Database storage implementation
@@ -2660,6 +2669,70 @@ export class DbStorage implements IStorage {
         reason: reason || 'Bulk permission revocation',
         metadata: { bulk: true, count: permissionIds.length }
       });
+    });
+  }
+
+  // Employee Access Assignments
+  async getEmployeeAccessAssignments(): Promise<EmployeeAccessAssignment[]> {
+    return db.select().from(employeeAccessAssignments);
+  }
+
+  async getEmployeeAccessAssignmentByEmployeeId(employeeId: string): Promise<EmployeeAccessAssignment | undefined> {
+    const result = await db
+      .select()
+      .from(employeeAccessAssignments)
+      .where(eq(employeeAccessAssignments.employeeId, employeeId));
+    return result[0];
+  }
+
+  async assignEmployeeAccessLevel(assignment: InsertEmployeeAccessAssignment): Promise<EmployeeAccessAssignment> {
+    const existing = await this.getEmployeeAccessAssignmentByEmployeeId(assignment.employeeId);
+    
+    if (existing) {
+      const result = await db
+        .update(employeeAccessAssignments)
+        .set({
+          ...assignment,
+          updatedAt: new Date()
+        })
+        .where(eq(employeeAccessAssignments.employeeId, assignment.employeeId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db
+        .insert(employeeAccessAssignments)
+        .values(assignment)
+        .returning();
+      return result[0];
+    }
+  }
+
+  async revokeEmployeeAccessLevel(employeeId: string): Promise<void> {
+    await db
+      .delete(employeeAccessAssignments)
+      .where(eq(employeeAccessAssignments.employeeId, employeeId));
+  }
+
+  async bulkAssignEmployeeAccessLevels(assignments: InsertEmployeeAccessAssignment[]): Promise<void> {
+    return await db.transaction(async (tx) => {
+      for (const assignment of assignments) {
+        const existing = await tx
+          .select()
+          .from(employeeAccessAssignments)
+          .where(eq(employeeAccessAssignments.employeeId, assignment.employeeId));
+
+        if (existing.length > 0) {
+          await tx
+            .update(employeeAccessAssignments)
+            .set({
+              ...assignment,
+              updatedAt: new Date()
+            })
+            .where(eq(employeeAccessAssignments.employeeId, assignment.employeeId));
+        } else {
+          await tx.insert(employeeAccessAssignments).values(assignment);
+        }
+      }
     });
   }
 }
