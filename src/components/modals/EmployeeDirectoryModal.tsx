@@ -511,6 +511,7 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
         {/* Comprehensive Employee Profile Modal */}
         {selectedEmployee && showProfileModal && (
           <ComprehensiveEmployeeProfileModal
+            key={selectedEmployee.id}
             isOpen={showProfileModal}
             onClose={() => {
               setShowProfileModal(false);
