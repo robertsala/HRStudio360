@@ -572,16 +572,27 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
   const formatMessageTime = (timestamp: string): string => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.floor((today.getTime() - messageDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const timeStr = date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-
-    return date.toLocaleDateString();
+    if (diffDays === 0) {
+      return timeStr;
+    } else if (diffDays === 1) {
+      return `Yesterday at ${timeStr}`;
+    } else if (diffDays < 7) {
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      return `${dayName} at ${timeStr}`;
+    } else {
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return `${dateStr} at ${timeStr}`;
+    }
   };
 
   const filteredChannels = channels.filter(channel =>
