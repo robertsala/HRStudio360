@@ -65,3 +65,24 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **UI**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`.
 -   **Forms**: `react-hook-form`, `@hookform/resolvers`, `zod`.
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
+## Recent Changes
+
+### November 17, 2025 - Navigation & UX Improvements
+
+**My Profile Comprehensive Modal Integration:**
+-   "My Profile" sidebar link now opens ComprehensiveEmployeeProfileModal with all tabs (Overview, Personal Info, Employment, Pay & Benefits, Schedule & Hours, Time Tracking, Performance & Development, Documents)
+-   Replaces basic profile page with full-featured comprehensive modal for one-click access to complete employee profile
+-   Created openMyProfile function in Dashboard that fetches current user's employee data via API and opens modal
+-   Intelligent fallback: opens comprehensive modal on dashboard, routes to /profile page when Dashboard isn't mounted
+-   Full TypeScript type safety with proper forwardRef signature updates
+
+**Chat Auto-Scroll Fix:**
+-   Fixed Enterprise Chat to automatically scroll to bottom (newest messages) when reopening with existing conversation history
+-   Added useEffect hook keyed by isOpen that triggers scroll after DOM updates using requestAnimationFrame
+-   Previously oldest messages appeared at top when reopening - now always shows newest messages first
+
+**Employee Directory Mock Data Restoration:**
+-   Restored 181 mock employees to Employee Directory for comprehensive testing
+-   Merged mock employees from src/data/mockEmployees.ts with real database employees
+-   Prefixed mock IDs with "mock-" to avoid conflicts
+-   Directory now displays full roster (real + mock) for robust functionality showcase
