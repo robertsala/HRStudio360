@@ -311,6 +311,10 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
     try {
       const channelMessages = await chatService.getMessages(channel.id);
       setMessages(channelMessages);
+      // Scroll to bottom after messages load
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
       await chatService.markAsRead(channel.id);
       await loadChannels();
     } catch (error) {

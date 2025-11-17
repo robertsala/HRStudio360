@@ -27,7 +27,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     location: '',
     department: '',
     role: '',
-    startDate: ''
+    startDate: '',
+    manager: ''
   });
 
   // Password change state
@@ -62,6 +63,25 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
         // Combine firstName and lastName for the name field
         const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
         
+        // Fetch employee data to get manager info
+        let managerName = '';
+        try {
+          const response = await fetch(`/api/employees/user/${user.id}`);
+          if (response.ok) {
+            const employeeData = await response.json();
+            if (employeeData && employeeData.managerId) {
+              // Fetch manager profile
+              const managerResponse = await fetch(`/api/profiles/${employeeData.managerId}`);
+              if (managerResponse.ok) {
+                const managerProfile = await managerResponse.json();
+                managerName = `${managerProfile.firstName || ''} ${managerProfile.lastName || ''}`.trim();
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error loading manager info:', err);
+        }
+        
         setFormData({
           name: fullName || user.name || '',
           email: profile.email || user.email || '',
@@ -69,7 +89,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
           location: `${profile.city || ''} ${profile.state || ''}`.trim(),
           department: profile.department || '',
           role: profile.role || '',
-          startDate: profile.hireDate || ''
+          startDate: profile.hireDate || '',
+          manager: managerName
         });
       }
     } catch (err: any) {
@@ -636,6 +657,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                         <p className="text-gray-900 dark:text-white">{new Date(formData.startDate).toLocaleDateString()}</p>
                       )}
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Manager</label>
+                    <p className="text-gray-900 dark:text-white">{formData.manager || 'Not assigned'}</p>
                   </div>
                 </div>
               </div>

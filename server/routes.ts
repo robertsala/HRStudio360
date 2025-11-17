@@ -353,6 +353,20 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get employee by userId (instead of employee ID)
+  app.get('/api/employees/user/:userId', async (req, res) => {
+    try {
+      const employees = await storage.getEmployees();
+      const employee = employees.find(e => e.userId === req.params.userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+      res.json(employee);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/employees', async (req, res) => {
     try {
       const employees = await storage.getEmployees();

@@ -9,8 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { DashboardStats } from '../../shared/schema';
 import { useDashboardWidgets } from '../hooks/useDashboardWidgets';
 import Calendar from './Calendar';
-import { mockEmployees } from './modals/EmployeeListModal';
-import EmployeeListModal from './modals/EmployeeListModal';
+import EmployeeDirectoryModal from './modals/EmployeeDirectoryModal';
 import ReviewsModal from './modals/ReviewsModal';
 import EventsModal from './modals/EventsModal';
 import NotificationsModal from './modals/NotificationsModal';
@@ -70,7 +69,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   const [systemSettingsTab, setSystemSettingsTab] = React.useState<string | undefined>(undefined);
 
   // Employee state management
-  const [employees, setEmployees] = React.useState(mockEmployees.slice(0, 247));
   const [activeEmployee, setActiveEmployee] = React.useState<any | null>(null);
 
   // Announcements state (deprecated - for backwards compatibility only)
@@ -548,41 +546,9 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
     switch (activeContent) {
       case 'employees':
         return (
-          <EmployeeListModal
-            employees={employees}
-            onViewProfile={(employeeId) => {
-              const employee = employees.find(e => e.id === employeeId);
-              if (employee) {
-                // Transform employee to match ComprehensiveEmployeeProfileModal's expected structure
-                const transformedEmployee = {
-                  ...employee,
-                  salary: employee.annualSalary ? `$${employee.annualSalary.toLocaleString()}` : employee.hourlyRate ? `$${employee.hourlyRate}/hr` : 'N/A',
-                  emergencyContact: {
-                    name: 'Emergency Contact',
-                    relationship: 'Family',
-                    phone: '(555) 000-0000'
-                  },
-                  skills: [],
-                  certifications: []
-                };
-                setActiveEmployee(transformedEmployee);
-              } else {
-                setActiveEmployee(null);
-              }
-              openModal('comprehensiveProfile');
-            }}
-            userRole={user?.role || 'employee'}
+          <EmployeeDirectoryModal
+            isOpen={true}
             onClose={closeInlineContent}
-            initialFilter={
-              modalFilter.type !== 'all'
-                ? {
-                    type: modalFilter.type,
-                    managerId: user?.name,
-                    department: userProfile?.department,
-                    location: employees.find(e => e.email === user?.email)?.location,
-                  }
-                : undefined
-            }
           />
         );
       case 'reviews':
