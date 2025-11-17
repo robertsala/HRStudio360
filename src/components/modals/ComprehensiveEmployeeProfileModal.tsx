@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
 import { performanceReviewService, CompensationHistory } from '../../utils/performanceReviewService';
-import { useToast } from '../../hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '../../lib/queryClient';
 
 interface Employee {
