@@ -249,19 +249,10 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
     };
   };
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={handleOverlayClick}
-    >
-      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl max-w-[95vw] w-full max-h-[95vh] overflow-hidden resize-both min-w-[300px] min-h-[300px] shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-emerald-600 text-white">
+    <div className="bg-white dark:bg-gray-800 rounded-lg w-full min-h-screen overflow-auto">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-emerald-600 text-white sticky top-0 z-10">
           <div className="flex items-center">
             <Users className="h-8 w-8 mr-3" />
             <div>
