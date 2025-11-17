@@ -7,6 +7,16 @@ import NewChannelModal from './NewChannelModal';
 import EmojiPicker from '../EmojiPicker';
 import CallModal from './CallModal';
 import { callingService, CallSession } from '../../utils/callingService';
+import '@chatscope/chat-ui-kit-styles/dist/default/styles.min.css';
+import {
+  MainContainer,
+  ChatContainer,
+  MessageList,
+  Message as ChatMessage,
+  MessageInput,
+  Avatar,
+  TypingIndicator
+} from '@chatscope/chat-ui-kit-react';
 
 interface EnterpriseChatModalProps {
   isOpen: boolean;
@@ -372,10 +382,10 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessageInput(e.target.value);
+  const handleInputChange = (value: string) => {
+    setMessageInput(value);
 
-    if (selectedChannel && e.target.value.trim()) {
+    if (selectedChannel && value.trim()) {
       chatService.setTyping(selectedChannel.id, true);
 
       if (typingTimeoutRef.current) {
@@ -387,13 +397,6 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
       }, 3000);
     } else if (selectedChannel) {
       chatService.setTyping(selectedChannel.id, false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
     }
   };
 
@@ -805,8 +808,8 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {messages.length === 0 && selectedChannel.channel_type === 'ai_assistant' && (
+              <div className="flex-1" style={{ position: 'relative', height: 'calc(100vh - 300px)' }}>
+                {messages.length === 0 && selectedChannel.channel_type === 'ai_assistant' ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="max-w-2xl w-full space-y-6 p-6">
                       <div className="text-center space-y-4">
@@ -907,104 +910,100 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                       </div>
                     </div>
                   </div>
-                )}
+                ) : (
+                  <MainContainer>
+                    <ChatContainer>
+                      <MessageList
+                        typingIndicator={typingUsers.length > 0 ? <TypingIndicator content="Someone is typing" /> : null}
+                      >
+                        {messages.map((message, index) => {
+                          const isOwn = message.sender_id === user?.id;
+                          const showAvatar = index === 0 || messages[index - 1].sender_id !== message.sender_id;
+                          const senderName = message.sender 
+                            ? `${message.sender.first_name} ${message.sender.last_name}` 
+                            : 'Unknown';
 
-                {messages.map((message, index) => {
-                  const isOwn = message.sender_id === user?.id;
-                  const showAvatar = index === 0 || messages[index - 1].sender_id !== message.sender_id;
+                          // Render file messages with custom content
+                          if (message.message_type === 'file' && message.file_url) {
+                            const isImage = message.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                            
+                            return (
+                              <ChatMessage
+                                key={message.id}
+                                model={{
+                                  message: message.decrypted_content || 'Shared a file',
+                                  sentTime: formatMessageTime(message.created_at),
+                                  sender: senderName,
+                                  direction: isOwn ? 'outgoing' : 'incoming',
+                                  position: 'normal',
+                                  type: 'custom'
+                                }}
+                              >
+                                {!isOwn && showAvatar && message.sender && (
+                                  <Avatar
+                                    name={senderName}
+                                    src={message.sender.profile_picture || undefined}
+                                  />
+                                )}
+                                <ChatMessage.CustomContent>
+                                  <div className="space-y-2">
+                                    {isImage ? (
+                                      <img
+                                        src={message.file_url}
+                                        alt={message.file_name || 'Image'}
+                                        className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                        onClick={() => window.open(message.file_url!, '_blank')}
+                                      />
+                                    ) : (
+                                      <a
+                                        href={message.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center space-x-2 hover:underline"
+                                      >
+                                        <Paperclip className="h-4 w-4" />
+                                        <span className="text-sm">{message.file_name}</span>
+                                        {message.file_size && (
+                                          <span className="text-xs opacity-75">
+                                            ({(message.file_size / 1024 / 1024).toFixed(2)} MB)
+                                          </span>
+                                        )}
+                                      </a>
+                                    )}
+                                    {message.decrypted_content && (
+                                      <p className="text-sm">{message.decrypted_content}</p>
+                                    )}
+                                  </div>
+                                </ChatMessage.CustomContent>
+                              </ChatMessage>
+                            );
+                          }
 
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
-                        !showAvatar && !isOwn ? 'ml-12' : ''
-                      }`}
-                    >
-                      {!isOwn && showAvatar && message.sender && (
-                        <div className="mr-3 flex-shrink-0">
-                          {getUserAvatar({
-                            user_id: message.sender.id,
-                            user: message.sender
-                          } as ChannelMember)}
-                        </div>
-                      )}
-
-                      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-lg`}>
-                        {showAvatar && !isOwn && message.sender && (
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                            {message.sender.first_name} {message.sender.last_name}
-                          </span>
-                        )}
-
-                        <div
-                          className={`px-4 py-2 rounded-2xl ${
-                            isOwn
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-                          } ${message.message_type === 'system' ? 'italic' : ''}`}
-                        >
-                          {message.message_type === 'file' && message.file_url ? (
-                            <div className="space-y-2">
-                              {message.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                                <img
-                                  src={message.file_url}
-                                  alt={message.file_name}
-                                  className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => window.open(message.file_url!, '_blank')}
+                          // Regular text messages
+                          return (
+                            <ChatMessage
+                              key={message.id}
+                              model={{
+                                message: message.decrypted_content || 'Unable to load message',
+                                sentTime: formatMessageTime(message.created_at),
+                                sender: senderName,
+                                direction: isOwn ? 'outgoing' : 'incoming',
+                                position: 'normal'
+                              }}
+                            >
+                              {!isOwn && showAvatar && message.sender && (
+                                <Avatar
+                                  name={senderName}
+                                  src={message.sender.profile_picture || undefined}
                                 />
-                              ) : (
-                                <a
-                                  href={message.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center space-x-2 hover:underline"
-                                >
-                                  <Paperclip className="h-4 w-4" />
-                                  <span className="text-sm">{message.file_name}</span>
-                                  {message.file_size && (
-                                    <span className="text-xs opacity-75">
-                                      ({(message.file_size / 1024 / 1024).toFixed(2)} MB)
-                                    </span>
-                                  )}
-                                </a>
                               )}
-                              <p className="text-sm">
-                                {message.decrypted_content || 'Shared a file'}
-                              </p>
-                            </div>
-                          ) : (
-                            message.decrypted_content || (
-                              <span className="text-gray-500 dark:text-gray-400 italic">
-                                Unable to load message
-                              </span>
-                            )
-                          )}
-                        </div>
-
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatMessageTime(message.created_at)}
-                          </span>
-                          {isOwn && (
-                            <CheckCheck className="h-3 w-3 text-blue-600" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {typingUsers.length > 0 && (
-                  <div className="flex items-center space-x-2 text-gray-500 dark:text-gray-400 text-sm">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                    <span>Someone is typing...</span>
-                  </div>
+                            </ChatMessage>
+                          );
+                        })}
+                      </MessageList>
+                    </ChatContainer>
+                  </MainContainer>
                 )}
-
                 <div ref={messagesEndRef} />
               </div>
 
@@ -1040,20 +1039,20 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingFile}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Attach file"
                   >
                     <Paperclip className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </button>
 
-                  <div className="flex-1 relative">
-                    <textarea
-                      ref={messageInputRef}
+                  <div className="flex-1">
+                    <MessageInput
+                      placeholder="Type a message..."
                       value={messageInput}
                       onChange={handleInputChange}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type a message..."
-                      rows={1}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                      style={{ minHeight: '48px', maxHeight: '120px' }}
+                      onSend={handleSendMessage}
+                      disabled={isSending}
+                      attachButton={false}
+                      sendDisabled={!messageInput.trim() || isSending}
                     />
                   </div>
 
@@ -1061,6 +1060,7 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                     <button
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                       className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      title="Add emoji"
                     >
                       <Smile className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                     </button>
@@ -1068,31 +1068,12 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                       isOpen={showEmojiPicker}
                       onClose={() => setShowEmojiPicker(false)}
                       onEmojiSelect={(emoji) => {
-                        const textarea = messageInputRef.current;
-                        if (textarea) {
-                          const start = textarea.selectionStart;
-                          const end = textarea.selectionEnd;
-                          const newValue = messageInput.slice(0, start) + emoji + messageInput.slice(end);
-                          setMessageInput(newValue);
-                          setTimeout(() => {
-                            textarea.focus();
-                            textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-                          }, 0);
-                        } else {
-                          setMessageInput(messageInput + emoji);
-                        }
+                        setMessageInput(messageInput + emoji);
+                        setShowEmojiPicker(false);
                       }}
                       isDarkMode={document.documentElement.classList.contains('dark')}
                     />
                   </div>
-
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || isSending}
-                    className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Send className="h-5 w-5" />
-                  </button>
                 </div>
               </div>
             </div>
