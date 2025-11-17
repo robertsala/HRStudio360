@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { storage } from './storage.js';
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -43,13 +44,20 @@ You can help employees with:
    - Troubleshooting common issues
    - Best practices
 
+5. **Personalized Employee Information** (when employee context is available)
+   - Answer specific questions about the user's PTO balance, manager, department, job title
+   - Provide timesheet summaries and hours worked
+   - Show benefits enrollment status
+   - Give personalized answers based on the employee's actual data
+
 IMPORTANT GUIDELINES:
+- **WHEN EMPLOYEE CONTEXT IS PROVIDED:** Use the specific data to give personalized, accurate answers. For example, if asked "What's my PTO balance?", respond with their actual numbers from the employee context.
+- **WHEN EMPLOYEE CONTEXT IS NOT AVAILABLE:** Politely explain that you don't have access to their personal data and suggest they check the relevant section of HRStudio360 or contact HR.
 - If you don't know something specific to the company, acknowledge it and suggest contacting HR directly
 - For sensitive topics (disciplinary actions, terminations, legal matters), recommend speaking with HR
 - Always maintain employee privacy and confidentiality
 - Provide step-by-step instructions when explaining processes
 - Use examples to clarify complex concepts
-- If asked about personal employee data you don't have access to, explain that you can only provide general guidance
 
 RESPONSE STYLE:
 - Start with a friendly acknowledgment
@@ -65,13 +73,205 @@ interface ConversationMessage {
   content: string;
 }
 
+interface EmployeeContext {
+  employee?: {
+    id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    department: string | null;
+    jobTitle: string | null;
+    manager?: {
+      name: string;
+      email: string;
+    } | null;
+  };
+  leaveBalance?: {
+    vacationDays: number;
+    sickDays: number;
+    personalDays: number;
+    year: number;
+  };
+  timesheetSummary?: {
+    currentWeekHours: number;
+    lastApprovalDate: string | null;
+  };
+  benefits?: string[];
+}
+
+async function getEmployeeContext(userId: string): Promise<EmployeeContext> {
+  try {
+    const profile = await storage.getProfileById(userId);
+    if (!profile) {
+      return {};
+    }
+
+    const allEmployees = await storage.getEmployees();
+    const employee = allEmployees.find(emp => emp.userId === userId);
+    
+    if (!employee) {
+      return {};
+    }
+
+    const context: EmployeeContext = {
+      employee: {
+        id: employee.id,
+        employeeId: employee.employeeId,
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        email: profile.email,
+        department: profile.department,
+        jobTitle: profile.role,
+      }
+    };
+
+    if (employee.managerId) {
+      const allEmployeesWithManager = await storage.getEmployees();
+      const managerEmployee = allEmployeesWithManager.find(emp => emp.id === employee.managerId);
+      if (managerEmployee && managerEmployee.userId) {
+        const managerProfile = await storage.getProfileById(managerEmployee.userId);
+        if (managerProfile) {
+          context.employee!.manager = {
+            name: `${managerProfile.firstName || ''} ${managerProfile.lastName || ''}`.trim(),
+            email: managerProfile.email
+          };
+        }
+      }
+    }
+
+    const leaveBalance = await storage.getLeaveBalanceByEmployeeId(employee.id);
+    if (leaveBalance) {
+      context.leaveBalance = {
+        vacationDays: parseFloat(leaveBalance.vacationDays as string),
+        sickDays: parseFloat(leaveBalance.sickDays as string),
+        personalDays: parseFloat(leaveBalance.personalDays as string),
+        year: leaveBalance.year
+      };
+    }
+
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+    
+    try {
+      const timesheetEntries = await storage.getTimesheetEntries(
+        formatDate(startOfWeek),
+        formatDate(endOfWeek)
+      );
+      
+      const employeeTimesheets = timesheetEntries.filter(
+        entry => entry.employeeId === employee.id
+      );
+
+      if (employeeTimesheets.length > 0) {
+        const currentWeekHours = employeeTimesheets.reduce((total, entry) => {
+          const regular = parseFloat(entry.regularHours as string) || 0;
+          const overtime = parseFloat(entry.overtimeHours as string) || 0;
+          return total + regular + overtime;
+        }, 0);
+
+        const approvedTimesheets = employeeTimesheets.filter(
+          entry => entry.status === 'Approved'
+        );
+        const lastApproved = approvedTimesheets.length > 0 
+          ? approvedTimesheets[approvedTimesheets.length - 1]
+          : null;
+
+        context.timesheetSummary = {
+          currentWeekHours: Math.round(currentWeekHours * 10) / 10,
+          lastApprovalDate: lastApproved?.updatedAt 
+            ? new Date(lastApproved.updatedAt).toLocaleDateString()
+            : null
+        };
+      }
+    } catch (error) {
+      console.log('[Employee Context] Could not fetch timesheet data:', error);
+    }
+
+    const benefits: string[] = [];
+    const expenseCategories = await storage.getExpenseCategories();
+    if (expenseCategories.length > 0) {
+      benefits.push('Expense Reimbursement Program');
+    }
+
+    if (benefits.length > 0) {
+      context.benefits = benefits;
+    }
+
+    return context;
+  } catch (error) {
+    console.error('[Employee Context] Error fetching employee context:', error);
+    return {};
+  }
+}
+
 export async function chatWithStudioAI(
   userMessage: string,
+  userId?: string,
   conversationHistory: ConversationMessage[] = []
 ): Promise<string> {
   try {
+    let systemPrompt = STUDIO_AI_SYSTEM_PROMPT;
+
+    if (userId) {
+      const employeeContext = await getEmployeeContext(userId);
+      
+      if (employeeContext.employee) {
+        systemPrompt += `\n\n--- EMPLOYEE CONTEXT ---
+You are currently chatting with: ${employeeContext.employee.firstName} ${employeeContext.employee.lastName}
+
+Employee Details:
+- Employee ID: ${employeeContext.employee.employeeId}
+- Email: ${employeeContext.employee.email}
+- Department: ${employeeContext.employee.department || 'Not specified'}
+- Job Title: ${employeeContext.employee.jobTitle || 'Not specified'}`;
+
+        if (employeeContext.employee.manager) {
+          systemPrompt += `
+- Manager: ${employeeContext.employee.manager.name} (${employeeContext.employee.manager.email})`;
+        } else {
+          systemPrompt += `
+- Manager: No manager assigned`;
+        }
+
+        if (employeeContext.leaveBalance) {
+          systemPrompt += `
+
+Leave Balance (${employeeContext.leaveBalance.year}):
+- Vacation Days: ${employeeContext.leaveBalance.vacationDays}
+- Sick Days: ${employeeContext.leaveBalance.sickDays}
+- Personal Days: ${employeeContext.leaveBalance.personalDays}`;
+        }
+
+        if (employeeContext.timesheetSummary) {
+          systemPrompt += `
+
+Timesheet Summary:
+- Current Week Hours: ${employeeContext.timesheetSummary.currentWeekHours} hours`;
+          if (employeeContext.timesheetSummary.lastApprovalDate) {
+            systemPrompt += `
+- Last Timesheet Approval: ${employeeContext.timesheetSummary.lastApprovalDate}`;
+          }
+        }
+
+        if (employeeContext.benefits && employeeContext.benefits.length > 0) {
+          systemPrompt += `
+
+Benefits Enrolled:
+${employeeContext.benefits.map(b => `- ${b}`).join('\n')}`;
+        }
+
+        systemPrompt += `\n\nUse this information to provide personalized, specific answers to the employee's questions. Always reference their actual data when answering questions about PTO, manager, timesheet, or benefits.`;
+      }
+    }
+
     const messages: ConversationMessage[] = [
-      { role: 'system', content: STUDIO_AI_SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       ...conversationHistory,
       { role: 'user', content: userMessage }
     ];

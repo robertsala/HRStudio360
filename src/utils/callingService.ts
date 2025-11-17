@@ -1,34 +1,45 @@
-import { supabase } from './supabaseClient';
+import { apiRequest } from '../lib/queryClient';
 
 export interface CallSession {
   id: string;
-  channel_id: string;
-  caller_id: string;
-  call_type: 'voice' | 'video';
+  channelId: string;
+  callerId: string;
+  callType: 'voice' | 'video';
   status: 'ringing' | 'active' | 'ended' | 'missed' | 'declined';
-  started_at: string;
-  ended_at?: string;
+  startedAt: string;
+  endedAt?: string;
   duration: number;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface CallParticipant {
   id: string;
-  call_session_id: string;
-  user_id: string;
-  joined_at: string;
-  left_at?: string;
+  callSessionId: string;
+  userId: string;
+  joinedAt: string;
+  leftAt?: string;
   status: 'calling' | 'connected' | 'disconnected';
 }
 
 export interface SignalData {
   id: string;
-  call_session_id: string;
-  from_user_id: string;
-  to_user_id?: string;
-  signal_type: 'offer' | 'answer' | 'ice-candidate';
-  signal_data: any;
-  created_at: string;
+  callSessionId: string;
+  fromUserId: string;
+  toUserId?: string;
+  signalType: 'offer' | 'answer' | 'ice-candidate';
+  signalData: any;
+  createdAt: string;
+}
+
+export interface IncomingCall {
+  callId: string;
+  channelId: string;
+  callerId: string;
+  callType: 'voice' | 'video';
+  status: string;
+  startedAt: string;
+  participantId: string;
+  participantStatus: string;
 }
 
 const ICE_SERVERS = [
@@ -59,56 +70,16 @@ class CallingService {
   private localStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
   private currentCallId: string | null = null;
-  private signalSubscription: any = null;
+  private signalPollingInterval: number | null = null;
+  private incomingCallPollingInterval: number | null = null;
+  private lastSignalTime: Date | null = null;
 
   async startCall(channelId: string, callType: 'voice' | 'video'): Promise<CallSession> {
     try {
-      const { data: session, error } = await supabase
-        .from('call_sessions')
-        .insert({
-          channel_id: channelId,
-          call_type: callType,
-          status: 'ringing',
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Failed to create call session:', error);
-        throw new Error('Failed to start call. Please try again.');
-      }
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.error('User authentication error:', userError);
-        throw new Error('User not authenticated');
-      }
-
-      const { error: participantError } = await supabase.from('call_participants').insert({
-        call_session_id: session.id,
-        user_id: user.id,
-        status: 'connected',
+      const session = await apiRequest<CallSession>('/api/calls/start', {
+        method: 'POST',
+        body: JSON.stringify({ channelId, callType })
       });
-
-      if (participantError) {
-        console.error('Failed to add call participant:', participantError);
-      }
-
-      const { data: channelMembers } = await supabase
-        .from('channel_members')
-        .select('user_id')
-        .eq('channel_id', channelId)
-        .neq('user_id', user.id);
-
-      if (channelMembers && channelMembers.length > 0) {
-        for (const member of channelMembers) {
-          await supabase.from('call_participants').insert({
-            call_session_id: session.id,
-            user_id: member.user_id,
-            status: 'calling',
-          });
-        }
-      }
 
       this.currentCallId = session.id;
       return session;
@@ -275,116 +246,76 @@ class CallingService {
     signalData: any,
     toUserId?: string
   ): Promise<void> {
-    await supabase.from('call_signaling').insert({
-      call_session_id: callId,
-      to_user_id: toUserId,
-      signal_type: signalType,
-      signal_data: signalData,
+    await apiRequest('/api/calls/signal', {
+      method: 'POST',
+      body: JSON.stringify({
+        callId,
+        signalType,
+        signalData,
+        toUserId
+      })
     });
   }
 
-  subscribeToSignals(callId: string, onSignal: (signal: SignalData) => void) {
-    const { data: { user } } = supabase.auth.getUser();
+  subscribeToSignals(callId: string, onSignal: (signal: SignalData) => void): { unsubscribe: () => void } {
+    this.lastSignalTime = new Date();
 
-    this.signalSubscription = supabase
-      .channel(`call_signaling:${callId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_signaling',
-          filter: `call_session_id=eq.${callId}`,
-        },
-        (payload) => {
-          const signal = payload.new as SignalData;
-          user.then(({ data }) => {
-            if (data?.user && signal.from_user_id !== data.user.id) {
-              onSignal(signal);
+    const pollSignals = async () => {
+      try {
+        const fromTime = this.lastSignalTime?.toISOString();
+        const signals = await apiRequest<SignalData[]>(
+          `/api/calls/signals/${callId}${fromTime ? `?fromTime=${fromTime}` : ''}`
+        );
+
+        if (signals && signals.length > 0) {
+          signals.forEach((signal: SignalData) => {
+            onSignal(signal);
+            const signalTime = new Date(signal.createdAt);
+            if (!this.lastSignalTime || signalTime > this.lastSignalTime) {
+              this.lastSignalTime = signalTime;
             }
           });
         }
-      )
-      .subscribe();
+      } catch (error) {
+        console.error('Error polling signals:', error);
+      }
+    };
 
-    return this.signalSubscription;
+    this.signalPollingInterval = window.setInterval(pollSignals, 500);
+
+    return {
+      unsubscribe: () => {
+        if (this.signalPollingInterval) {
+          clearInterval(this.signalPollingInterval);
+          this.signalPollingInterval = null;
+        }
+      }
+    };
   }
 
   async joinCall(callId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
     this.currentCallId = callId;
 
-    await supabase
-      .from('call_participants')
-      .update({ status: 'connected', joined_at: new Date().toISOString() })
-      .eq('call_session_id', callId)
-      .eq('user_id', user.id);
-
-    await supabase
-      .from('call_sessions')
-      .update({ status: 'active' })
-      .eq('id', callId);
+    await apiRequest('/api/calls/join', {
+      method: 'POST',
+      body: JSON.stringify({ callId })
+    });
   }
 
   async endCall(callId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase
-      .from('call_participants')
-      .update({ status: 'disconnected', left_at: new Date().toISOString() })
-      .eq('call_session_id', callId)
-      .eq('user_id', user.id);
-
-    const { data: participants } = await supabase
-      .from('call_participants')
-      .select('status')
-      .eq('call_session_id', callId);
-
-    const allDisconnected = participants?.every((p) => p.status === 'disconnected');
-
-    if (allDisconnected) {
-      const { data: session } = await supabase
-        .from('call_sessions')
-        .select('started_at')
-        .eq('id', callId)
-        .single();
-
-      if (session) {
-        const duration = Math.floor(
-          (new Date().getTime() - new Date(session.started_at).getTime()) / 1000
-        );
-
-        await supabase
-          .from('call_sessions')
-          .update({
-            status: 'ended',
-            ended_at: new Date().toISOString(),
-            duration,
-          })
-          .eq('id', callId);
-      }
-    }
+    await apiRequest('/api/calls/end', {
+      method: 'POST',
+      body: JSON.stringify({ callId })
+    });
 
     this.cleanup();
   }
 
   async declineCall(callId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    await supabase
-      .from('call_participants')
-      .update({ status: 'disconnected' })
-      .eq('call_session_id', callId)
-      .eq('user_id', user.id);
-
-    await supabase
-      .from('call_sessions')
-      .update({ status: 'declined' })
-      .eq('id', callId);
+    await apiRequest('/api/calls/decline', {
+      method: 'POST',
+      body: JSON.stringify({ callId })
+    });
   }
 
   cleanup(): void {
@@ -398,13 +329,19 @@ class CallingService {
       this.peerConnection = null;
     }
 
-    if (this.signalSubscription) {
-      this.signalSubscription.unsubscribe();
-      this.signalSubscription = null;
+    if (this.signalPollingInterval) {
+      clearInterval(this.signalPollingInterval);
+      this.signalPollingInterval = null;
+    }
+
+    if (this.incomingCallPollingInterval) {
+      clearInterval(this.incomingCallPollingInterval);
+      this.incomingCallPollingInterval = null;
     }
 
     this.remoteStream = null;
     this.currentCallId = null;
+    this.lastSignalTime = null;
   }
 
   getLocalStream(): MediaStream | null {
@@ -431,53 +368,44 @@ class CallingService {
     }
   }
 
-  async getIncomingCalls(userId: string) {
-    const { data, error } = await supabase
-      .from('call_participants')
-      .select(`
-        *,
-        call_session:call_sessions!call_participants_call_session_id_fkey(
-          *,
-          caller:profiles!call_sessions_caller_id_fkey(*)
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('status', 'calling');
-
-    if (error) throw error;
-    return data;
+  async getIncomingCalls(): Promise<IncomingCall[]> {
+    const calls = await apiRequest<IncomingCall[]>('/api/calls/incoming');
+    return calls;
   }
 
-  subscribeToIncomingCalls(userId: string, onIncomingCall: (call: any) => void) {
-    return supabase
-      .channel(`incoming_calls:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_participants',
-          filter: `user_id=eq.${userId}`,
-        },
-        async (payload) => {
-          const participant = payload.new;
-          if (participant.status === 'calling') {
-            const { data: session } = await supabase
-              .from('call_sessions')
-              .select(`
-                *,
-                caller:profiles!call_sessions_caller_id_fkey(*)
-              `)
-              .eq('id', participant.call_session_id)
-              .single();
+  subscribeToIncomingCalls(onIncomingCall: (call: IncomingCall) => void): { unsubscribe: () => void } {
+    let previousCallIds = new Set<string>();
 
-            if (session) {
-              onIncomingCall({ ...participant, call_session: session });
-            }
+    const pollIncomingCalls = async () => {
+      try {
+        const calls = await this.getIncomingCalls();
+        
+        calls.forEach(call => {
+          if (!previousCallIds.has(call.callId)) {
+            onIncomingCall(call);
+            previousCallIds.add(call.callId);
           }
+        });
+
+        const currentCallIds = new Set(calls.map(c => c.callId));
+        previousCallIds = currentCallIds;
+      } catch (error) {
+        console.error('Error polling incoming calls:', error);
+      }
+    };
+
+    pollIncomingCalls();
+
+    this.incomingCallPollingInterval = window.setInterval(pollIncomingCalls, 2000);
+
+    return {
+      unsubscribe: () => {
+        if (this.incomingCallPollingInterval) {
+          clearInterval(this.incomingCallPollingInterval);
+          this.incomingCallPollingInterval = null;
         }
-      )
-      .subscribe();
+      }
+    };
   }
 }
 

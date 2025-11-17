@@ -43,7 +43,10 @@ import type {
   PermissionRequest, InsertPermissionRequest,
   PermissionChangeAudit, InsertPermissionChangeAudit,
   AccessLevel, InsertAccessLevel,
-  EmployeeAccessAssignment, InsertEmployeeAccessAssignment
+  EmployeeAccessAssignment, InsertEmployeeAccessAssignment,
+  CallSession, InsertCallSession,
+  CallParticipant, InsertCallParticipant,
+  CallSignaling, InsertCallSignaling
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
@@ -60,7 +63,8 @@ import {
   timesheetEntries, timesheetApprovals, payrollLocks,
   permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit,
   permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit,
-  accessLevels, employeeAccessAssignments
+  accessLevels, employeeAccessAssignments,
+  callSessions, callParticipants, callSignaling
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -184,6 +188,16 @@ export interface IStorage {
   // User Presence
   upsertUserPresence(presence: InsertUserPresence): Promise<UserPresence>;
   getUserPresence(userId: string): Promise<UserPresence | undefined>;
+  
+  // Call Sessions
+  createCallSession(session: InsertCallSession): Promise<CallSession>;
+  getCallSessionById(id: string): Promise<CallSession | undefined>;
+  updateCallSession(id: string, session: Partial<InsertCallSession>): Promise<CallSession | undefined>;
+  addCallParticipant(participant: InsertCallParticipant): Promise<CallParticipant>;
+  updateCallParticipant(id: string, participant: Partial<InsertCallParticipant>): Promise<CallParticipant | undefined>;
+  getCallParticipants(callSessionId: string): Promise<CallParticipant[]>;
+  createCallSignal(signal: InsertCallSignaling): Promise<CallSignaling>;
+  getCallSignals(callSessionId: string, fromTime?: Date): Promise<CallSignaling[]>;
   
   // User Notifications
   getUserNotifications(userId: string, unreadOnly?: boolean): Promise<UserNotification[]>;
@@ -942,6 +956,58 @@ export class DbStorage implements IStorage {
   async getUserPresence(userId: string): Promise<UserPresence | undefined> {
     const result = await db.select().from(userPresence).where(eq(userPresence.userId, userId));
     return result[0];
+  }
+
+  // Call Sessions
+  async createCallSession(session: InsertCallSession): Promise<CallSession> {
+    const result = await db.insert(callSessions).values(session).returning();
+    return result[0];
+  }
+
+  async getCallSessionById(id: string): Promise<CallSession | undefined> {
+    const result = await db.select().from(callSessions).where(eq(callSessions.id, id));
+    return result[0];
+  }
+
+  async updateCallSession(id: string, session: Partial<InsertCallSession>): Promise<CallSession | undefined> {
+    const result = await db.update(callSessions)
+      .set(session)
+      .where(eq(callSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async addCallParticipant(participant: InsertCallParticipant): Promise<CallParticipant> {
+    const result = await db.insert(callParticipants).values(participant).returning();
+    return result[0];
+  }
+
+  async updateCallParticipant(id: string, participant: Partial<InsertCallParticipant>): Promise<CallParticipant | undefined> {
+    const result = await db.update(callParticipants)
+      .set(participant)
+      .where(eq(callParticipants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getCallParticipants(callSessionId: string): Promise<CallParticipant[]> {
+    return db.select().from(callParticipants)
+      .where(eq(callParticipants.callSessionId, callSessionId));
+  }
+
+  async createCallSignal(signal: InsertCallSignaling): Promise<CallSignaling> {
+    const result = await db.insert(callSignaling).values(signal).returning();
+    return result[0];
+  }
+
+  async getCallSignals(callSessionId: string, fromTime?: Date): Promise<CallSignaling[]> {
+    const conditions = [eq(callSignaling.callSessionId, callSessionId)];
+    if (fromTime) {
+      conditions.push(gte(callSignaling.createdAt, fromTime));
+    }
+    return db.select().from(callSignaling)
+      .where(and(...conditions))
+      .orderBy(callSignaling.createdAt);
   }
 
   // User Notifications

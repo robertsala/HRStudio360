@@ -13,6 +13,7 @@ import {
   insertEmployeeTaxConfigurationSchema, insertAutoFixAuditLogSchema,
   insertPermissionTemplateSchema, insertRoleHierarchySchema,
   insertTimeBasedPermissionGrantSchema, insertPermissionRequestSchema,
+  insertCallSessionSchema, insertCallParticipantSchema, insertCallSignalingSchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -23,7 +24,9 @@ import {
   tutorialCompletions,
   tutorialCertificates,
   tutorialBadges,
-  userTutorialBadges
+  userTutorialBadges,
+  callSessions,
+  callParticipants
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { sendAutoFixNotificationEmail, notificationService } from './notification-service.js';
@@ -37,13 +40,13 @@ import { ObjectPermission } from './objectAcl.js';
 import {
   screenCandidate,
   batchScreenCandidates,
-  chatWithStudioAI,
   generateHiringInsights,
   runDailyScreeningWorkflow,
   validatePayrollRun,
   analyzeExpenses,
   chatWithPayrollAI
 } from './ai-agent.js';
+import { chatWithStudioAI } from './ai-assistant.js';
 import { taxCalculator } from './tax-calculator.js';
 import { TaxDataService } from './tax-data-service.js';
 import { suggestTaxConfiguration, batchSuggestTaxConfigurations } from './ai-agent.js';
@@ -1324,6 +1327,275 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // === CALL ROUTES ===
+
+  // Start a new call
+  app.post('/api/calls/start', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { channelId, callType } = req.body;
+      if (!channelId || !callType) {
+        return res.status(400).json({ error: 'channelId and callType are required' });
+      }
+
+      if (callType !== 'voice' && callType !== 'video') {
+        return res.status(400).json({ error: 'callType must be "voice" or "video"' });
+      }
+
+      // Create call session
+      const callSessionData = {
+        channelId,
+        callerId: userId,
+        callType,
+        status: 'ringing' as const,
+        startedAt: new Date()
+      };
+      const validated = insertCallSessionSchema.parse(callSessionData);
+      const callSession = await storage.createCallSession(validated);
+
+      // Add caller as participant with status 'connected'
+      await storage.addCallParticipant({
+        callSessionId: callSession.id,
+        userId,
+        status: 'connected',
+        joinedAt: new Date()
+      });
+
+      // Get all channel members and add them as participants with status 'calling'
+      const channelMembers = await storage.getChannelMembers(channelId);
+      for (const member of channelMembers) {
+        if (member.userId !== userId) {
+          await storage.addCallParticipant({
+            callSessionId: callSession.id,
+            userId: member.userId,
+            status: 'calling'
+          });
+        }
+      }
+
+      res.status(201).json(callSession);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Join an existing call
+  app.post('/api/calls/join', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { callId } = req.body;
+      if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+      }
+
+      // Get all participants for this call
+      const participants = await storage.getCallParticipants(callId);
+      const userParticipant = participants.find(p => p.userId === userId);
+
+      if (!userParticipant) {
+        return res.status(404).json({ error: 'Participant not found in this call' });
+      }
+
+      // Update participant status to 'connected' with joinedAt timestamp
+      await storage.updateCallParticipant(userParticipant.id, {
+        status: 'connected',
+        joinedAt: new Date()
+      });
+
+      // Update call session status to 'active'
+      await storage.updateCallSession(callId, {
+        status: 'active'
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // End a call
+  app.post('/api/calls/end', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { callId } = req.body;
+      if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+      }
+
+      // Get all participants for this call
+      const participants = await storage.getCallParticipants(callId);
+      const userParticipant = participants.find(p => p.userId === userId);
+
+      if (!userParticipant) {
+        return res.status(404).json({ error: 'Participant not found in this call' });
+      }
+
+      // Update current user's participant status to 'disconnected' with leftAt timestamp
+      await storage.updateCallParticipant(userParticipant.id, {
+        status: 'disconnected',
+        leftAt: new Date()
+      });
+
+      // Get fresh participant list to check if all are disconnected
+      const updatedParticipants = await storage.getCallParticipants(callId);
+      const allDisconnected = updatedParticipants.every(p => p.status === 'disconnected');
+
+      if (allDisconnected) {
+        // Get call session to calculate duration
+        const callSession = await storage.getCallSessionById(callId);
+        if (callSession && callSession.startedAt) {
+          const duration = Math.floor((Date.now() - new Date(callSession.startedAt).getTime()) / 1000);
+          await storage.updateCallSession(callId, {
+            status: 'ended',
+            endedAt: new Date(),
+            duration
+          });
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Decline an incoming call
+  app.post('/api/calls/decline', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { callId } = req.body;
+      if (!callId) {
+        return res.status(400).json({ error: 'callId is required' });
+      }
+
+      // Get all participants for this call
+      const participants = await storage.getCallParticipants(callId);
+      const userParticipant = participants.find(p => p.userId === userId);
+
+      if (!userParticipant) {
+        return res.status(404).json({ error: 'Participant not found in this call' });
+      }
+
+      // Update participant status to 'disconnected'
+      await storage.updateCallParticipant(userParticipant.id, {
+        status: 'disconnected'
+      });
+
+      // Update call session status to 'declined'
+      await storage.updateCallSession(callId, {
+        status: 'declined'
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Send WebRTC signaling data
+  app.post('/api/calls/signal', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { callId, signalType, signalData, toUserId } = req.body;
+      if (!callId || !signalType || !signalData) {
+        return res.status(400).json({ error: 'callId, signalType, and signalData are required' });
+      }
+
+      if (!['offer', 'answer', 'ice-candidate'].includes(signalType)) {
+        return res.status(400).json({ error: 'signalType must be "offer", "answer", or "ice-candidate"' });
+      }
+
+      // Create signaling record
+      const signalingRecord = {
+        callSessionId: callId,
+        fromUserId: userId,
+        toUserId: toUserId || null,
+        signalType,
+        signalData
+      };
+      const validated = insertCallSignalingSchema.parse(signalingRecord);
+      await storage.createCallSignal(validated);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get signaling data for a call
+  app.get('/api/calls/signals/:callId', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { callId } = req.params;
+      const fromTime = req.query.fromTime ? new Date(req.query.fromTime as string) : undefined;
+
+      const signals = await storage.getCallSignals(callId, fromTime);
+      res.json(signals);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get incoming calls for current user
+  app.get('/api/calls/incoming', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Find call participants where userId matches current user and status is 'calling'
+      // Join with call sessions to get call details
+      const incomingCalls = await db
+        .select({
+          callId: callSessions.id,
+          channelId: callSessions.channelId,
+          callerId: callSessions.callerId,
+          callType: callSessions.callType,
+          status: callSessions.status,
+          startedAt: callSessions.startedAt,
+          participantId: callParticipants.id,
+          participantStatus: callParticipants.status
+        })
+        .from(callParticipants)
+        .innerJoin(callSessions, eq(callParticipants.callSessionId, callSessions.id))
+        .where(
+          and(
+            eq(callParticipants.userId, userId),
+            eq(callParticipants.status, 'calling')
+          )
+        );
+
+      res.json(incomingCalls);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // === CHANGELOG ROUTES ===
 
   // Change Log routes
@@ -2032,32 +2304,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // AI Assistant chat endpoint (simplified version)
+  // AI Assistant chat endpoint
   app.post('/api/ai-assistant/chat', async (req, res) => {
     try {
-      const { message, userId } = req.body;
+      const { message } = req.body;
 
-      if (!message || !userId) {
-        return res.status(400).json({ error: 'Message and userId are required' });
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
       }
 
-      // Get user profile
-      const profile = await storage.getProfileById(userId);
-      const firstName = profile?.firstName || 'there';
+      const userId = (req.session as any)?.userId;
 
-      // Simple AI response logic
-      const messageLower = message.toLowerCase();
-      let response = '';
-
-      if (messageLower.includes('benefit')) {
-        response = `Hi ${firstName}! I'd be happy to help with benefits information. 🏥\n\nWe offer comprehensive benefits including health, dental, and vision insurance, 401(k) with company match, paid time off, and more. Check the Benefits & Pay section for details!`;
-      } else if (messageLower.includes('pto') || messageLower.includes('time off') || messageLower.includes('vacation')) {
-        response = `Hi ${firstName}! For PTO inquiries, go to Leave Management to view your balance and request time off. Your manager typically responds within 24-48 hours.`;
-      } else if (messageLower.includes('pay') || messageLower.includes('payroll')) {
-        response = `Hi ${firstName}! For payroll questions, paychecks are issued bi-weekly on Fridays. Go to Payroll in your dashboard to view pay stubs, update direct deposit, and more.`;
-      } else {
-        response = `Hi ${firstName}! 👋 I'm Studio, your HRStudio360 AI Assistant. I can help with HR questions, benefits, PTO, payroll, and more. What can I help you with?`;
-      }
+      const response = await chatWithStudioAI(message, userId);
 
       res.json({
         success: true,
