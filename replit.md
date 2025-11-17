@@ -93,3 +93,27 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **UI**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`.
 -   **Forms**: `react-hook-form`, `@hookform/resolvers`, `zod`.
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
+
+## Recent Changes
+
+### November 17, 2025 - AI Assistant Testing Environment & Navigation Improvements
+
+**Test Environment Setup:**
+-   Created CFO user account (Victor Martinez, EMP-CFO001) with complete employee profile and stock photo
+-   Updated Robert Sala's employee record to report to Victor Martinez as manager
+-   Created comprehensive leave balances for Robert: 15 days vacation, 6 days sick, 5 days personal for 2025
+-   Added benefits field to employees schema and enrolled Robert in 6 benefits (Health, Dental, Vision, 401k, Life, Disability Insurance)
+
+**AI Assistant Enhancements:**
+-   Enhanced AI to retrieve benefits from employee records
+-   AI can now answer personalized questions about enrolled benefits using actual employee data
+-   All data access uses session-based authentication for security
+
+**Navigation Improvements:**
+-   Moved "My Profile" from user menu to main sidebar navigation
+-   Positioned between Dashboard and Directory for better accessibility
+-   Added bilingual support (English: "My Profile", Spanish: "Mi Perfil")
+
+**Testing Ready:**
+-   Robert Sala account fully configured for AI testing
+-   Can test queries: "What's my PTO balance?", "Who is my manager?", "What benefits am I enrolled in?"
