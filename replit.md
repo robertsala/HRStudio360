@@ -22,13 +22,17 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Data Storage**: PostgreSQL database (Neon-backed) with schema defined by Drizzle ORM.
 -   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Role-based access control (RBAC) is implemented for features and API endpoints.
 -   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, and presence tracking. Celebration badges and notifications are integrated. Features robust message deduplication to prevent race conditions between WebSocket broadcasts and HTTP responses, user-friendly error notifications, and comprehensive error logging for debugging.
-    -   **Enterprise Chat UI**: Professional chat interface powered by ChatScope UI Kit (`@chatscope/chat-ui-kit-react`), providing Slack-quality user experience with:
-        -   ChatScope components: MainContainer, ChatContainer, MessageList, Message, MessageInput, Avatar, and TypingIndicator
-        -   Custom styling integrated with HRStudio360 design system (blue-600 for outgoing messages, gray tones for incoming)
-        -   Full dark mode support with tailored color schemes
-        -   File message support with image previews and download links via Message.CustomContent
-        -   String-based event handlers optimized for ChatScope's API
-        -   Preserved functionality: AI Assistant welcome screen, typing indicators, emoji picker, file uploads, and WebSocket real-time updates
+    -   **Enterprise Chat UI**: Professional custom chat interface built with Tailwind CSS components, providing Slack-quality user experience with:
+        -   Clean message bubbles with proper alignment (right for outgoing, left for incoming)
+        -   Visible timestamps below each message for better context
+        -   Sender names and avatars with presence indicators (green dot for online)
+        -   File message support with image previews and download links
+        -   Animated typing indicators with bouncing dots
+        -   Auto-resize textarea input with emoji picker integration
+        -   Read receipts with checkmark icons
+        -   Full dark mode support integrated with HRStudio360 design system
+        -   Optimistic UI updates for instant message feedback
+        -   Preserved functionality: AI Assistant welcome screen, WebSocket real-time updates, and channel management
 -   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), the "Studio AI" agent provides:
     -   **Global AI Assistant**: Enterprise-wide conversational AI accessible via Enterprise Chat, capable of answering questions about HRStudio360 platform features, HR policies, workflows, and general work-related queries. Features conversation history support for contextual responses and uses a dedicated system profile (`00000000-0000-0000-0000-000000000000`) for message attribution.
     -   **Recruitment AI**: Autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search.
@@ -78,6 +82,6 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Core**: `react`, `react-dom`, `typescript`, `vite`, `express`.
 -   **Database**: `drizzle-orm`, `drizzle-kit`, `drizzle-zod`, `@neondatabase/serverless`.
 -   **Auth/Security**: `argon2`, `express-rate-limit`, `express-session`.
--   **UI**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`, `@chatscope/chat-ui-kit-react`, `@chatscope/chat-ui-kit-styles`.
+-   **UI**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`.
 -   **Forms**: `react-hook-form`, `@hookform/resolvers`, `zod`.
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
