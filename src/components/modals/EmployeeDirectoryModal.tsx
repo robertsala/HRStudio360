@@ -18,6 +18,8 @@ interface Employee {
   profileImage?: string;
   salary?: number;
   employmentType?: 'Salaried' | 'Hourly';
+  managerId?: string;
+  managerName?: string;
 }
 
 interface EmployeeDirectoryModalProps {
@@ -76,12 +78,47 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
           status: normalizedStatus as 'Active' | 'Remote' | 'On Leave',
           profileImage: emp.profile?.avatarUrl,
           salary: parseFloat(emp.salary?.toString() || '0'),
-          employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried'
+          employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried',
+          managerId: emp.managerId || null
         };
       });
 
+      // Fetch manager names for all employees with managers
+      const managerIds = [...new Set(formattedEmployees.map(e => e.managerId).filter(Boolean))];
+      const managerMap = new Map<string, string>();
+      
+      if (managerIds.length > 0) {
+        try {
+          await Promise.all(
+            managerIds.map(async (managerId) => {
+              if (!managerId) return;
+              try {
+                const response = await fetch(`/api/profiles/${managerId}`);
+                if (response.ok) {
+                  const profile = await response.json();
+                  const managerName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+                  if (managerName) {
+                    managerMap.set(managerId, managerName);
+                  }
+                }
+              } catch (err) {
+                console.error(`Error fetching manager ${managerId}:`, err);
+              }
+            })
+          );
+        } catch (err) {
+          console.error('Error fetching managers:', err);
+        }
+      }
+      
+      // Add manager names to employees
+      const employeesWithManagers = formattedEmployees.map(emp => ({
+        ...emp,
+        managerName: emp.managerId ? (managerMap.get(emp.managerId) || 'Not assigned') : 'Not assigned'
+      }));
+
       // Keep all employees - filtering can be done by user via filter controls
-      setEmployees(formattedEmployees);
+      setEmployees(employeesWithManagers);
     } catch (error) {
       console.error('Error fetching employees:', error);
       setEmployees([]);
@@ -526,7 +563,7 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
               status: selectedEmployee.status,
               startDate: selectedEmployee.startDate,
               location: selectedEmployee.location,
-              manager: 'Manager Name',
+              manager: selectedEmployee.managerName || 'Not assigned',
               salary: selectedEmployee.salary?.toString() || '$0',
               employeeId: selectedEmployee.id,
               profileImage: selectedEmployee.profileImage,

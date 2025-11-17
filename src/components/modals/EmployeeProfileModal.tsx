@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, Camera, FileText, Award, Clock, UserX, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -37,6 +37,7 @@ interface EmployeeProfileModalProps {
 const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({ isOpen, onClose, employee }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   // Determine if current user is HR staff
@@ -49,31 +50,100 @@ const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({ isOpen, onC
   // Combined authorization: HR staff OR Product Owner can terminate employees
   const canTerminateEmployees = isHRUser || isProductOwner;
 
-  const [formData, setFormData] = useState(employee || {
+  const [formData, setFormData] = useState<Employee>({
     id: '1',
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@company.com',
-    phone: '+1 (555) 123-4567',
-    department: 'Engineering',
-    role: 'Senior Software Engineer',
+    name: '',
+    email: '',
+    phone: '',
+    department: '',
+    role: '',
     status: 'Active' as const,
-    startDate: '2022-03-15',
-    location: 'San Francisco, CA',
-    manager: 'Mike Chen',
-    salary: '$125,000',
-    employeeId: 'EMP001',
-    profileImage: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    startDate: '',
+    location: '',
+    manager: '',
+    salary: '',
+    employeeId: '',
+    profileImage: '',
     emergencyContact: {
-      name: 'John Johnson',
-      relationship: 'Spouse',
-      phone: '+1 (555) 987-6543'
+      name: '',
+      relationship: '',
+      phone: ''
     },
-    skills: ['React', 'TypeScript', 'Node.js', 'Python', 'AWS'],
-    certifications: ['AWS Solutions Architect', 'Scrum Master'],
-    performanceRating: 4.5,
-    ptoBalance: 18,
-    sickLeaveBalance: 5
+    skills: [],
+    certifications: [],
+    performanceRating: 0,
+    ptoBalance: 0,
+    sickLeaveBalance: 0
   });
+
+  // Fetch current user's employee data when modal opens
+  useEffect(() => {
+    const fetchEmployeeData = async () => {
+      if (!isOpen || !user?.id) return;
+      
+      try {
+        setLoading(true);
+        
+        // Fetch profile data
+        const profileResponse = await fetch(`/api/profiles/${user.id}`);
+        const profile = await profileResponse.json();
+        
+        // Fetch employee data
+        const employeeResponse = await fetch(`/api/employees/user/${user.id}`);
+        const employeeData = await employeeResponse.json();
+        
+        // Fetch manager info if managerId exists
+        let managerName = 'Not assigned';
+        if (employeeData.managerId) {
+          try {
+            const managerResponse = await fetch(`/api/profiles/${employeeData.managerId}`);
+            if (managerResponse.ok) {
+              const managerProfile = await managerResponse.json();
+              managerName = `${managerProfile.firstName || ''} ${managerProfile.lastName || ''}`.trim();
+            }
+          } catch (err) {
+            console.error('Error fetching manager:', err);
+          }
+        }
+        
+        // Combine data
+        const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+        const location = `${profile.city || ''}, ${profile.state || ''}`.trim();
+        
+        setFormData({
+          id: employeeData.id,
+          name: fullName || user.name || '',
+          email: profile.email || user.email || '',
+          phone: profile.phone || '',
+          department: profile.department || '',
+          role: profile.role || '',
+          status: employeeData.status || 'Active',
+          startDate: employeeData.startDate || profile.hireDate || '',
+          location: location || '',
+          manager: managerName,
+          salary: employeeData.salary ? `$${parseFloat(employeeData.salary).toLocaleString()}` : '',
+          employeeId: employeeData.employeeId || '',
+          profileImage: profile.profilePicture || user.profilePicture || '',
+          emergencyContact: {
+            name: '',
+            relationship: '',
+            phone: ''
+          },
+          skills: [],
+          certifications: [],
+          performanceRating: 4.0,
+          ptoBalance: 0,
+          sickLeaveBalance: 0
+        });
+      } catch (error) {
+        console.error('Error fetching employee data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchEmployeeData();
+  }, [isOpen, user?.id, user?.name, user?.email, user?.profilePicture]);
 
   // Check if viewing own profile (compare emails)
   const isViewingOwnProfile = user?.email === formData.email;
