@@ -35,6 +35,7 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
   const [activeCall, setActiveCall] = useState<CallSession | null>(null);
   const [showCallModal, setShowCallModal] = useState(false);
   const [incomingCall, setIncomingCall] = useState<any | null>(null);
+  const [errorNotification, setErrorNotification] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initializationAttempted = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -87,7 +88,13 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
       const message: Message = customEvent.detail;
 
       if (selectedChannel && message.channel_id === selectedChannel.id) {
-        setMessages(prev => [...prev, message]);
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === message.id);
+          if (exists) {
+            return prev;
+          }
+          return [...prev, message];
+        });
       }
 
       loadChannels();
@@ -329,16 +336,19 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
         'text'
       );
 
-      setMessages(prev => prev.map(msg =>
-        msg.id === tempMessage.id ? newMessage : msg
-      ));
+      setMessages(prev => {
+        const withoutTemp = prev.filter(msg => msg.id !== tempMessage.id);
+        const withoutDuplicate = withoutTemp.filter(msg => msg.id !== newMessage.id);
+        return [...withoutDuplicate, newMessage];
+      });
       await loadChannels();
     } catch (error) {
       console.error('Failed to send message:', error);
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
       setMessageInput(content);
 
-      alert('Failed to send message. Please check your connection and try again.');
+      setErrorNotification('Failed to send message. Please check your connection and try again.');
+      setTimeout(() => setErrorNotification(null), 5000);
     } finally {
       setIsSending(false);
     }
@@ -580,6 +590,15 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
             <X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
+
+        {errorNotification && (
+          <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3">
+            <svg className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium">{errorNotification}</span>
+          </div>
+        )}
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar - Channel List */}
