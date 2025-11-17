@@ -75,6 +75,22 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   Created openMyProfile function in Dashboard that fetches current user's employee data via API and opens modal
 -   Intelligent fallback: opens comprehensive modal on dashboard, routes to /profile page when Dashboard isn't mounted
 -   Full TypeScript type safety with proper forwardRef signature updates
+-   Fixed TypeError "can't access property 'split', name is undefined" by updating `/api/employees/user/:userId` endpoint to use `getEmployeesWithProfiles()` and format response with name property
+
+**Manager Display & Selection:**
+-   Fixed manager display showing "Not Assigned" instead of actual manager names (e.g., Victor Martinez)
+-   Added useEffect hook in ComprehensiveEmployeeProfileModal to fetch manager name from profiles table using managerId
+-   Implemented manager dropdown selector in edit mode - replaces text input with select dropdown
+-   Dropdown fetches all employees from directory API and prevents self-selection
+-   Stores both managerId and manager name for proper data persistence
+-   Manager information now displays correctly across all employee profiles
+
+**Employee Directory Full-Screen Conversion:**
+-   Converted Employee Directory from modal overlay to full-screen inline view matching Recruitment/Onboarding/Performance pattern
+-   Changed styling from `fixed inset-0 bg-black bg-opacity-50` to `bg-white w-full min-h-screen`
+-   Removed overlay click handler and modal centering
+-   Added sticky header with gradient background
+-   Directory now provides immersive full-screen experience consistent with other HR modules
 
 **Chat Auto-Scroll Fix:**
 -   Fixed Enterprise Chat to automatically scroll to bottom (newest messages) when reopening with existing conversation history
