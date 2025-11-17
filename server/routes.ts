@@ -1034,7 +1034,27 @@ export function registerRoutes(app: Express) {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const messages = await storage.getChatMessages(req.params.channelId, limit);
-      res.json(messages);
+      
+      // Populate sender information for each message
+      const messagesWithSender = await Promise.all(
+        messages.map(async (message) => {
+          if (message.senderId) {
+            const sender = await storage.getProfileById(message.senderId);
+            return {
+              ...message,
+              sender: sender ? {
+                id: sender.id,
+                first_name: sender.firstName,
+                last_name: sender.lastName,
+                email: sender.email
+              } : null
+            };
+          }
+          return { ...message, sender: null };
+        })
+      );
+      
+      res.json(messagesWithSender);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
