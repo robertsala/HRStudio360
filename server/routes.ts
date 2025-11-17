@@ -1098,22 +1098,34 @@ export function registerRoutes(app: Express) {
       // (channel already fetched above for security validation)
       if (channel.channelType === 'ai_assistant') {
         // Import AI response generator
-        const { getAIResponse } = await import('./ai-assistant');
-        
-        // Generate AI response based on user message
-        // Use plainContent (extracted above for security) if available, otherwise use encryptedContent
-        const userMessage = plainContent || message.encryptedContent;
-        const aiResponse = getAIResponse(userMessage);
+        const { chatWithStudioAI } = await import('./ai-assistant.js');
         
         // Create AI response message with dedicated AI sender identity
-        // Use special null UUID to represent AI Assistant (00000000-0000-0000-0000-000000000000)
         const AI_ASSISTANT_ID = '00000000-0000-0000-0000-000000000000';
+        
+        // Use plainContent (extracted above for security) if available, otherwise use encryptedContent
+        const userMessage = plainContent || message.encryptedContent;
+        
+        // Get recent conversation history for context (last 10 messages)
+        const recentMessages = await storage.getChatMessages(req.params.channelId, 10);
+        
+        // Build conversation history for AI (exclude current message)
+        const conversationHistory = recentMessages
+          .filter(msg => msg.id !== message.id)
+          .reverse()
+          .map(msg => ({
+            role: (msg.senderId === AI_ASSISTANT_ID ? 'assistant' : 'user') as 'assistant' | 'user',
+            content: msg.encryptedContent
+          }));
+        
+        // Generate AI response with conversation context
+        const aiResponse = await chatWithStudioAI(userMessage, conversationHistory);
         
         const aiMessageData = {
           channelId: req.params.channelId,
-          senderId: AI_ASSISTANT_ID, // Dedicated AI sender identity
+          senderId: AI_ASSISTANT_ID,
           encryptedContent: aiResponse,
-          messageType: 'system' // System messages aren't encrypted
+          messageType: 'system'
         };
         
         const aiMessage = await storage.createChatMessage(aiMessageData);
