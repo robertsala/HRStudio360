@@ -33,8 +33,16 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
         -   Full dark mode support integrated with HRStudio360 design system
         -   Optimistic UI updates for instant message feedback
         -   Preserved functionality: AI Assistant welcome screen, WebSocket real-time updates, and channel management
+    -   **Voice & Video Calling**: Enterprise-grade WebRTC-based calling system with PostgreSQL backend:
+        -   Database schema with `callSessions`, `callParticipants`, and `callSignaling` tables for call state management
+        -   7 comprehensive API endpoints for call lifecycle management (start, join, end, decline, signal exchange, incoming calls retrieval)
+        -   Session-based authentication ensuring users can only access their own calls
+        -   Polling-based signaling system (500ms interval) for WebRTC offer/answer/ICE candidate exchange
+        -   Multi-participant support with per-user connection tracking
+        -   Call session persistence with duration calculation and participant status tracking
+        -   Fully migrated from Supabase to PostgreSQL with no external dependencies
 -   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), the "Studio AI" agent provides:
-    -   **Global AI Assistant**: Enterprise-wide conversational AI accessible via Enterprise Chat, capable of answering questions about HRStudio360 platform features, HR policies, workflows, and general work-related queries. Features conversation history support for contextual responses and uses a dedicated system profile (`00000000-0000-0000-0000-000000000000`) for message attribution.
+    -   **Global AI Assistant**: Enterprise-wide conversational AI accessible via Enterprise Chat, capable of answering questions about HRStudio360 platform features, HR policies, workflows, and general work-related queries. Features conversation history support for contextual responses and uses a dedicated system profile (`00000000-0000-0000-0000-000000000000`) for message attribution. **Employee-aware capabilities**: The AI can now access and answer personalized questions about the logged-in user's HR data, including PTO balance, manager information, benefits enrollment, and timesheet summaries by querying the PostgreSQL database through secure session-based authentication.
     -   **Recruitment AI**: Autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search.
     -   **Payroll AI**: AI Payroll Assistant for payroll validation, error detection, expense analysis, and tax configuration suggestions.
     -   AI capabilities are restricted to authorized roles (HR/Product Owner) with audit logging. The AI is context-aware, adapting its responses and routing based on the module currently in use.
