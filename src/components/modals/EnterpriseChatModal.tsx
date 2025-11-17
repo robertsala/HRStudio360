@@ -93,7 +93,22 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
           if (exists) {
             return prev;
           }
-          return [...prev, message];
+          
+          const tempFromSender = prev.filter(m => 
+            m.id.startsWith('temp-') && m.sender_id === message.sender_id
+          );
+          
+          if (tempFromSender.length > 0) {
+            const oldestTemp = tempFromSender.sort((a, b) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            )[0];
+            
+            const updated = prev.map(m => m.id === oldestTemp.id ? message : m);
+            return updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          }
+          
+          const updated = [...prev, message];
+          return updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         });
       }
 
@@ -337,10 +352,13 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
       );
 
       setMessages(prev => {
-        const withoutTemp = prev.filter(msg => msg.id !== tempMessage.id);
-        const withoutDuplicate = withoutTemp.filter(msg => msg.id !== newMessage.id);
-        return [...withoutDuplicate, newMessage];
+        const withoutDuplicates = prev.filter(msg => 
+          msg.id !== tempMessage.id && msg.id !== newMessage.id
+        );
+        const updated = [...withoutDuplicates, newMessage];
+        return updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       });
+      
       await loadChannels();
     } catch (error) {
       console.error('Failed to send message:', error);
