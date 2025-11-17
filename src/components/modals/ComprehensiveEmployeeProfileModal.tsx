@@ -51,6 +51,8 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const [managerName, setManagerName] = useState<string>('Not assigned');
+  const [availableManagers, setAvailableManagers] = useState<Array<{ id: string; name: string }>>([]);
 
   // Determine if current user is HR staff
   const isHRUser = user?.email?.includes('hr') || user?.email?.includes('HR') || 
@@ -245,6 +247,61 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       loadEmployeeData();
     }
   }, [activeTab, user?.id]);
+
+  // Fetch manager name when component mounts or when employee/managerId changes
+  useEffect(() => {
+    const fetchManagerName = async () => {
+      const managerId = (employee as any)?.managerId || formData.managerId;
+      if (managerId) {
+        try {
+          const response = await fetch(`/api/profiles/${managerId}`);
+          if (response.ok) {
+            const profile = await response.json();
+            const name = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+            setManagerName(name || 'Not assigned');
+            // Update formData with manager name
+            setFormData(prev => ({ ...prev, manager: name || 'Not assigned' }));
+          } else {
+            setManagerName('Not assigned');
+          }
+        } catch (error) {
+          console.error('Error fetching manager name:', error);
+          setManagerName('Not assigned');
+        }
+      } else {
+        setManagerName('Not assigned');
+        setFormData(prev => ({ ...prev, manager: 'Not assigned' }));
+      }
+    };
+
+    fetchManagerName();
+  }, [employee, formData.managerId]);
+
+  // Fetch available employees for manager dropdown when entering edit mode
+  useEffect(() => {
+    const fetchAvailableManagers = async () => {
+      if (isEditing) {
+        try {
+          const response = await fetch('/api/employees/directory');
+          if (response.ok) {
+            const employees = await response.json();
+            const managers = employees
+              .filter((emp: any) => emp.id !== formData.id) // Don't allow selecting self as manager
+              .map((emp: any) => ({
+                id: emp.id,
+                name: emp.profile ? `${emp.profile.firstName || ''} ${emp.profile.lastName || ''}`.trim() : 'Unknown'
+              }))
+              .filter((manager: any) => manager.name !== 'Unknown');
+            setAvailableManagers(managers);
+          }
+        } catch (error) {
+          console.error('Error fetching employees for manager dropdown:', error);
+        }
+      }
+    };
+
+    fetchAvailableManagers();
+  }, [isEditing, formData.id]);
 
   const loadEmployeeData = async () => {
     // Use employee.id if provided (when viewing another employee), otherwise use user.id (when viewing own profile)
@@ -702,14 +759,29 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Manager</label>
                       {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.manager}
-                          onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
-                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
+                        <select
+                          value={(employee as any)?.managerId || formData.managerId || ''}
+                          onChange={(e) => {
+                            const selectedManagerId = e.target.value;
+                            const selectedManager = availableManagers.find(m => m.id === selectedManagerId);
+                            setFormData({ 
+                              ...formData, 
+                              managerId: selectedManagerId,
+                              manager: selectedManager?.name || 'Not assigned'
+                            });
+                          }}
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          data-testid="select-manager"
+                        >
+                          <option value="">No Manager</option>
+                          {availableManagers.map((manager) => (
+                            <option key={manager.id} value={manager.id}>
+                              {manager.name}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        <p className="text-gray-900 dark:text-white dark:text-white">{formData.manager}</p>
+                        <p className="text-gray-900 dark:text-white dark:text-white">{formData.manager || managerName}</p>
                       )}
                     </div>
                     <div>
