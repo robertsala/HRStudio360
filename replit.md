@@ -117,3 +117,26 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 **Testing Ready:**
 -   Robert Sala account fully configured for AI testing
 -   Can test queries: "What's my PTO balance?", "Who is my manager?", "What benefits am I enrolled in?"
+
+### November 17, 2025 - Bug Fixes & UX Improvements
+
+**Employee Directory Fix:**
+-   Fixed Dashboard to display real database employees instead of mock data
+-   Replaced EmployeeListModal (181 mock employees) with EmployeeDirectoryModal (actual 6 database employees)
+-   Victor Martinez now appears correctly in search results
+
+**My Profile Enhancements:**
+-   Added manager information display to My Profile page
+-   Created new API endpoint `/api/employees/user/:userId` to fetch employee by userId
+-   Robert Sala's profile now correctly shows "Victor Martinez" as manager
+-   Manager field is read-only and displays "Not assigned" when no manager is set
+
+**Chat UX Improvement:**
+-   Fixed Enterprise Chat to auto-scroll to bottom (most recent messages) on load
+-   Added smooth scroll behavior after messages load for better user experience
+-   Users no longer need to manually scroll down to see latest conversation
+
+**Critical AI Assistant Bug Fix:**
+-   Fixed severe bug where conversation history was being passed as userId parameter
+-   AI can now properly access employee context (PTO, manager, benefits, timesheets)
+-   Resolved PostgreSQL UUID parsing errors in getEmployeeContext function
