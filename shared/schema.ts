@@ -1908,3 +1908,61 @@ export const insertEmployeeAccessAssignmentSchema = createInsertSchema(employeeA
 });
 export type InsertEmployeeAccessAssignment = z.infer<typeof insertEmployeeAccessAssignmentSchema>;
 export type EmployeeAccessAssignment = typeof employeeAccessAssignments.$inferSelect;
+
+export const callTypeEnum = pgEnum('call_type', ['voice', 'video']);
+export const callStatusEnum = pgEnum('call_status', ['ringing', 'active', 'ended', 'missed', 'declined']);
+export const participantStatusEnum = pgEnum('participant_status', ['calling', 'connected', 'disconnected']);
+export const signalTypeEnum = pgEnum('signal_type', ['offer', 'answer', 'ice-candidate']);
+
+export const callSessions = pgTable('call_sessions', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  channelId: uuid('channel_id').references(() => chatChannels.id, { onDelete: 'cascade' }).notNull(),
+  callerId: uuid('caller_id').references(() => profiles.id).notNull(),
+  callType: callTypeEnum('call_type').notNull(),
+  status: callStatusEnum('status').default('ringing').notNull(),
+  startedAt: timestamp('started_at').defaultNow(),
+  endedAt: timestamp('ended_at'),
+  duration: integer('duration').default(0),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const callParticipants = pgTable('call_participants', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  callSessionId: uuid('call_session_id').references(() => callSessions.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => profiles.id).notNull(),
+  status: participantStatusEnum('status').default('calling').notNull(),
+  joinedAt: timestamp('joined_at'),
+  leftAt: timestamp('left_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const callSignaling = pgTable('call_signaling', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  callSessionId: uuid('call_session_id').references(() => callSessions.id, { onDelete: 'cascade' }).notNull(),
+  fromUserId: uuid('from_user_id').references(() => profiles.id).notNull(),
+  toUserId: uuid('to_user_id').references(() => profiles.id),
+  signalType: signalTypeEnum('signal_type').notNull(),
+  signalData: json('signal_data').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const insertCallSessionSchema = createInsertSchema(callSessions).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertCallSession = z.infer<typeof insertCallSessionSchema>;
+export type CallSession = typeof callSessions.$inferSelect;
+
+export const insertCallParticipantSchema = createInsertSchema(callParticipants).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertCallParticipant = z.infer<typeof insertCallParticipantSchema>;
+export type CallParticipant = typeof callParticipants.$inferSelect;
+
+export const insertCallSignalingSchema = createInsertSchema(callSignaling).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertCallSignaling = z.infer<typeof insertCallSignalingSchema>;
+export type CallSignaling = typeof callSignaling.$inferSelect;
