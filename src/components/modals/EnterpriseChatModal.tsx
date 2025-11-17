@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MessageCircle, Users, Search, Plus, Hash, Send, Paperclip, Smile, MoreVertical, Phone, Video, Settings, Bot, UserPlus, Archive, Trash2, Edit2, Reply, Check, CheckCheck, Sparkles } from 'lucide-react';
+import { X, MessageCircle, Users, Search, Plus, Hash, Send, Paperclip, Smile, Phone, Video, Settings, Bot, CheckCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { chatService, Channel, Message, ChannelMember } from '../../utils/chatService';
 import { useUserPresence } from '../../hooks/useUserPresence';
@@ -7,16 +7,6 @@ import NewChannelModal from './NewChannelModal';
 import EmojiPicker from '../EmojiPicker';
 import CallModal from './CallModal';
 import { callingService, CallSession } from '../../utils/callingService';
-import '@chatscope/chat-ui-kit-styles/dist/default/styles.min.css';
-import {
-  MainContainer,
-  ChatContainer,
-  MessageList,
-  Message as ChatMessage,
-  MessageInput,
-  Avatar,
-  TypingIndicator
-} from '@chatscope/chat-ui-kit-react';
 
 interface EnterpriseChatModalProps {
   isOpen: boolean;
@@ -91,6 +81,13 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (messageInputRef.current) {
+      messageInputRef.current.style.height = 'auto';
+      messageInputRef.current.style.height = `${Math.min(messageInputRef.current.scrollHeight, 120)}px`;
+    }
+  }, [messageInput]);
 
   useEffect(() => {
     const handleNewMessage = (event: Event) => {
@@ -328,6 +325,7 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
     setMessageInput('');
     setIsSending(true);
 
+    const nameParts = (user?.name || 'You').split(' ');
     const tempMessage = {
       id: 'temp-' + Date.now(),
       channel_id: selectedChannel.id,
@@ -344,9 +342,10 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
       created_at: new Date().toISOString(),
       sender: {
         id: user?.id || '',
-        first_name: user?.user_metadata?.first_name || 'You',
-        last_name: user?.user_metadata?.last_name || '',
+        firstName: nameParts[0] || 'You',
+        lastName: nameParts.slice(1).join(' ') || '',
         email: user?.email || '',
+        profilePicture: user?.profilePicture,
       }
     };
 
@@ -518,7 +517,7 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
     if (channel.channel_type === 'direct' && channel.members) {
       const otherMember = channel.members.find(m => m.user_id !== user?.id);
       if (otherMember?.user) {
-        return `${otherMember.user.first_name} ${otherMember.user.last_name}`;
+        return `${otherMember.user.firstName} ${otherMember.user.lastName}`;
       }
     }
 
@@ -543,15 +542,15 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
   const getUserAvatar = (member?: ChannelMember) => {
     if (!member?.user) return null;
 
-    const initials = `${member.user.first_name?.[0] || ''}${member.user.last_name?.[0] || ''}`.toUpperCase();
+    const initials = `${member.user.firstName?.[0] || ''}${member.user.lastName?.[0] || ''}`.toUpperCase();
     const presenceStatus = getPresenceStatus(member.user_id);
 
     return (
       <div className="relative">
-        {member.user.profile_picture ? (
+        {member.user.profilePicture ? (
           <img
-            src={member.user.profile_picture}
-            alt={`${member.user.first_name} ${member.user.last_name}`}
+            src={member.user.profilePicture}
+            alt={`${member.user.firstName} ${member.user.lastName}`}
             className="h-8 w-8 rounded-full object-cover"
           />
         ) : (
@@ -911,41 +910,52 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                     </div>
                   </div>
                 ) : (
-                  <MainContainer>
-                    <ChatContainer>
-                      <MessageList
-                        typingIndicator={typingUsers.length > 0 ? <TypingIndicator content="Someone is typing" /> : null}
-                      >
-                        {messages.map((message, index) => {
-                          const isOwn = message.sender_id === user?.id;
-                          const showAvatar = index === 0 || messages[index - 1].sender_id !== message.sender_id;
-                          const senderName = message.sender 
-                            ? `${message.sender.first_name} ${message.sender.last_name}` 
-                            : 'Unknown';
+                  <div className="flex flex-col h-full">
+                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                      {messages.map((message, index) => {
+                        const isOwn = message.sender_id === user?.id;
+                        const showAvatar = index === 0 || messages[index - 1].sender_id !== message.sender_id;
+                        const senderName = message.sender 
+                          ? `${message.sender.firstName} ${message.sender.lastName}` 
+                          : 'Unknown';
+                        const isImage = message.message_type === 'file' && message.file_url && message.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
 
-                          // Render file messages with custom content
-                          if (message.message_type === 'file' && message.file_url) {
-                            const isImage = message.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                            
-                            return (
-                              <ChatMessage
-                                key={message.id}
-                                model={{
-                                  message: message.decrypted_content || 'Shared a file',
-                                  sentTime: formatMessageTime(message.created_at),
-                                  sender: senderName,
-                                  direction: isOwn ? 'outgoing' : 'incoming',
-                                  position: 'normal',
-                                  type: 'custom'
-                                }}
-                              >
-                                {!isOwn && showAvatar && message.sender && (
-                                  <Avatar
-                                    name={senderName}
-                                    src={message.sender.profile_picture || undefined}
+                        return (
+                          <div 
+                            key={message.id}
+                            className={`flex ${isOwn ? 'justify-end' : 'justify-start'} items-end gap-2`}
+                            data-testid={`message-${message.id}`}
+                          >
+                            {!isOwn && showAvatar && (
+                              <div className="flex-shrink-0">
+                                {message.sender?.profilePicture ? (
+                                  <img
+                                    src={message.sender.profilePicture}
+                                    alt={senderName}
+                                    className="w-8 h-8 rounded-full object-cover"
                                   />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
+                                    {senderName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                  </div>
                                 )}
-                                <ChatMessage.CustomContent>
+                              </div>
+                            )}
+                            {!isOwn && !showAvatar && <div className="w-8" />}
+
+                            <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                              {!isOwn && showAvatar && (
+                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 px-1">
+                                  {senderName}
+                                </span>
+                              )}
+                              
+                              <div className={`rounded-2xl px-4 py-2 ${
+                                isOwn 
+                                  ? 'bg-blue-600 text-white rounded-br-sm' 
+                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-sm'
+                              }`}>
+                                {message.message_type === 'file' && message.file_url ? (
                                   <div className="space-y-2">
                                     {isImage ? (
                                       <img
@@ -953,13 +963,15 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                                         alt={message.file_name || 'Image'}
                                         className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                                         onClick={() => window.open(message.file_url!, '_blank')}
+                                        data-testid={`image-${message.id}`}
                                       />
                                     ) : (
                                       <a
                                         href={message.file_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center space-x-2 hover:underline"
+                                        className="flex items-center gap-2 hover:underline"
+                                        data-testid={`file-link-${message.id}`}
                                       >
                                         <Paperclip className="h-4 w-4" />
                                         <span className="text-sm">{message.file_name}</span>
@@ -971,38 +983,51 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                                       </a>
                                     )}
                                     {message.decrypted_content && (
-                                      <p className="text-sm">{message.decrypted_content}</p>
+                                      <p className="text-sm whitespace-pre-wrap break-words">
+                                        {message.decrypted_content}
+                                      </p>
                                     )}
                                   </div>
-                                </ChatMessage.CustomContent>
-                              </ChatMessage>
-                            );
-                          }
+                                ) : (
+                                  <p className="text-sm whitespace-pre-wrap break-words" data-testid={`message-content-${message.id}`}>
+                                    {message.decrypted_content || 'Unable to load message'}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center gap-2 mt-1 px-1">
+                                <span className="text-xs text-gray-500 dark:text-gray-400" data-testid={`timestamp-${message.id}`}>
+                                  {formatMessageTime(message.created_at)}
+                                </span>
+                                {isOwn && message.read_by && message.read_by.length > 0 && (
+                                  <CheckCheck className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                )}
+                              </div>
+                            </div>
 
-                          // Regular text messages
-                          return (
-                            <ChatMessage
-                              key={message.id}
-                              model={{
-                                message: message.decrypted_content || 'Unable to load message',
-                                sentTime: formatMessageTime(message.created_at),
-                                sender: senderName,
-                                direction: isOwn ? 'outgoing' : 'incoming',
-                                position: 'normal'
-                              }}
-                            >
-                              {!isOwn && showAvatar && message.sender && (
-                                <Avatar
-                                  name={senderName}
-                                  src={message.sender.profile_picture || undefined}
-                                />
-                              )}
-                            </ChatMessage>
-                          );
-                        })}
-                      </MessageList>
-                    </ChatContainer>
-                  </MainContainer>
+                            {isOwn && <div className="w-8" />}
+                          </div>
+                        );
+                      })}
+
+                      {typingUsers.length > 0 && (
+                        <div className="flex items-end gap-2" data-testid="typing-indicator">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white text-xs font-semibold">
+                              <MessageCircle className="h-4 w-4" />
+                            </div>
+                          </div>
+                          <div className="bg-gray-200 dark:bg-gray-700 rounded-2xl rounded-bl-sm px-4 py-3">
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <div className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <div className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -1044,16 +1069,40 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                     <Paperclip className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                   </button>
 
-                  <div className="flex-1">
-                    <MessageInput
-                      placeholder="Type a message..."
+                  <div className="flex-1 relative">
+                    <textarea
+                      ref={messageInputRef}
                       value={messageInput}
-                      onChange={handleInputChange}
-                      onSend={handleSendMessage}
+                      onChange={(e) => {
+                        setMessageInput(e.target.value);
+                        handleInputChange(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      placeholder="Type a message..."
                       disabled={isSending}
-                      attachButton={false}
-                      sendDisabled={!messageInput.trim() || isSending}
+                      rows={1}
+                      className="w-full px-4 py-3 pr-12 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        minHeight: '48px',
+                        maxHeight: '120px',
+                        height: 'auto'
+                      }}
+                      data-testid="input-message"
                     />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || isSending}
+                      className="absolute right-2 bottom-2 p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+                      title="Send message"
+                      data-testid="button-send"
+                    >
+                      <Send className="h-4 w-4 text-white" />
+                    </button>
                   </div>
 
                   <div className="relative">
@@ -1128,7 +1177,7 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
                           {getUserAvatar(member)}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                              {member.user?.first_name} {member.user?.last_name}
+                              {member.user?.firstName} {member.user?.lastName}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                               {member.user?.email}

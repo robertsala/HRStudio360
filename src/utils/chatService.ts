@@ -2,22 +2,17 @@ import { apiClient } from '../lib/api';
 import { chatEncryption } from './chatEncryptionService';
 import { getChatWebSocketClient, type ChatWebSocketClient } from './websocketClient';
 
-// Normalization helpers to convert camelCase API responses to snake_case for backward compatibility
+// Normalization helpers to convert camelCase API responses to match type definitions
 function normalizeUser(user: any): any {
   if (!user) return null;
   return {
     id: user.id,
     email: user.email,
-    first_name: user.firstName,
-    last_name: user.lastName,
-    full_name: user.fullName,
-    avatar_url: user.avatarUrl,
-    role: user.role,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    profilePicture: user.avatarUrl || user.profilePicture,
     department: user.department,
-    job_title: user.jobTitle,
-    status: user.status,
-    created_at: user.createdAt,
-    updated_at: user.updatedAt
+    role: user.role
   };
 }
 

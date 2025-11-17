@@ -17,8 +17,6 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@chatscope/chat-ui-kit-react": "^2.1.1",
-    "@chatscope/chat-ui-kit-styles": "^1.4.0",
     "@google-cloud/storage": "^7.17.3",
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/serverless": "^1.0.2",
