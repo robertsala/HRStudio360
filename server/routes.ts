@@ -1155,8 +1155,11 @@ export function registerRoutes(app: Express) {
             content: msg.encryptedContent
           }));
         
-        // Generate AI response with conversation context
-        const aiResponse = await chatWithStudioAI(userMessage, conversationHistory);
+        // Get userId from session for employee context
+        const userId = (req.session as any)?.userId;
+        
+        // Generate AI response with conversation context and employee data
+        const aiResponse = await chatWithStudioAI(userMessage, userId, conversationHistory);
         
         const aiMessageData = {
           channelId: req.params.channelId,
