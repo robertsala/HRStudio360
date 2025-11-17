@@ -356,12 +356,26 @@ export function registerRoutes(app: Express) {
   // Get employee by userId (instead of employee ID)
   app.get('/api/employees/user/:userId', async (req, res) => {
     try {
-      const employees = await storage.getEmployees();
-      const employee = employees.find(e => e.userId === req.params.userId);
+      const employees = await storage.getEmployeesWithProfiles();
+      const employee = employees.find((e: any) => e.userId === req.params.userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee not found' });
       }
-      res.json(employee);
+      
+      // Format employee data to include name for frontend compatibility
+      const formattedEmployee = {
+        ...employee,
+        name: employee.profile ? 
+          `${employee.profile.firstName || ''} ${employee.profile.lastName || ''}`.trim() : 
+          'Unknown',
+        firstName: employee.profile?.firstName || '',
+        lastName: employee.profile?.lastName || '',
+        email: employee.profile?.email || '',
+        phone: employee.profile?.phone || '',
+        avatarUrl: employee.profile?.avatarUrl || null
+      };
+      
+      res.json(formattedEmployee);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
