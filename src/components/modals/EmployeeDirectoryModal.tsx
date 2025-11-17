@@ -4,6 +4,7 @@ import { apiClient } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUserPresence } from '../../hooks/useUserPresence';
 import ComprehensiveEmployeeProfileModal from './ComprehensiveEmployeeProfileModal';
+import { mockEmployees } from '../../data/mockEmployees';
 
 interface Employee {
   id: string;
@@ -117,8 +118,18 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
         managerName: emp.managerId ? (managerMap.get(emp.managerId) || 'Not assigned') : 'Not assigned'
       }));
 
+      // Merge with mock employees for comprehensive directory
+      const mockEmployeesFormatted = mockEmployees.map(mock => ({
+        ...mock,
+        id: `mock-${mock.id}`, // Prefix to avoid ID conflicts with real employees
+        managerId: undefined,
+        managerName: 'Not assigned'
+      }));
+
+      const allEmployees = [...employeesWithManagers, ...mockEmployeesFormatted];
+      
       // Keep all employees - filtering can be done by user via filter controls
-      setEmployees(employeesWithManagers);
+      setEmployees(allEmployees);
     } catch (error) {
       console.error('Error fetching employees:', error);
       setEmployees([]);

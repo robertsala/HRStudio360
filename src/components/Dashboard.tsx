@@ -59,7 +59,7 @@ import JobManagementModal from './modals/JobManagementModal';
 import StudioAIChatModal from './modals/StudioAIChatModal';
 import AgentActivityModal from './modals/AgentActivityModal';
 
-const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((props, ref) => {
+const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; openMyProfile: () => void }>((props, ref) => {
   const { t } = useTranslation();
   const { user, signOut, isImpersonating } = useAuth();
   
@@ -287,8 +287,29 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void }>((
   };
 
   // Expose openModal function to parent via ref
+  // Function to open My Profile with current user's employee data
+  const openMyProfile = async () => {
+    try {
+      const response = await fetch(`/api/employees/user/${user?.id}`);
+      if (response.ok) {
+        const employeeData = await response.json();
+        setActiveEmployee(employeeData);
+        setActiveContent('comprehensiveProfile');
+      } else {
+        console.error('Failed to fetch employee data for My Profile');
+        // Still open the modal, it will fetch the data internally
+        setActiveContent('comprehensiveProfile');
+      }
+    } catch (error) {
+      console.error('Error fetching employee data:', error);
+      // Still open the modal, it will fetch the data internally
+      setActiveContent('comprehensiveProfile');
+    }
+  };
+
   React.useImperativeHandle(ref, () => ({
-    openModal
+    openModal,
+    openMyProfile
   }));
   
   // Handle successful employee addition

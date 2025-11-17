@@ -82,6 +82,16 @@ const EnterpriseChatModal: React.FC<EnterpriseChatModalProps> = ({ isOpen, onClo
     scrollToBottom();
   }, [messages]);
 
+  // Scroll to bottom when modal opens/reopens with existing conversation
+  useEffect(() => {
+    if (isOpen && messages.length > 0) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        scrollToBottom();
+      });
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (messageInputRef.current) {
       messageInputRef.current.style.height = 'auto';

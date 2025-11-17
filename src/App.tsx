@@ -40,6 +40,18 @@ function App() {
     }
   };
 
+  // Handle opening My Profile comprehensive modal
+  const handleOpenMyProfile = () => {
+    console.log('[App.tsx] handleOpenMyProfile called');
+    if (dashboardRef.current && dashboardRef.current.openMyProfile) {
+      dashboardRef.current.openMyProfile();
+    } else {
+      // Fallback to profile route when Dashboard is not mounted
+      console.log('[App.tsx] Dashboard not mounted, routing to /profile');
+      setLocation('/profile');
+    }
+  };
+
   // Show loading state
   if (isLoading) {
     return (
@@ -67,7 +79,7 @@ function App() {
 
         {/* Dashboard route - protected */}
         <Route path="/dashboard">
-          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <ProtectedRoute>
               <Dashboard ref={dashboardRef} />
             </ProtectedRoute>
@@ -76,7 +88,7 @@ function App() {
 
         {/* Profile route - protected */}
         <Route path="/profile">
-          <Layout currentView="profile" onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+          <Layout currentView="profile" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <ProtectedRoute>
               <UserProfile onNavigate={handleNavigation} />
             </ProtectedRoute>
@@ -85,7 +97,7 @@ function App() {
 
         {/* Landing page - default route */}
         <Route path="/">
-          <Layout currentView="landing" onNavigate={handleNavigation} onOpenModal={handleOpenModal}>
+          <Layout currentView="landing" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <Hero />
             <Problems />
             <Features />

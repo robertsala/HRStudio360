@@ -13,9 +13,10 @@ interface LayoutProps {
   currentView?: 'landing' | 'dashboard' | 'profile';
   onNavigate?: (view: 'landing' | 'dashboard' | 'profile') => void;
   onOpenModal?: (modalName: string) => void;
+  onOpenMyProfile?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNavigate, onOpenModal }) => {
+const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNavigate, onOpenModal, onOpenMyProfile }) => {
   const { t } = useTranslation();
   const { user, isAuthenticated, signIn, signOut } = useAuth();
   const [, setLocation] = useLocation();
@@ -232,7 +233,12 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
     },
     { id: 'profile', label: t('sidebar.myProfile'), icon: User, action: () => {
         setActiveSidebarItem('profile');
-        setLocation('/profile');
+        // Try to open comprehensive modal if on dashboard, otherwise route to profile page
+        if (onOpenMyProfile) {
+          onOpenMyProfile();
+        } else {
+          setLocation('/profile');
+        }
       }
     },
     { id: 'employees', label: t('sidebar.directory'), icon: Users, action: () => onOpenModal?.('employees') },
