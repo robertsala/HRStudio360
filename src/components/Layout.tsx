@@ -230,6 +230,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
         }
       }
     },
+    { id: 'profile', label: t('sidebar.myProfile'), icon: User, action: () => onOpenModal?.('userProfile') },
     { id: 'employees', label: t('sidebar.directory'), icon: Users, action: () => onOpenModal?.('employees') },
     { id: 'recruitment', label: t('sidebar.recruitment'), icon: UserPlus, action: () => onOpenModal?.('hiring') },
     { id: 'onboarding', label: t('sidebar.onboarding'), icon: GraduationCap, action: () => onOpenModal?.('onboarding') },

@@ -393,6 +393,7 @@
   },
   "sidebar": {
     "dashboard": "Panel",
+    "myProfile": "Mi Perfil",
     "directory": "Directorio",
     "recruitment": "Reclutamiento",
     "onboarding": "Incorporación",
