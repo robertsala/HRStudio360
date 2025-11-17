@@ -1072,7 +1072,9 @@ export function registerRoutes(app: Express) {
       };
       delete messageData.plainContent; // Always remove - not a database column
       
+      console.log('[Chat] Creating message with data:', JSON.stringify(messageData, null, 2));
       const validated = insertChatMessageSchema.parse(messageData);
+      console.log('[Chat] Validation successful');
       const message = await storage.createChatMessage(validated);
       
       // Broadcast new message via WebSocket to all connected clients
@@ -1135,7 +1137,11 @@ export function registerRoutes(app: Express) {
       
       res.status(201).json(message);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error('[Chat] Message creation failed:', error);
+      if (error.issues) {
+        console.error('[Chat] Zod validation errors:', JSON.stringify(error.issues, null, 2));
+      }
+      res.status(400).json({ error: error.message, details: error.issues });
     }
   });
 

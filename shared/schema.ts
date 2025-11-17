@@ -981,7 +981,14 @@ export const insertExpenseVendorSchema = createInsertSchema(expenseVendors).omit
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
 export const insertChatChannelSchema = createInsertSchema(chatChannels).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChannelMemberSchema = createInsertSchema(channelMembers).omit({ id: true, joinedAt: true, lastReadAt: true });
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true }).extend({
+  fileUrl: z.string().nullable().optional(),
+  fileName: z.string().nullable().optional(),
+  fileSize: z.number().nullable().optional(),
+  replyToMessageId: z.string().uuid().nullable().optional(),
+  editedAt: z.date().nullable().optional(),
+  deletedAt: z.date().nullable().optional()
+});
 export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({ id: true, createdAt: true });
 export const insertTypingIndicatorSchema = createInsertSchema(typingIndicators).omit({ id: true, startedTypingAt: true });
 export const insertUserPresenceSchema = createInsertSchema(userPresence).omit({ lastSeenAt: true });
