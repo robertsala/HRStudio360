@@ -193,14 +193,8 @@ async function getEmployeeContext(userId: string): Promise<EmployeeContext> {
       console.log('[Employee Context] Could not fetch timesheet data:', error);
     }
 
-    const benefits: string[] = [];
-    const expenseCategories = await storage.getExpenseCategories();
-    if (expenseCategories.length > 0) {
-      benefits.push('Expense Reimbursement Program');
-    }
-
-    if (benefits.length > 0) {
-      context.benefits = benefits;
+    if (employee.benefits && employee.benefits.length > 0) {
+      context.benefits = employee.benefits;
     }
 
     return context;
