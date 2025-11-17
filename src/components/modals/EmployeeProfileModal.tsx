@@ -50,7 +50,8 @@ const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({ isOpen, onC
   // Combined authorization: HR staff OR Product Owner can terminate employees
   const canTerminateEmployees = isHRUser || isProductOwner;
 
-  const [formData, setFormData] = useState<Employee>({
+  // Stable initial template for form data
+  const initialFormData: Employee = {
     id: '1',
     name: '',
     email: '',
@@ -74,22 +75,48 @@ const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({ isOpen, onC
     performanceRating: 0,
     ptoBalance: 0,
     sickLeaveBalance: 0
-  });
+  };
 
-  // Fetch current user's employee data when modal opens
+  const [formData, setFormData] = useState<Employee>(initialFormData);
+
+  // Populate formData from employee prop when provided (Employee Directory scenario)
+  useEffect(() => {
+    if (employee) {
+      setFormData({
+        ...initialFormData,
+        ...employee,
+        emergencyContact: {
+          ...initialFormData.emergencyContact,
+          ...(employee.emergencyContact || {})
+        },
+        skills: employee.skills || initialFormData.skills,
+        certifications: employee.certifications || initialFormData.certifications
+      });
+      setLoading(false);
+    }
+  }, [employee]);
+
+  // Fetch current user's employee data when modal opens WITHOUT an employee prop (Quick Access)
   useEffect(() => {
     const fetchEmployeeData = async () => {
-      if (!isOpen || !user?.id) return;
+      // Only fetch if modal is open, user exists, AND no employee prop was provided
+      if (!isOpen || !user?.id || employee) return;
       
       try {
         setLoading(true);
         
         // Fetch profile data
         const profileResponse = await fetch(`/api/profiles/${user.id}`);
+        if (!profileResponse.ok) {
+          throw new Error('Failed to fetch profile');
+        }
         const profile = await profileResponse.json();
         
         // Fetch employee data
         const employeeResponse = await fetch(`/api/employees/user/${user.id}`);
+        if (!employeeResponse.ok) {
+          throw new Error('Failed to fetch employee data');
+        }
         const employeeData = await employeeResponse.json();
         
         // Fetch manager info if managerId exists
@@ -143,7 +170,7 @@ const EmployeeProfileModal: React.FC<EmployeeProfileModalProps> = ({ isOpen, onC
     };
     
     fetchEmployeeData();
-  }, [isOpen, user?.id, user?.name, user?.email, user?.profilePicture]);
+  }, [isOpen, user?.id, user?.name, user?.email, user?.profilePicture, employee]);
 
   // Check if viewing own profile (compare emails)
   const isViewingOwnProfile = user?.email === formData.email;
