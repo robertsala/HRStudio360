@@ -4,9 +4,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
 import { performanceReviewService, CompensationHistory } from '../../utils/performanceReviewService';
+import { useToast } from '../../hooks/use-toast';
+import { apiRequest } from '../../lib/queryClient';
 
 interface Employee {
-  id: string;
+  id: string; // Profile or display ID
+  employeeRecordId?: string; // Employees table UUID for backend updates
   name: string;
   email: string;
   phone: string;
@@ -16,6 +19,7 @@ interface Employee {
   startDate: string;
   location: string;
   manager: string;
+  managerId?: string;
   salary: string;
   employeeId: string;
   profileImage?: string;
@@ -51,8 +55,10 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { toast } = useToast();
   const [managerName, setManagerName] = useState<string>('Not assigned');
   const [availableManagers, setAvailableManagers] = useState<Array<{ id: string; name: string }>>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Determine if current user is HR staff
   const isHRUser = user?.email?.includes('hr') || user?.email?.includes('HR') || 
@@ -95,11 +101,18 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Derive display employee from prop - this always reflects the current employee
   const displayEmployee = React.useMemo(() => employee ?? fallbackEmployee, [employee, fallbackEmployee]);
 
-  const [formData, setFormData] = useState<Employee>(displayEmployee);
+  // Normalize employee data to ensure optional arrays are initialized
+  const normalizeEmployee = (emp: Employee): Employee => ({
+    ...emp,
+    skills: emp.skills ?? [],
+    certifications: emp.certifications ?? [],
+  });
+
+  const [formData, setFormData] = useState<Employee>(normalizeEmployee(displayEmployee));
 
   // Update formData when displayEmployee changes (e.g., when a different employee is selected)
   React.useEffect(() => {
-    setFormData(displayEmployee);
+    setFormData(normalizeEmployee(displayEmployee));
   }, [displayEmployee]);
 
   // Handle ESC key press
@@ -127,9 +140,68 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Show terminate button only if: user has termination privileges AND not viewing their own profile
   const showTerminateButton = canTerminateEmployees && !isViewingOwnProfile;
 
-  const handleSave = () => {
-    console.log('Saving employee data:', formData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    // Use employeeRecordId (employees table UUID) instead of id (profile UUID)
+    const employeeTableId = formData.employeeRecordId || formData.id;
+    
+    if (!employeeTableId) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Employee record ID is missing"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Only send managerId for now - the employees table has limited fields
+      // Other profile data (name, email, phone, etc.) is in the profiles table
+      const updateData: { managerId?: string | null } = {};
+      
+      // Only include managerId if it was explicitly changed to a valid value
+      // Guard against undefined values from dropdown that could wipe existing manager
+      if (formData.managerId !== undefined && formData.managerId !== null && formData.managerId !== '') {
+        updateData.managerId = formData.managerId;
+      } else if (formData.managerId === '' || formData.managerId === null) {
+        // Explicitly allow clearing the manager
+        updateData.managerId = null;
+      }
+      
+      // If no updates to make, skip the API call
+      if (Object.keys(updateData).length === 0) {
+        setIsEditing(false);
+        return;
+      }
+
+      // Send PATCH request to update employee using employees table UUID
+      await apiRequest(`/api/employees/${employeeTableId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updateData)
+      });
+
+      toast({
+        title: "Success",
+        description: "Manager assignment updated successfully"
+      });
+
+      setIsEditing(false);
+      
+      // Optionally trigger a refresh of the employee data
+      if (employee) {
+        // If this was opened from Dashboard.openMyProfile, the parent should refetch
+        window.dispatchEvent(new CustomEvent('employee-updated', { detail: { employeeId: employeeTableId } }));
+      }
+    } catch (error) {
+      console.error('Error saving employee data:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update manager assignment. Please try again."
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
 
@@ -251,7 +323,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Fetch manager name when component mounts or when employee/managerId changes
   useEffect(() => {
     const fetchManagerName = async () => {
-      const managerId = (employee as any)?.managerId || formData.managerId;
+      const managerId = employee?.managerId || formData.managerId;
       if (managerId) {
         try {
           const response = await fetch(`/api/profiles/${managerId}`);
@@ -286,9 +358,9 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
           if (response.ok) {
             const employees = await response.json();
             const managers = employees
-              .filter((emp: any) => emp.id !== formData.id) // Don't allow selecting self as manager
+              .filter((emp: any) => emp.employeeRecordId !== formData.employeeRecordId) // Don't allow selecting self as manager
               .map((emp: any) => ({
-                id: emp.id,
+                id: emp.userId, // Use userId (profile UUID) for managerId foreign key
                 name: emp.profile ? `${emp.profile.firstName || ''} ${emp.profile.lastName || ''}`.trim() : 'Unknown'
               }))
               .filter((manager: any) => manager.name !== 'Unknown');
@@ -301,7 +373,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     };
 
     fetchAvailableManagers();
-  }, [isEditing, formData.id]);
+  }, [isEditing, formData.employeeRecordId]);
 
   const loadEmployeeData = async () => {
     // Use employee.id if provided (when viewing another employee), otherwise use user.id (when viewing own profile)
@@ -380,14 +452,18 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                   <div className="flex space-x-2">
                     <button
                       onClick={handleSave}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                      disabled={isSaving}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="button-save-profile"
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Save
+                      {isSaving ? 'Saving...' : 'Save'}
                     </button>
                     <button
                       onClick={() => setIsEditing(false)}
-                      className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                      disabled={isSaving}
+                      className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="button-cancel-edit"
                     >
                       Cancel
                     </button>
@@ -760,7 +836,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Manager</label>
                       {isEditing ? (
                         <select
-                          value={(employee as any)?.managerId || formData.managerId || ''}
+                          value={employee?.managerId || formData.managerId || ''}
                           onChange={(e) => {
                             const selectedManagerId = e.target.value;
                             const selectedManager = availableManagers.find(m => m.id === selectedManagerId);

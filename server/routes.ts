@@ -363,8 +363,10 @@ export function registerRoutes(app: Express) {
       }
       
       // Format employee data to include name for frontend compatibility
+      // IMPORTANT: Keep employee.id (the employees table UUID) for PATCH operations
       const formattedEmployee = {
         ...employee,
+        employeeRecordId: employee.id, // Explicitly expose employees table ID for updates
         name: employee.profile ? 
           `${employee.profile.firstName || ''} ${employee.profile.lastName || ''}`.trim() : 
           'Unknown',
@@ -409,6 +411,31 @@ export function registerRoutes(app: Express) {
       res.status(201).json(employee);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/employees/:id', async (req, res) => {
+    try {
+      // Only allow updating managerId for now
+      const { managerId } = req.body;
+      
+      if (managerId !== undefined && managerId !== null && typeof managerId !== 'string') {
+        return res.status(400).json({ error: 'managerId must be a string or null' });
+      }
+
+      const updateData: Partial<import('../shared/schema.js').InsertEmployee> = {};
+      if (managerId !== undefined) {
+        updateData.managerId = managerId || null;
+      }
+
+      const employee = await storage.updateEmployee(req.params.id, updateData);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found. Please check the employee ID.' });
+      }
+      res.json(employee);
+    } catch (error: any) {
+      console.error('Error updating employee:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

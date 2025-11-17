@@ -551,6 +551,7 @@ export class DbStorage implements IStorage {
 
     return result.map(row => ({
       ...row.employee,
+      userId: row.employee.userId, // Explicitly expose for manager assignment foreign key
       profile: row.profile ? {
         firstName: row.profile.firstName,
         lastName: row.profile.lastName,
