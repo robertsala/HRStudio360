@@ -131,6 +131,7 @@ export const employees = pgTable('employees', {
   employmentType: employmentTypeEnum('employment_type').default('Full-time'),
   salary: numeric('salary', { precision: 10, scale: 2 }),
   status: employeeStatusEnum('status').default('Active'),
+  benefits: text('benefits').array(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });
