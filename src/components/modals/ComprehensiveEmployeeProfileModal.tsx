@@ -104,6 +104,11 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     ...emp,
     skills: emp.skills ?? [],
     certifications: emp.certifications ?? [],
+    emergencyContact: emp.emergencyContact ?? {
+      name: '',
+      relationship: '',
+      phone: ''
+    },
   });
 
   const [formData, setFormData] = useState<Employee>(normalizeEmployee(displayEmployee));
