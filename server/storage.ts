@@ -697,6 +697,19 @@ export class DbStorage implements IStorage {
         role: row.profile.role,
         phone: row.profile.phone,
         avatarUrl: row.profile.profilePicture,
+        // Address fields from profiles table
+        address: row.profile.address,
+        city: row.profile.city,
+        state: row.profile.state,
+        zipCode: row.profile.zipCode,
+        // Emergency contact fields from profiles table
+        emergencyContactFirstName: row.profile.emergencyContactFirstName,
+        emergencyContactLastName: row.profile.emergencyContactLastName,
+        emergencyContactMiddleName: row.profile.emergencyContactMiddleName,
+        emergencyContactRelationship: row.profile.emergencyContactRelationship,
+        emergencyContactPhone: row.profile.emergencyContactPhone,
+        // Profile picture (base64 data) from profiles table
+        profilePicture: row.profile.profilePicture,
         managerName: row.managerProfile 
           ? `${row.managerProfile.firstName || ''} ${row.managerProfile.lastName || ''}`.trim() || null
           : null

@@ -176,6 +176,17 @@ export type EmployeeWithProfile = Employee & {
     role: string | null;
     phone: string | null;
     avatarUrl: string | null;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
+    emergencyContactFirstName: string | null;
+    emergencyContactLastName: string | null;
+    emergencyContactMiddleName: string | null;
+    emergencyContactRelationship: string | null;
+    emergencyContactPhone: string | null;
+    profilePicture: string | null;
+    managerName?: string | null;
   } | null;
 };
 

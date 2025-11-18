@@ -629,7 +629,22 @@ export function registerRoutes(app: Express) {
         lastName: employee.profile?.lastName || '',
         email: employee.profile?.email || '',
         phone: employee.profile?.phone || '',
-        avatarUrl: employee.profile?.avatarUrl || null
+        avatarUrl: null, // Keep null to avoid duplicating base64 data (use profileImage instead)
+        // Include address fields from profiles table
+        address: employee.profile?.address || null,
+        city: employee.profile?.city || null,
+        state: employee.profile?.state || null,
+        zipCode: employee.profile?.zipCode || null,
+        // Include emergency contact from profiles table (always return object even when blank)
+        emergencyContact: {
+          firstName: employee.profile?.emergencyContactFirstName || '',
+          lastName: employee.profile?.emergencyContactLastName || '',
+          middleName: employee.profile?.emergencyContactMiddleName || '',
+          relationship: employee.profile?.emergencyContactRelationship || '',
+          phone: employee.profile?.emergencyContactPhone || ''
+        },
+        // Include profile picture (base64 data from profiles table)
+        profileImage: employee.profile?.profilePicture || null
       };
       
       res.json(formattedEmployee);
