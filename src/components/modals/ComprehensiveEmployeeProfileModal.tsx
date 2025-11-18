@@ -5,7 +5,7 @@ import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
 import { performanceReviewService, CompensationHistory } from '../../utils/performanceReviewService';
 import { apiRequest } from '../../lib/queryClient';
-import { formatPhoneNumber, formatZipCode, EMERGENCY_CONTACT_RELATIONSHIPS } from '../../lib/formatters';
+import { formatPhoneNumber, formatZipCode, EMERGENCY_CONTACT_RELATIONSHIPS } from '@/lib/formatters';
 
 interface Employee {
   id: string; // Profile or display ID
