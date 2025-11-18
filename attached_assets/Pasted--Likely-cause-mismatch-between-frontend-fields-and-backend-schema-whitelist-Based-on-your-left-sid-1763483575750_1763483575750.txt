@@ -1,0 +1,334 @@
+ Likely cause: mismatch between frontend fields and backend schema/whitelist
+
+Based on your left-side notes in the screenshot (backend updates, field whitelisting, SQL fixes) and the earlier console logs, here’s the pattern I see:
+
+    You have:
+        An Employees table (employment info).
+        A Profiles table (personal info like address, phone, emergency contacts, profile picture).
+    You recently:
+        Tightened field whitelisting.
+        Changed or renamed some fields.
+        Fixed or changed SQL.
+
+Typical failure scenarios after that:
+
+    Frontend sends a field not in the whitelist.
+        Example: frontend sends preferredLanguage, but backend expects languagePreference.
+        Backend either:
+            Throws a validation error, or
+            Produces invalid SQL (e.g., no fields to update).
+
+    Frontend sends values that violate a constraint.
+        Example: sending null where the column is NOT NULL.
+        Or sending an empty string where backend expects something specific.
+
+    The update builds malformed SQL.
+        Example: if, after filtering to allowed fields, there are no valid fields left, the backend builds UPDATE table SET WHERE id = ..., which is invalid and causes a 500.
+
+Given your console log with:
+
+    emergencyContactFirstName: null
+    emergencyContactLastName: null
+    etc.
+
+If the DB columns are non-nullable or your backend validation doesn’t allow null, that alone can cause the save to fail.
+4. Check your frontend save function
+
+Find the function that runs when you click “Save”. Look for something like:
+
+    A call to fetch or axios.post/put.
+    Where formData or a data object is built and sent to the backend.
+
+There are two things to confirm:
+
+    The body you send matches backend expectations:
+        Field names are all correct.
+        You’re not sending extra fields that no longer exist on the backend.
+        Nulls are acceptable (or you omit fields entirely if they’re empty).
+
+    For example, instead of:
+    js Copy
+
+    emergencyContactFirstName: formEmergencyFirstName || null
+
+js Copy
+
+emergencyContactFirstName: formEmergencyFirstName || null
+
+js Copy
+
+emergencyContactFirstName: formEmergencyFirstName || null
+
+you might want:
+js Copy
+
+if (formEmergencyFirstName) {
+  body.emergencyContactFirstName = formEmergencyFirstName;
+}
+// Don’t include the field at all if not provided
+
+js Copy
+
+if (formEmergencyFirstName) {
+  body.emergencyContactFirstName = formEmergencyFirstName;
+}
+// Don’t include the field at all if not provided
+
+js Copy
+
+if (formEmergencyFirstName) {
+  body.emergencyContactFirstName = formEmergencyFirstName;
+}
+// Don’t include the field at all if not provided
+
+Your error handling:
+
+You probably have something like:
+js Copy
+
+const res = await fetch(url, options);
+const text = await res.text();
+if (!res.ok) {
+  alert(text); // This is what shows that weird d19a85ec-...
+  return;
+}
+
+js Copy
+
+const res = await fetch(url, options);
+const text = await res.text();
+if (!res.ok) {
+  alert(text); // This is what shows that weird d19a85ec-...
+  return;
+}
+
+js Copy
+
+const res = await fetch(url, options);
+const text = await res.text();
+if (!res.ok) {
+  alert(text); // This is what shows that weird d19a85ec-...
+  return;
+}
+
+or:
+js Copy
+
+try {
+  // ...
+} catch (err) {
+  alert(err.message || err);
+}
+
+js Copy
+
+try {
+  // ...
+} catch (err) {
+  alert(err.message || err);
+}
+
+js Copy
+
+try {
+  // ...
+} catch (err) {
+  alert(err.message || err);
+}
+
+Improvements:
+
+    Log the full error, but show a friendly message to the user:
+    js Copy
+
+    if (!res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      let errorDetails;
+
+      if (contentType.includes("application/json")) {
+        errorDetails = await res.json();
+      } else {
+        errorDetails = await res.text();
+      }
+
+      console.error("Save failed:", errorDetails);
+      alert("Something went wrong while saving. Please try again.");
+      return;
+    }
+
+js Copy
+
+if (!res.ok) {
+  const contentType = res.headers.get("content-type") || "";
+  let errorDetails;
+
+  if (contentType.includes("application/json")) {
+    errorDetails = await res.json();
+  } else {
+    errorDetails = await res.text();
+  }
+
+  console.error("Save failed:", errorDetails);
+  alert("Something went wrong while saving. Please try again.");
+  return;
+}
+
+        js Copy
+
+        if (!res.ok) {
+          const contentType = res.headers.get("content-type") || "";
+          let errorDetails;
+
+          if (contentType.includes("application/json")) {
+            errorDetails = await res.json();
+          } else {
+            errorDetails = await res.text();
+          }
+
+          console.error("Save failed:", errorDetails);
+          alert("Something went wrong while saving. Please try again.");
+          return;
+        }
+
+    This will:
+        Keep the weird ID out of the popup.
+        Give you a usable error message in the console for debugging.
+
+5. Check backend whitelist / update logic
+
+In your backend update handler (likely a route like /api/profile or /api/employee):
+
+Look for:
+
+    An array or object listing allowed fields, e.g.:
+    ts Copy
+
+    const allowedFields = [
+      "address",
+      "city",
+      "state",
+      "zipCode",
+      "phone",
+      "profilePicture",
+      "emergencyContactFirstName",
+      "emergencyContactLastName",
+      // ...
+    ];
+
+ts Copy
+
+const allowedFields = [
+  "address",
+  "city",
+  "state",
+  "zipCode",
+  "phone",
+  "profilePicture",
+  "emergencyContactFirstName",
+  "emergencyContactLastName",
+  // ...
+];
+
+    ts Copy
+
+    const allowedFields = [
+      "address",
+      "city",
+      "state",
+      "zipCode",
+      "phone",
+      "profilePicture",
+      "emergencyContactFirstName",
+      "emergencyContactLastName",
+      // ...
+    ];
+
+    Logic that filters the incoming request body to only those fields.
+
+    Logic that builds the SQL UPDATE statement.
+
+Make sure:
+
+    Every field you want to save is in the allowed list.
+
+    Names match table columns or your mapping logic exactly.
+
+    If, after filtering, there are no valid fields, you handle it gracefully:
+    ts Copy
+
+    if (Object.keys(filteredFields).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+ts Copy
+
+if (Object.keys(filteredFields).length === 0) {
+  return res.status(400).json({ error: "No valid fields to update" });
+}
+
+    ts Copy
+
+    if (Object.keys(filteredFields).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    You don’t generate invalid SQL when the filtered fields are empty or improperly formatted.
+
+6. Why the “success” logs vs. actual failure
+
+You might have logging like:
+js Copy
+
+console.log("Updating employee table with:", employeeUpdateObject);
+// call fetch/axios
+console.log("Employee table updated successfully");
+
+js Copy
+
+console.log("Updating employee table with:", employeeUpdateObject);
+// call fetch/axios
+console.log("Employee table updated successfully");
+
+js Copy
+
+console.log("Updating employee table with:", employeeUpdateObject);
+// call fetch/axios
+console.log("Employee table updated successfully");
+
+If the “Employee table updated successfully” log happens before you actually check res.ok, you can get “success” logs even when the request fails.
+
+You want something like:
+js Copy
+
+console.log("Updating employee table with:", employeeUpdateObject);
+const res = await fetch(...);
+
+if (!res.ok) {
+  console.error("Employee update failed", await res.text());
+} else {
+  console.log("Employee table updated successfully");
+}
+
+js Copy
+
+console.log("Updating employee table with:", employeeUpdateObject);
+const res = await fetch(...);
+
+if (!res.ok) {
+  console.error("Employee update failed", await res.text());
+} else {
+  console.log("Employee table updated successfully");
+}
+
+js Copy
+
+console.log("Updating employee table with:", employeeUpdateObject);
+const res = await fetch(...);
+
+if (!res.ok) {
+  console.error("Employee update failed", await res.text());
+} else {
+  console.log("Employee table updated successfully");
+}
+
+Do a similar pattern for the profile update.

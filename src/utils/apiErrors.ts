@@ -19,9 +19,30 @@ export async function parseApiError(response: Response): Promise<ApiError> {
   let errorData: any;
   
   try {
-    errorData = await response.json();
+    // Try to parse as JSON first
+    const text = await response.text();
+    
+    // Check if it's actually JSON
+    if (text && text.trim().startsWith('{')) {
+      errorData = JSON.parse(text);
+    } else {
+      // It's HTML or plain text - extract a meaningful error
+      const statusMessages: Record<number, string> = {
+        400: 'Invalid request. Please check your input and try again.',
+        401: 'You need to be logged in to perform this action.',
+        403: 'You don't have permission to perform this action.',
+        404: 'The requested resource was not found.',
+        500: 'Server error. Please try again later.',
+        502: 'Service temporarily unavailable. Please try again later.',
+        503: 'Service temporarily unavailable. Please try again later.',
+      };
+      
+      errorData = { 
+        error: statusMessages[response.status] || response.statusText || 'An unexpected error occurred'
+      };
+    }
   } catch {
-    errorData = { error: response.statusText };
+    errorData = { error: response.statusText || 'An unexpected error occurred' };
   }
 
   const error: ApiError = {
