@@ -318,13 +318,18 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       const managerId = employee?.managerId || formData.managerId;
       if (managerId) {
         try {
-          const response = await fetch(`/api/profiles/${managerId}`);
+          // Fetch from employees directory and find manager by employee table ID
+          const response = await fetch('/api/employees/directory');
           if (response.ok) {
-            const profile = await response.json();
-            const name = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
-            setManagerName(name || 'Not assigned');
-            // Update formData with manager name
-            setFormData(prev => ({ ...prev, manager: name || 'Not assigned' }));
+            const employees = await response.json();
+            const manager = employees.find((emp: any) => emp.employeeRecordId === managerId);
+            if (manager && manager.profile) {
+              const name = `${manager.profile.firstName || ''} ${manager.profile.lastName || ''}`.trim();
+              setManagerName(name || 'Not assigned');
+              setFormData(prev => ({ ...prev, manager: name || 'Not assigned' }));
+            } else {
+              setManagerName('Not assigned');
+            }
           } else {
             setManagerName('Not assigned');
           }
@@ -352,7 +357,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
             const managers = employees
               .filter((emp: any) => emp.employeeRecordId !== formData.employeeRecordId) // Don't allow selecting self as manager
               .map((emp: any) => ({
-                id: emp.userId, // Use userId (profile UUID) for managerId foreign key
+                id: emp.employeeRecordId, // Use employee table ID for managerId foreign key
                 name: emp.profile ? `${emp.profile.firstName || ''} ${emp.profile.lastName || ''}`.trim() : 'Unknown'
               }))
               .filter((manager: any) => manager.name !== 'Unknown');
