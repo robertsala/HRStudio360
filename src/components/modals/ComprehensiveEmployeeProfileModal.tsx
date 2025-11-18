@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
 import { performanceReviewService, CompensationHistory } from '../../utils/performanceReviewService';
-import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '../../lib/queryClient';
 
 interface Employee {
@@ -145,11 +144,8 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     const employeeTableId = formData.employeeRecordId || formData.id;
     
     if (!employeeTableId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Employee record ID is missing"
-      });
+      console.error("Employee record ID is missing");
+      alert("Error: Employee record ID is missing");
       return;
     }
 
@@ -180,11 +176,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
         body: JSON.stringify(updateData)
       });
 
-      toast({
-        title: "Success",
-        description: "Manager assignment updated successfully"
-      });
-
+      console.log("Manager assignment updated successfully");
       setIsEditing(false);
       
       // Optionally trigger a refresh of the employee data
@@ -194,11 +186,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       }
     } catch (error) {
       console.error('Error saving employee data:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update manager assignment. Please try again."
-      });
+      alert("Failed to update manager assignment. Please try again.");
     } finally {
       setIsSaving(false);
     }
