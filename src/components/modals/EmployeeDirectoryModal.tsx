@@ -74,10 +74,10 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
           phone: emp.profile?.phone || '(555) 000-0000',
           department: emp.profile?.department || 'General',
           role: emp.profile?.role || 'Employee',
-          location: 'Remote', // Default for now, can be added to schema later
+          location: emp.location || 'Remote', // Use location from enriched endpoint
           startDate: emp.startDate || new Date().toISOString().split('T')[0],
           status: normalizedStatus as 'Active' | 'Remote' | 'On Leave',
-          profileImage: emp.profile?.avatarUrl,
+          profileImage: emp.profileImage || null, // Use profileImage from enriched endpoint (base64 data)
           salary: parseFloat(emp.salary?.toString() || '0'),
           employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried',
           managerId: emp.managerId || null
@@ -371,11 +371,19 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
 
                     <div className="flex items-center space-x-4 mb-4">
                       <div className="relative">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
-                          <span className="text-white font-bold">
-                            {getInitials(employee.name)}
-                          </span>
-                        </div>
+                        {employee.profileImage ? (
+                          <img
+                            src={employee.profileImage}
+                            alt={employee.name}
+                            className="w-12 h-12 rounded-full object-cover shadow-md"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                            <span className="text-white font-bold">
+                              {getInitials(employee.name)}
+                            </span>
+                          </div>
+                        )}
                         {(() => {
                           const presenceStatus = getPresenceStatus(employee.id);
                           if (presenceStatus === 'online') {
@@ -465,11 +473,19 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4 flex-1">
                           <div className="relative flex-shrink-0">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
-                              <span className="text-white font-bold text-sm">
-                                {getInitials(employee.name)}
-                              </span>
-                            </div>
+                            {employee.profileImage ? (
+                              <img
+                                src={employee.profileImage}
+                                alt={employee.name}
+                                className="w-12 h-12 rounded-full object-cover shadow-md"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                                <span className="text-white font-bold text-sm">
+                                  {getInitials(employee.name)}
+                                </span>
+                              </div>
+                            )}
                             {(() => {
                               const presenceStatus = getPresenceStatus(employee.id);
                               if (presenceStatus === 'online') {

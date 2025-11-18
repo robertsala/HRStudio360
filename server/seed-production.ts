@@ -106,6 +106,16 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         hireDate: '2023-09-15',
         profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=LisaAnderson&backgroundColor=feca57',
       },
+      {
+        email: 'hradmin@hrstudio360.com',
+        firstName: 'HR',
+        lastName: 'Admin',
+        department: 'People',
+        role: 'HR Manager',
+        canAccessOrgChart: true,
+        hireDate: '2024-01-01',
+        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HRAdmin&backgroundColor=a8dadc',
+      },
     ];
 
     const createdTeamMembers = await db.insert(profiles).values(teamMembers).returning();
@@ -278,6 +288,17 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         employmentType: 'Full-time' as const,
         salary: '115000',
         status: 'Active' as const
+      },
+      {
+        userId: createdTeamMembers[5].id, // HR Admin
+        employeeId: 'EMP008',
+        departmentId: peopleDeptFull?.id,
+        jobTitleId: hrJobTitle?.id,
+        startDate: '2024-01-01',
+        employmentType: 'Full-time' as const,
+        salary: '105000',
+        status: 'Active' as const,
+        role: 'HR Manager' // Ensure role is set for authorization checks
       }
     ];
 

@@ -45,6 +45,9 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation.
 -   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
 -   **Profile Picture Management**: Dual upload system for user self-service and HR administrative uploads, using existing object storage.
+-   **Profile Data Loading**: Unified data pipeline across all entry points (Dashboard, Employee Directory, Quick Access) ensures consistent profile data display. Fixed critical bug where saved address, emergency contact, and profile pictures were not loading after modal reopening.
+-   **Role-Based Profile Viewing**: HR Manager and Product Owner roles see full employee profiles (address, emergency contact, salary), while regular employees see limited public data (name, email, phone, department, role).
+-   **User Impersonation**: "View As" feature allows HR/Product Owner to impersonate employees for troubleshooting, accessible via Employee Directory with visual banner indicating impersonation status.
 
 ## External Dependencies
 

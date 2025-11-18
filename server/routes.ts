@@ -601,8 +601,95 @@ export function registerRoutes(app: Express) {
   // Note: Specific routes must come before parametric routes
   app.get('/api/employees/directory', async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Get current user's employee record to determine their role
+      const currentUserEmployee = await storage.getEmployeeByUserId(userId);
+      const viewerRole = currentUserEmployee?.role || 'Employee';
+      
+      // Determine if viewer can see full profiles (HR and Product Owner only)
+      const canViewFullProfiles = ['HR Manager', 'HR', 'Product Owner', 'Executive'].includes(viewerRole);
+
       const employees = await storage.getEmployeesWithProfiles();
-      res.json(employees);
+      
+      // Format each employee with role-based field filtering
+      const formattedEmployees = employees.map((employee: any) => {
+        // For authorized viewers (HR/Product Owner), return full profile
+        if (canViewFullProfiles) {
+          return {
+            ...employee,
+            employeeRecordId: employee.id,
+            name: employee.profile ? 
+              `${employee.profile.firstName || ''} ${employee.profile.lastName || ''}`.trim() : 
+              'Unknown',
+            firstName: employee.profile?.firstName || '',
+            lastName: employee.profile?.lastName || '',
+            email: employee.profile?.email || '',
+            phone: employee.profile?.phone || '',
+            avatarUrl: null,
+            profileImage: employee.profile?.profilePicture || null,
+            location: employee.profile?.city && employee.profile?.state 
+              ? `${employee.profile.city}, ${employee.profile.state}` 
+              : null,
+            address: employee.profile?.address || null,
+            city: employee.profile?.city || null,
+            state: employee.profile?.state || null,
+            zipCode: employee.profile?.zipCode || null,
+            emergencyContact: {
+              firstName: employee.profile?.emergencyContactFirstName || '',
+              lastName: employee.profile?.emergencyContactLastName || '',
+              middleName: employee.profile?.emergencyContactMiddleName || '',
+              relationship: employee.profile?.emergencyContactRelationship || '',
+              phone: employee.profile?.emergencyContactPhone || ''
+            }
+          };
+        }
+
+        // For regular employees, return whitelisted fields only (no salary, emergency contact, etc.)
+        return {
+          // Whitelist: only public employee record fields
+          id: employee.id,
+          userId: employee.userId,
+          employeeId: employee.employeeId,
+          status: employee.status,
+          employeeRecordId: employee.id,
+          
+          // Filtered profile object with only public fields
+          profile: {
+            firstName: employee.profile?.firstName || '',
+            lastName: employee.profile?.lastName || '',
+            email: employee.profile?.email || '',
+            phone: employee.profile?.phone || '',
+            department: employee.profile?.department || null,
+            role: employee.profile?.role || null,
+            city: employee.profile?.city || null,
+            state: employee.profile?.state || null,
+            profilePicture: employee.profile?.profilePicture || null,
+          },
+          
+          // Computed/formatted fields
+          name: employee.profile ? 
+            `${employee.profile.firstName || ''} ${employee.profile.lastName || ''}`.trim() : 
+            'Unknown',
+          firstName: employee.profile?.firstName || '',
+          lastName: employee.profile?.lastName || '',
+          email: employee.profile?.email || '',
+          phone: employee.profile?.phone || '',
+          avatarUrl: null,
+          profileImage: employee.profile?.profilePicture || null,
+          location: employee.profile?.city && employee.profile?.state 
+            ? `${employee.profile.city}, ${employee.profile.state}` 
+            : null
+          
+          // Explicitly excluded: salary, startDate, employmentType, managerId, departmentId, jobTitleId,
+          // address, zipCode, emergencyContact*, hireDate, and other sensitive fields
+        };
+      });
+      
+      res.json(formattedEmployees);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
