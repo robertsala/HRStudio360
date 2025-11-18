@@ -535,6 +535,7 @@ export class DbStorage implements IStorage {
   }
 
   async getEmployeesWithProfiles(): Promise<EmployeeWithProfile[]> {
+    const managerEmployees = alias(employees, 'managerEmployees');
     const managerProfiles = alias(profiles, 'managerProfiles');
     
     const result = await db
@@ -542,16 +543,19 @@ export class DbStorage implements IStorage {
         employee: employees,
         profile: profiles,
         department: departments,
+        managerEmployee: managerEmployees,
         managerProfile: managerProfiles
       })
       .from(employees)
       .leftJoin(profiles, eq(employees.userId, profiles.id))
       .leftJoin(departments, eq(employees.departmentId, departments.id))
-      .leftJoin(managerProfiles, eq(employees.managerId, managerProfiles.id));
+      .leftJoin(managerEmployees, eq(employees.managerId, managerEmployees.id))
+      .leftJoin(managerProfiles, eq(managerEmployees.userId, managerProfiles.id));
 
     return result.map(row => ({
       ...row.employee,
-      userId: row.employee.userId, // Explicitly expose for manager assignment foreign key
+      userId: row.employee.userId, // Profile UUID
+      employeeRecordId: row.employee.id, // Employee table UUID for backend operations
       profile: row.profile ? {
         firstName: row.profile.firstName,
         lastName: row.profile.lastName,

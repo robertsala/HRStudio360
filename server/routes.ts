@@ -50,6 +50,13 @@ import { chatWithStudioAI } from './ai-assistant.js';
 import { taxCalculator } from './tax-calculator.js';
 import { TaxDataService } from './tax-data-service.js';
 import { suggestTaxConfiguration, batchSuggestTaxConfigurations } from './ai-agent.js';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client for address validation
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 export function registerRoutes(app: Express) {
   // Rate limiting for authentication endpoints to prevent brute-force attacks
@@ -138,7 +145,16 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: 'Invalid base64 image data' });
       }
 
-      // Return the base64 data URL directly
+      // Save profile picture to database
+      try {
+        await storage.updateProfile(userId, { profilePicture: base64Data });
+        console.log(`Profile picture saved for user ${userId}`);
+      } catch (dbError: any) {
+        console.error('Error saving profile picture to database:', dbError);
+        return res.status(500).json({ error: 'Failed to save profile picture to database' });
+      }
+
+      // Return the base64 data URL
       res.json({ imageUrl: base64Data });
     } catch (error: any) {
       console.error('Error processing upload:', error);
@@ -339,6 +355,81 @@ export function registerRoutes(app: Express) {
       res.json(profile);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // AI Address Validation endpoint
+  app.post('/api/ai/validate-address', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { city, state, zipCode } = req.body;
+      
+      if (!city || !state || !zipCode) {
+        return res.status(400).json({ error: 'City, state, and zipCode are required' });
+      }
+
+      // Use OpenAI to validate the address
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an address validation expert. Your job is to verify if a given ZIP code matches the specified city and state in the United States.
+            
+            Respond ONLY with a JSON object in this exact format:
+            {
+              "valid": true/false,
+              "message": "explanation message",
+              "suggestion": "corrected city/state if applicable, or null"
+            }
+            
+            Rules:
+            - If the ZIP code correctly matches the city and state, return valid: true
+            - If the ZIP code is in the correct state but different city, return valid: false with a suggestion
+            - If the ZIP code is in a different state entirely, return valid: false
+            - Be aware that some ZIP codes can span multiple cities
+            - Consider common abbreviations and alternative city names`
+          },
+          {
+            role: 'user',
+            content: `Validate this address:\nCity: ${city}\nState: ${state}\nZIP Code: ${zipCode}`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 300
+      });
+
+      const aiResponse = completion.choices[0]?.message?.content;
+      if (!aiResponse) {
+        return res.status(500).json({ error: 'AI validation failed' });
+      }
+
+      // Parse AI response
+      let validation;
+      try {
+        validation = JSON.parse(aiResponse);
+      } catch (parseError) {
+        // If AI doesn't return valid JSON, assume validation passed to not block user
+        validation = { 
+          valid: true, 
+          message: 'Address validation could not be completed, proceeding anyway.',
+          suggestion: null 
+        };
+      }
+
+      res.json(validation);
+    } catch (error: any) {
+      console.error('AI address validation error:', error);
+      // On error, don't block the user - return success with a note
+      res.json({ 
+        valid: true, 
+        message: 'Address validation service temporarily unavailable. Address accepted.',
+        suggestion: null 
+      });
     }
   });
 

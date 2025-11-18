@@ -22,6 +22,10 @@ interface Employee {
   salary: string;
   employeeId: string;
   profileImage?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   emergencyContact: {
     name: string;
     relationship: string;
@@ -72,6 +76,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Fallback employee data for when no employee prop is provided
   const fallbackEmployee: Employee = React.useMemo(() => ({
     id: '124',
+    employeeRecordId: '124', // Fallback - same as id for mock employee
     name: 'Jennifer Martinez',
     email: 'jennifer.martinez@company.com',
     phone: '+1 (555) 124-0001',
@@ -146,56 +151,134 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const handleSave = async () => {
     // Use employeeRecordId (employees table UUID) instead of id (profile UUID)
     const employeeTableId = formData.employeeRecordId || formData.id;
+    // CRITICAL: Use the target employee's profile ID, not the current user's ID
+    // This ensures HR can edit other employees' profiles correctly
+    const profileId = formData.id;
+    
+    // Debug logging to help track ID usage
+    console.log("=== HandleSave ID Debug ===");
+    console.log("formData.id (profile UUID):", formData.id);
+    console.log("formData.employeeRecordId (employees table UUID):", formData.employeeRecordId);
+    console.log("Using employeeTableId:", employeeTableId);
+    console.log("Using profileId:", profileId);
+    console.log("=========================");
     
     if (!employeeTableId) {
       console.error("Employee record ID is missing");
-      alert("Error: Employee record ID is missing");
+      alert("Error: Employee record ID is missing. Cannot save changes.");
+      return;
+    }
+
+    if (!profileId) {
+      console.error("Profile ID is missing");
+      alert("Error: Profile ID is missing. Cannot save changes.");
       return;
     }
 
     setIsSaving(true);
     try {
-      // Only send managerId for now - the employees table has limited fields
-      // Other profile data (name, email, phone, etc.) is in the profiles table
-      const updateData: { managerId?: string | null } = {};
+      // Validate required address fields
+      if (formData.address || formData.city || formData.state || formData.zipCode) {
+        if (!formData.address || !formData.city || !formData.state || !formData.zipCode) {
+          alert("All address fields (Street, City, State, ZIP Code) are required for tax and payroll compliance.");
+          setIsSaving(false);
+          return;
+        }
+
+        // Validate ZIP code format
+        const zipPattern = /^[0-9]{5}(-[0-9]{4})?$/;
+        if (!zipPattern.test(formData.zipCode)) {
+          alert("Please enter a valid ZIP code (e.g., 12345 or 12345-6789)");
+          setIsSaving(false);
+          return;
+        }
+
+        // AI-powered address validation
+        try {
+          const aiValidation = await apiRequest('/api/ai/validate-address', {
+            method: 'POST',
+            body: JSON.stringify({
+              city: formData.city,
+              state: formData.state,
+              zipCode: formData.zipCode
+            })
+          });
+
+          if (!aiValidation.valid) {
+            const confirmProceed = confirm(
+              `⚠️ Address Validation Warning:\n\n${aiValidation.message}\n\nDo you want to proceed anyway?`
+            );
+            if (!confirmProceed) {
+              setIsSaving(false);
+              return;
+            }
+          }
+        } catch (aiError) {
+          console.error('AI validation error:', aiError);
+          // Continue even if AI validation fails - don't block user
+          console.log('Proceeding without AI validation');
+        }
+      }
+
+      // Prepare employee table updates (managerId only)
+      const employeeUpdateData: { managerId?: string | null } = {};
       
-      // Only include managerId if it was explicitly changed to a valid value
-      // Guard against undefined values from dropdown that could wipe existing manager
+      // Only include managerId if it was explicitly changed
       if (formData.managerId !== undefined && formData.managerId !== null && formData.managerId !== '') {
-        updateData.managerId = formData.managerId;
+        employeeUpdateData.managerId = formData.managerId;
       } else if (formData.managerId === '' || formData.managerId === null) {
-        // Explicitly allow clearing the manager
-        updateData.managerId = null;
+        employeeUpdateData.managerId = null;
       }
-      
-      // If no updates to make, skip the API call
-      if (Object.keys(updateData).length === 0) {
-        setIsEditing(false);
-        return;
-      }
+
+      // Prepare profile table updates (address and other fields)
+      const profileUpdateData: any = {};
+      if (formData.address) profileUpdateData.address = formData.address;
+      if (formData.city) profileUpdateData.city = formData.city;
+      if (formData.state) profileUpdateData.state = formData.state;
+      if (formData.zipCode) profileUpdateData.zipCode = formData.zipCode;
 
       // Debug logging
-      console.log("Sending PATCH request with data:", updateData);
-      console.log("formData.managerId:", formData.managerId);
-      console.log("formData.manager:", formData.manager);
+      console.log("Updating employee table with:", employeeUpdateData);
+      console.log("Updating profile table with:", profileUpdateData);
 
-      // Send PATCH request to update employee using employees table UUID
-      await apiRequest(`/api/employees/${employeeTableId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updateData)
-      });
+      // Update employee table if needed
+      if (Object.keys(employeeUpdateData).length > 0) {
+        try {
+          await apiRequest(`/api/employees/${employeeTableId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(employeeUpdateData)
+          });
+          console.log("Employee table updated successfully");
+        } catch (employeeUpdateError: any) {
+          console.error("Failed to update employee table:", employeeUpdateError);
+          throw new Error(`Failed to update manager assignment: ${employeeUpdateError.message || 'Unknown error'}`);
+        }
+      }
 
-      console.log("Manager assignment updated successfully");
+      // Update profile table if needed
+      if (Object.keys(profileUpdateData).length > 0) {
+        try {
+          await apiRequest(`/api/profiles/${profileId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(profileUpdateData)
+          });
+          console.log("Profile table updated successfully");
+        } catch (profileUpdateError: any) {
+          console.error("Failed to update profile table:", profileUpdateError);
+          throw new Error(`Failed to update profile information: ${profileUpdateError.message || 'Unknown error'}`);
+        }
+      }
+
       setIsEditing(false);
+      alert("✅ Profile updated successfully!");
       
-      // Optionally trigger a refresh of the employee data
+      // Trigger refresh
       if (employee) {
-        // If this was opened from Dashboard.openMyProfile, the parent should refetch
         window.dispatchEvent(new CustomEvent('employee-updated', { detail: { employeeId: employeeTableId } }));
       }
     } catch (error) {
       console.error('Error saving employee data:', error);
-      alert("Failed to update manager assignment. Please try again.");
+      alert("Failed to update profile. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -742,7 +825,91 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                   </div>
 
                   <div>
-                    <h4 className="text-md font-semibold text-gray-900 dark:text-white dark:text-white mb-4">Emergency Contact</h4>
+                    <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Address Information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Street Address <span className="text-red-500">*</span>
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.address || ''}
+                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                            required
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="123 Main St, Apt 4B"
+                          />
+                        ) : (
+                          <p className="text-gray-900 dark:text-white">{formData.address || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          City <span className="text-red-500">*</span>
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.city || ''}
+                            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                            required
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter city name"
+                          />
+                        ) : (
+                          <p className="text-gray-900 dark:text-white">{formData.city || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          State <span className="text-red-500">*</span>
+                        </label>
+                        {isEditing ? (
+                          <select
+                            value={formData.state || ''}
+                            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                            required
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            <option value="">Select State</option>
+                            {['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'].map(state => (
+                              <option key={state} value={state}>{state}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-gray-900 dark:text-white">{formData.state || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          ZIP Code <span className="text-red-500">*</span>
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.zipCode || ''}
+                            onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                            required
+                            maxLength={10}
+                            pattern="[0-9]{5}(-[0-9]{4})?"
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="12345 or 12345-6789"
+                          />
+                        ) : (
+                          <p className="text-gray-900 dark:text-white">{formData.zipCode || 'Not provided'}</p>
+                        )}
+                      </div>
+                    </div>
+                    {isEditing && formData.city && formData.state && formData.zipCode && (
+                      <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+                        💡 AI will verify this address matches {formData.city}, {formData.state} when you save
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Emergency Contact</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Name</label>
