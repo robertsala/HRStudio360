@@ -608,12 +608,15 @@ export function registerRoutes(app: Express) {
 
       const employees = await storage.getEmployeesWithProfiles();
       
-      // Get current user's employee record to determine their role
+      // Get current user's employee record to determine their role and department
       const currentUserEmployee = employees.find((e: any) => e.userId === userId);
       const viewerRole = currentUserEmployee?.profile?.role || currentUserEmployee?.role || 'Employee';
+      const viewerDepartment = currentUserEmployee?.profile?.department || currentUserEmployee?.department || '';
       
-      // Determine if viewer can see full profiles (HR and Product Owner only)
-      const canViewFullProfiles = ['HR Manager', 'HR', 'Product Owner', 'Executive'].includes(viewerRole);
+      // Determine if viewer can see full profiles (HR, Product Owner, CEO, or Executive department)
+      const privilegedRoles = ['HR Manager', 'HR', 'Product Owner', 'Executive', 'CEO'];
+      const privilegedDepartments = ['HR', 'Executive'];
+      const canViewFullProfiles = privilegedRoles.includes(viewerRole) || privilegedDepartments.includes(viewerDepartment);
       
       // Format each employee with role-based field filtering
       const formattedEmployees = employees.map((employee: any) => {
