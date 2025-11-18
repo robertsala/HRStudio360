@@ -49,7 +49,7 @@ import type {
   CallSignaling, InsertCallSignaling
 } from '../shared/schema.js';
 import { 
-  profiles, authCredentials, announcements, employees, leaveRequests, leaveBalances,
+  profiles, authCredentials, addressChangeRequests, announcements, employees, leaveRequests, leaveBalances,
   candidates, newHires, expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   userNotifications, collaboratorInvitations,
@@ -76,6 +76,13 @@ export interface IStorage {
   getProfileByEmail(email: string): Promise<Profile | undefined>;
   createProfile(profile: InsertProfile): Promise<Profile>;
   updateProfile(id: string, profile: Partial<InsertProfile>): Promise<Profile | undefined>;
+  
+  // Address Change Requests
+  getPendingAddressChangeRequests(): Promise<any[]>;
+  getAddressChangeRequestsByProfileId(profileId: string): Promise<any[]>;
+  createAddressChangeRequest(request: any): Promise<any>;
+  approveAddressChangeRequest(id: string, reviewedBy: string, reviewNotes?: string): Promise<any>;
+  rejectAddressChangeRequest(id: string, reviewedBy: string, reviewNotes?: string): Promise<any>;
   
   // Auth Credentials
   createAuthCredential(credential: InsertAuthCredential): Promise<AuthCredential>;
@@ -449,6 +456,69 @@ export class DbStorage implements IStorage {
 
   async updateProfile(id: string, profile: Partial<InsertProfile>): Promise<Profile | undefined> {
     const result = await db.update(profiles).set(profile).where(eq(profiles.id, id)).returning();
+    return result[0];
+  }
+
+  // Address Change Requests
+  async getPendingAddressChangeRequests(): Promise<any[]> {
+    return db.select().from(addressChangeRequests)
+      .where(eq(addressChangeRequests.status, 'Pending'))
+      .orderBy(desc(addressChangeRequests.submittedAt));
+  }
+
+  async getAddressChangeRequestsByProfileId(profileId: string): Promise<any[]> {
+    return db.select().from(addressChangeRequests)
+      .where(eq(addressChangeRequests.profileId, profileId))
+      .orderBy(desc(addressChangeRequests.submittedAt));
+  }
+
+  async createAddressChangeRequest(request: any): Promise<any> {
+    const result = await db.insert(addressChangeRequests).values(request).returning();
+    return result[0];
+  }
+
+  async approveAddressChangeRequest(id: string, reviewedBy: string, reviewNotes?: string): Promise<any> {
+    // First, get the request to apply the address change
+    const requests = await db.select().from(addressChangeRequests).where(eq(addressChangeRequests.id, id));
+    if (!requests.length) throw new Error('Address change request not found');
+    
+    const request = requests[0];
+    
+    // Update the profile with the new address
+    await db.update(profiles)
+      .set({
+        address: request.newAddress,
+        city: request.newCity,
+        state: request.newState,
+        zipCode: request.newZipCode
+      })
+      .where(eq(profiles.id, request.profileId));
+    
+    // Mark the request as approved
+    const result = await db.update(addressChangeRequests)
+      .set({
+        status: 'Approved',
+        reviewedAt: new Date(),
+        reviewedBy,
+        reviewNotes
+      })
+      .where(eq(addressChangeRequests.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async rejectAddressChangeRequest(id: string, reviewedBy: string, reviewNotes?: string): Promise<any> {
+    const result = await db.update(addressChangeRequests)
+      .set({
+        status: 'Rejected',
+        reviewedAt: new Date(),
+        reviewedBy,
+        reviewNotes
+      })
+      .where(eq(addressChangeRequests.id, id))
+      .returning();
+    
     return result[0];
   }
 
