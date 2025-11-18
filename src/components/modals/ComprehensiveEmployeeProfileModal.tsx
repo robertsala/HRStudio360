@@ -346,9 +346,11 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
           console.log("Profile table updated successfully");
           
           // Re-format phone numbers for display (backend returns normalized digits only)
+          // Also update profile image if it changed
           setFormData(prev => ({
             ...prev,
             phone: updatedProfile.phone ? formatPhoneNumber(updatedProfile.phone) : prev.phone,
+            profileImage: updatedProfile.profilePicture || prev.profileImage,
             emergencyContact: {
               ...prev.emergencyContact,
               phone: updatedProfile.emergencyContactPhone 
@@ -369,9 +371,11 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       if (employee) {
         window.dispatchEvent(new CustomEvent('employee-updated', { detail: { employeeId: employeeTableId } }));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving employee data:', error);
-      alert("Failed to update profile. Please try again.");
+      // Display the actual error message to the user
+      const errorMessage = error.message || error.error || "Failed to update profile. Please try again.";
+      alert(errorMessage);
     } finally {
       setIsSaving(false);
     }
