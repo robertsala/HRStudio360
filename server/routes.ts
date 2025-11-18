@@ -379,7 +379,13 @@ export function registerRoutes(app: Express) {
       }
       res.json(profile);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('❌ PROFILE UPDATE ERROR:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        updateData: req.body
+      });
+      res.status(500).json({ error: error.message || 'Failed to update profile' });
     }
   });
 
