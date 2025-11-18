@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, MapPin, Calendar, CreditCard as Edit3, Save, Camera, FileText, Award, Clock, UserX, Building, Briefcase, Star, TrendingUp, DollarSign, CheckCircle, AlertTriangle, Eye, Download, Send, Bell, CreditCard, TrendingUp as TrendingUpIcon, History, ChevronRight, Upload } from 'lucide-react';
+import { X, Mail, Phone, MapPin, Calendar, CreditCard as Edit3, Save, Camera, FileText, Award, Clock, UserX, Star, DollarSign, CheckCircle, CreditCard, TrendingUp as TrendingUpIcon, History, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
 import { performanceReviewService, CompensationHistory } from '../../utils/performanceReviewService';
 import { apiRequest } from '../../lib/queryClient';
-import { formatPhoneNumber, formatZipCode, EMERGENCY_CONTACT_RELATIONSHIPS } from '@/lib/formatters';
+import { formatPhoneNumber, formatZipCode, EMERGENCY_CONTACT_RELATIONSHIPS } from '../../../client/src/lib/formatters';
 
 interface Employee {
   id: string; // Profile or display ID
+  userId: string; // Profiles table UUID for backend updates
   employeeRecordId?: string; // Employees table UUID for backend updates
   name: string;
   email: string;
@@ -75,6 +76,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Fallback employee data for when no employee prop is provided
   const fallbackEmployee: Employee = React.useMemo(() => ({
     id: '124',
+    userId: '124', // Profiles table ID (fallback - same as id for mock employee)
     employeeRecordId: '124', // Fallback - same as id for mock employee
     name: 'Jennifer Martinez',
     email: 'jennifer.martinez@company.com',
@@ -237,9 +239,9 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       const employeeUpdateData: { managerId?: string | null } = {};
       
       // Only include managerId if it was explicitly changed
-      if (formData.managerId !== undefined && formData.managerId !== null && formData.managerId !== '') {
+      if (formData.managerId && formData.managerId !== '') {
         employeeUpdateData.managerId = formData.managerId;
-      } else if (formData.managerId === '' || formData.managerId === null) {
+      } else if (formData.managerId === '' || formData.managerId === null || formData.managerId === undefined) {
         employeeUpdateData.managerId = null;
       }
 
@@ -344,15 +346,16 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
           console.log("Profile table updated successfully");
           
           // Re-format phone numbers for display (backend returns normalized digits only)
-          if (updatedProfile.phone) {
-            formData.phone = formatPhoneNumber(updatedProfile.phone);
-          }
-          if (updatedProfile.emergencyContactPhone) {
-            formData.emergencyContact.phone = formatPhoneNumber(updatedProfile.emergencyContactPhone);
-          }
-          
-          // Update formData with the formatted values
-          setFormData({ ...formData });
+          setFormData(prev => ({
+            ...prev,
+            phone: updatedProfile.phone ? formatPhoneNumber(updatedProfile.phone) : prev.phone,
+            emergencyContact: {
+              ...prev.emergencyContact,
+              phone: updatedProfile.emergencyContactPhone 
+                ? formatPhoneNumber(updatedProfile.emergencyContactPhone) 
+                : prev.emergencyContact.phone
+            }
+          }));
         } catch (profileUpdateError: any) {
           console.error("Failed to update profile table:", profileUpdateError);
           throw new Error(`Failed to update profile information: ${profileUpdateError.message || 'Unknown error'}`);
@@ -1156,7 +1159,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                             console.log("Manager selected:", { selectedManagerId, selectedManager });
                             setFormData({ 
                               ...formData, 
-                              managerId: selectedManagerId || null,
+                              managerId: selectedManagerId || undefined,
                               manager: selectedManager?.name || 'Not assigned'
                             });
                           }}
