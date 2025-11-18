@@ -91,7 +91,7 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
             firstName,
             lastName,
             password,
-            preferredLanguage: selectedLanguage
+            languagePreference: selectedLanguage
           })
         });
 
@@ -121,7 +121,7 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSignIn }) 
             const updateResponse = await fetch(`/api/profiles/${user.id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ preferredLanguage: selectedLanguage })
+              body: JSON.stringify({ languagePreference: selectedLanguage })
             });
 
             if (!updateResponse.ok) {
