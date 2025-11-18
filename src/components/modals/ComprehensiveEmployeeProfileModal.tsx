@@ -174,6 +174,11 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
         return;
       }
 
+      // Debug logging
+      console.log("Sending PATCH request with data:", updateData);
+      console.log("formData.managerId:", formData.managerId);
+      console.log("formData.manager:", formData.manager);
+
       // Send PATCH request to update employee using employees table UUID
       await apiRequest(`/api/employees/${employeeTableId}`, {
         method: 'PATCH',
@@ -833,13 +838,14 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Manager</label>
                       {isEditing ? (
                         <select
-                          value={employee?.managerId || formData.managerId || ''}
+                          value={formData.managerId || ''}
                           onChange={(e) => {
                             const selectedManagerId = e.target.value;
                             const selectedManager = availableManagers.find(m => m.id === selectedManagerId);
+                            console.log("Manager selected:", { selectedManagerId, selectedManager });
                             setFormData({ 
                               ...formData, 
-                              managerId: selectedManagerId,
+                              managerId: selectedManagerId || null,
                               manager: selectedManager?.name || 'Not assigned'
                             });
                           }}
