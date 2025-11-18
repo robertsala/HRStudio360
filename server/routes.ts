@@ -606,14 +606,14 @@ export function registerRoutes(app: Express) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      const employees = await storage.getEmployeesWithProfiles();
+      
       // Get current user's employee record to determine their role
-      const currentUserEmployee = await storage.getEmployeeByUserId(userId);
-      const viewerRole = currentUserEmployee?.role || 'Employee';
+      const currentUserEmployee = employees.find((e: any) => e.userId === userId);
+      const viewerRole = currentUserEmployee?.profile?.role || currentUserEmployee?.role || 'Employee';
       
       // Determine if viewer can see full profiles (HR and Product Owner only)
       const canViewFullProfiles = ['HR Manager', 'HR', 'Product Owner', 'Executive'].includes(viewerRole);
-
-      const employees = await storage.getEmployeesWithProfiles();
       
       // Format each employee with role-based field filtering
       const formattedEmployees = employees.map((employee: any) => {
