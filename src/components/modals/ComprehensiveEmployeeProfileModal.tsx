@@ -886,17 +886,11 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Location</label>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={formData.location}
-                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      ) : (
-                        <p className="text-gray-900 dark:text-white dark:text-white">{formData.location}</p>
-                      )}
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">
+                        Work Location
+                        {isEditing && <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(Contact HR to change)</span>}
+                      </label>
+                      <p className="text-gray-900 dark:text-white dark:text-white">{formData.location}</p>
                     </div>
                   </div>
 
