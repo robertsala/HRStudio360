@@ -373,7 +373,32 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const profile = await storage.updateProfile(targetProfileId, updateData);
+      // Filter out invalid fields that don't exist in the schema
+      const validFields = [
+        'email', 'firstName', 'lastName', 'phone', 'address', 'city', 'state', 
+        'zipCode', 'profilePicture', 'department', 'role', 'dateOfBirth', 'hireDate',
+        'languagePreference', 'themePreference', 'locationLat', 'locationLon',
+        'locationCity', 'locationState', 'locationZipCode', 'locationManualOverride',
+        'workLocationState', 'workLocationCity', 'residenceState', 'residenceCity',
+        'canAccessOrgChart', 'managerId', 'emergencyContactFirstName', 
+        'emergencyContactLastName', 'emergencyContactMiddleName', 
+        'emergencyContactRelationship', 'emergencyContactPhone'
+      ];
+      
+      const filteredUpdateData = Object.fromEntries(
+        Object.entries(updateData).filter(([key]) => validFields.includes(key))
+      );
+
+      // If there's nothing left to update after filtering, return success with current profile
+      if (Object.keys(filteredUpdateData).length === 0) {
+        const currentProfile = await storage.getProfile(targetProfileId);
+        if (!currentProfile) {
+          return res.status(404).json({ error: 'Profile not found' });
+        }
+        return res.json(currentProfile);
+      }
+
+      const profile = await storage.updateProfile(targetProfileId, filteredUpdateData);
       if (!profile) {
         return res.status(404).json({ error: 'Profile not found' });
       }
