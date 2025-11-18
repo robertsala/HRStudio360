@@ -368,9 +368,16 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       setIsEditing(false);
       alert("✅ Profile updated successfully!");
       
-      // Trigger refresh
+      // Trigger refresh - wrap in setTimeout to prevent event listener errors from bubbling back
       if (employee) {
-        window.dispatchEvent(new CustomEvent('employee-updated', { detail: { employeeId: employeeTableId } }));
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('employee-updated', { detail: { employeeId: employeeTableId } }));
+          } catch (eventError) {
+            // Silently ignore analytics/celebration errors - they're not critical
+            console.warn('Non-critical event listener error:', eventError);
+          }
+        }, 0);
       }
     } catch (error: any) {
       console.error('Error saving employee data:', error);
