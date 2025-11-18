@@ -105,12 +105,21 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   // Derive display employee from prop - this always reflects the current employee
   const displayEmployee = React.useMemo(() => employee ?? fallbackEmployee, [employee, fallbackEmployee]);
 
-  // Normalize employee data to ensure optional arrays are initialized
+  // Normalize employee data to ensure optional arrays are initialized and format phone numbers for display
   const normalizeEmployee = (emp: Employee): Employee => ({
     ...emp,
+    // Format phone number for display (database stores digits only)
+    phone: emp.phone ? formatPhoneNumber(emp.phone) : emp.phone,
     skills: emp.skills ?? [],
     certifications: emp.certifications ?? [],
-    emergencyContact: emp.emergencyContact ?? {
+    emergencyContact: emp.emergencyContact ? {
+      firstName: emp.emergencyContact.firstName ?? '',
+      lastName: emp.emergencyContact.lastName ?? '',
+      middleName: emp.emergencyContact.middleName ?? '',
+      relationship: emp.emergencyContact.relationship ?? '',
+      // Format emergency contact phone for display (database stores digits only)
+      phone: emp.emergencyContact.phone ? formatPhoneNumber(emp.emergencyContact.phone) : ''
+    } : {
       firstName: '',
       lastName: '',
       middleName: '',
@@ -328,11 +337,22 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       // Update profile table if needed
       if (Object.keys(profileUpdateData).length > 0) {
         try {
-          await apiRequest(`/api/profiles/${profileId}`, {
+          const updatedProfile = await apiRequest(`/api/profiles/${profileId}`, {
             method: 'PATCH',
             body: JSON.stringify(profileUpdateData)
           });
           console.log("Profile table updated successfully");
+          
+          // Re-format phone numbers for display (backend returns normalized digits only)
+          if (updatedProfile.phone) {
+            formData.phone = formatPhoneNumber(updatedProfile.phone);
+          }
+          if (updatedProfile.emergencyContactPhone) {
+            formData.emergencyContact.phone = formatPhoneNumber(updatedProfile.emergencyContactPhone);
+          }
+          
+          // Update formData with the formatted values
+          setFormData({ ...formData });
         } catch (profileUpdateError: any) {
           console.error("Failed to update profile table:", profileUpdateError);
           throw new Error(`Failed to update profile information: ${profileUpdateError.message || 'Unknown error'}`);

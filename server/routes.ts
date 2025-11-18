@@ -344,9 +344,34 @@ export function registerRoutes(app: Express) {
       }
 
       // Build the final update payload
-      const updateData = hasSensitiveFields && hasPrivilegedRole
+      let updateData = hasSensitiveFields && hasPrivilegedRole
         ? req.body  // Include all fields for privileged users
         : basicFields;  // Only basic fields for regular users
+
+      // Normalize phone numbers - strip formatting for database storage (SCIM compatibility)
+      const normalizePhone = (phone: string | null | undefined): string | null => {
+        if (!phone) return null;
+        return phone.replace(/\D/g, '') || null;
+      };
+
+      if (updateData.phone) {
+        updateData.phone = normalizePhone(updateData.phone);
+        // Validate normalized phone number is exactly 10 digits
+        if (updateData.phone && updateData.phone.length !== 10) {
+          return res.status(400).json({ 
+            error: 'Invalid phone number: must be exactly 10 digits' 
+          });
+        }
+      }
+      if (updateData.emergencyContactPhone) {
+        updateData.emergencyContactPhone = normalizePhone(updateData.emergencyContactPhone);
+        // Validate normalized emergency contact phone is exactly 10 digits
+        if (updateData.emergencyContactPhone && updateData.emergencyContactPhone.length !== 10) {
+          return res.status(400).json({ 
+            error: 'Invalid emergency contact phone: must be exactly 10 digits' 
+          });
+        }
+      }
 
       const profile = await storage.updateProfile(targetProfileId, updateData);
       if (!profile) {
