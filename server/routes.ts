@@ -433,6 +433,102 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Address Change Request routes
+  app.post('/api/address-change-requests', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { profileId, oldAddress, oldCity, oldState, oldZipCode, newAddress, newCity, newState, newZipCode } = req.body;
+
+      if (!profileId || !newAddress || !newCity || !newState || !newZipCode) {
+        return res.status(400).json({ error: 'Profile ID and new address fields are required' });
+      }
+
+      const request = await storage.createAddressChangeRequest({
+        profileId,
+        requestedBy: userId,
+        oldAddress,
+        oldCity,
+        oldState,
+        oldZipCode,
+        newAddress,
+        newCity,
+        newState,
+        newZipCode,
+        status: 'Pending'
+      });
+
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/address-change-requests', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has HR/admin privileges
+      const hasPrivilegedRole = await canManageAnnouncements(userId);
+      if (!hasPrivilegedRole) {
+        return res.status(403).json({ error: 'Forbidden: Only HR can view pending requests' });
+      }
+
+      const requests = await storage.getPendingAddressChangeRequests();
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/address-change-requests/:id/approve', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has HR/admin privileges
+      const hasPrivilegedRole = await canManageAnnouncements(userId);
+      if (!hasPrivilegedRole) {
+        return res.status(403).json({ error: 'Forbidden: Only HR can approve requests' });
+      }
+
+      const { reviewNotes } = req.body;
+      const request = await storage.approveAddressChangeRequest(req.params.id, userId, reviewNotes);
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/address-change-requests/:id/reject', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has HR/admin privileges
+      const hasPrivilegedRole = await canManageAnnouncements(userId);
+      if (!hasPrivilegedRole) {
+        return res.status(403).json({ error: 'Forbidden: Only HR can reject requests' });
+      }
+
+      const { reviewNotes } = req.body;
+      const request = await storage.rejectAddressChangeRequest(req.params.id, userId, reviewNotes);
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Employee routes
   // Note: Specific routes must come before parametric routes
   app.get('/api/employees/directory', async (req, res) => {
