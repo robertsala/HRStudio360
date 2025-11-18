@@ -145,18 +145,19 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const showTerminateButton = canTerminateEmployees && !isViewingOwnProfile;
 
   const handleSave = async () => {
-    // Use employeeRecordId (employees table UUID) instead of id (profile UUID)
+    // CRITICAL FIX: Use the correct IDs for each table
+    // - Employee table ID: formData.employeeRecordId (or fallback to formData.id for employee record)
+    // - Profile table ID: formData.userId (this references profiles.id)
     const employeeTableId = formData.employeeRecordId || formData.id;
-    // CRITICAL: Use the target employee's profile ID, not the current user's ID
-    // This ensures HR can edit other employees' profiles correctly
-    const profileId = formData.id;
+    const profileId = formData.userId; // FIXED: Use userId which references profiles.id
     
     // Debug logging to help track ID usage
     console.log("=== HandleSave ID Debug ===");
-    console.log("formData.id (profile UUID):", formData.id);
-    console.log("formData.employeeRecordId (employees table UUID):", formData.employeeRecordId);
-    console.log("Using employeeTableId:", employeeTableId);
-    console.log("Using profileId:", profileId);
+    console.log("formData.id (employee record ID):", formData.id);
+    console.log("formData.userId (profile ID):", formData.userId);
+    console.log("formData.employeeRecordId:", formData.employeeRecordId);
+    console.log("Using employeeTableId for employees table:", employeeTableId);
+    console.log("Using profileId for profiles table:", profileId);
     console.log("=========================");
     
     if (!employeeTableId) {
@@ -166,7 +167,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     }
 
     if (!profileId) {
-      console.error("Profile ID is missing");
+      console.error("Profile ID (userId) is missing");
       alert("Error: Profile ID is missing. Cannot save changes.");
       return;
     }
