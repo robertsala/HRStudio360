@@ -39,6 +39,7 @@ import AnnouncementsModal from './modals/AnnouncementsModal';
 import OnboardingModal from './modals/OnboardingModal';
 import OfferManagementModal from './modals/OfferManagementModal';
 import HRKPIDashboardModal from './modals/HRKPIDashboardModal';
+import AddressChangeApprovalModal from './modals/AddressChangeApprovalModal';
 import WorkersCompensationModal from './modals/WorkersCompensationModal';
 import UserManagementModal from './modals/UserManagementModalEnhanced';
 import OrgChartModal from './modals/OrgChartModal';
@@ -96,7 +97,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
     collaborator: false,
     jobManagement: false,
     studioAIChat: false,
-    agentActivity: false
+    agentActivity: false,
+    addressChangeApproval: false
   });
 
   // Chat-specific state
@@ -497,6 +499,14 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       icon: Briefcase,
       color: 'bg-gradient-to-r from-blue-600 to-indigo-600',
       action: () => openModal('jobManagement')
+    });
+    quickAccessModules.push({
+      id: 'addressChangeApproval',
+      title: 'Address Change Approvals',
+      description: 'Review and approve employee address change requests',
+      icon: MapPin,
+      color: 'bg-gradient-to-r from-purple-600 to-blue-600',
+      action: () => openModal('addressChangeApproval')
     });
   }
 
@@ -1441,6 +1451,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
           <AgentActivityModal
             isOpen={modals.agentActivity}
             onClose={() => closeModal('agentActivity')}
+          />
+        )}
+        {modals.addressChangeApproval && (
+          <AddressChangeApprovalModal
+            isOpen={modals.addressChangeApproval}
+            onClose={() => closeModal('addressChangeApproval')}
           />
         )}
 
