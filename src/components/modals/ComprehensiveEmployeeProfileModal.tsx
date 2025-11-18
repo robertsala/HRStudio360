@@ -230,12 +230,58 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
         employeeUpdateData.managerId = null;
       }
 
+      // Check if address fields have changed
+      const addressChanged = 
+        formData.address !== displayEmployee.address ||
+        formData.city !== displayEmployee.city ||
+        formData.state !== displayEmployee.state ||
+        formData.zipCode !== displayEmployee.zipCode;
+
+      // Determine if user can directly update addresses
+      const canDirectlyUpdateAddress = isHRUser || canTerminateEmployees;
+
       // Prepare profile table updates (address and other fields)
       const profileUpdateData: any = {};
-      if (formData.address) profileUpdateData.address = formData.address;
-      if (formData.city) profileUpdateData.city = formData.city;
-      if (formData.state) profileUpdateData.state = formData.state;
-      if (formData.zipCode) profileUpdateData.zipCode = formData.zipCode;
+      
+      // Handle address fields based on user role
+      if (addressChanged && !canDirectlyUpdateAddress) {
+        // Non-HR users: Create address change request
+        try {
+          await apiRequest('/api/address-change-requests', {
+            method: 'POST',
+            body: JSON.stringify({
+              profileId,
+              oldAddress: displayEmployee.address || '',
+              oldCity: displayEmployee.city || '',
+              oldState: displayEmployee.state || '',
+              oldZipCode: displayEmployee.zipCode || '',
+              newAddress: formData.address,
+              newCity: formData.city,
+              newState: formData.state,
+              newZipCode: formData.zipCode
+            })
+          });
+          console.log("Address change request created successfully");
+          
+          // Show temporary success message
+          setIsEditing(false);
+          alert("✅ Address change submitted for review and approval!\n\nYour address update has been sent to HR for verification. You'll be notified once it's processed.");
+          setIsSaving(false);
+          
+          // Close modal and trigger refresh
+          if (onClose) onClose();
+          return; // Exit early since we're not doing direct updates
+        } catch (requestError: any) {
+          console.error("Failed to create address change request:", requestError);
+          throw new Error(`Failed to submit address change request: ${requestError.message || 'Unknown error'}`);
+        }
+      } else if (canDirectlyUpdateAddress) {
+        // HR users: Save address directly
+        if (formData.address) profileUpdateData.address = formData.address;
+        if (formData.city) profileUpdateData.city = formData.city;
+        if (formData.state) profileUpdateData.state = formData.state;
+        if (formData.zipCode) profileUpdateData.zipCode = formData.zipCode;
+      }
 
       // Debug logging
       console.log("Updating employee table with:", employeeUpdateData);
