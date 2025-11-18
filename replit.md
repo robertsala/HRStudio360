@@ -67,6 +67,22 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
 ## Recent Changes
 
+### November 18, 2025 - Critical Bug Fixes
+
+**Fixed Application Crash (ReferenceError: useToast is not defined):**
+- Removed orphaned `const { toast } = useToast();` declaration from ComprehensiveEmployeeProfileModal
+- Replaced toast notifications with console.log/alert for temporary fix
+- Application now loads without ErrorBoundary crash
+- Pending: Investigate PATCH /api/profiles/:id 500 errors
+- Pending: Implement proper toast notification system
+
+**Manager Persistence Implementation:**
+- Exposed userId field in getEmployeesWithProfiles() for proper foreign key mapping
+- Manager dropdown now uses profile UUID (userId) instead of employee table UUID
+- Added validation guards to prevent undefined managerId from wiping existing manager
+- Fixed self-selection prevention using employeeRecordId comparison
+- Separated employee table UUID (employeeRecordId) from profile UUID (id/userId) for clarity
+
 ### November 17, 2025 - Navigation & UX Improvements
 
 **My Profile Comprehensive Modal Integration:**
