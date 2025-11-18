@@ -62,16 +62,12 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const [availableManagers, setAvailableManagers] = useState<Array<{ id: string; name: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Determine if current user is HR staff
-  const isHRUser = user?.email?.includes('hr') || user?.email?.includes('HR') || 
-                   user?.email?.includes('human') || user?.email?.includes('emma.wilson') ||
-                   user?.email?.includes('robertsala');
+  // Determine if current user has HR or admin privileges (authoritative check)
+  // Based on backend canManageAnnouncements logic: department === 'HR' OR role === 'Product Owner'
+  const isHRUser = user?.department === 'HR' || user?.role === 'Product Owner';
   
-  // Determine if current user is Product Owner (based on user context from Layout.tsx)
-  const isProductOwner = user?.email && !user.email.includes('manager') && !user.email.includes('hr');
-  
-  // Combined authorization: HR staff OR Product Owner can terminate employees
-  const canTerminateEmployees = isHRUser || isProductOwner;
+  // For compatibility with existing code
+  const canTerminateEmployees = isHRUser;
 
   // Fallback employee data for when no employee prop is provided
   const fallbackEmployee: Employee = React.useMemo(() => ({

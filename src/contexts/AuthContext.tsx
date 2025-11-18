@@ -9,7 +9,8 @@ interface User {
   email: string;
   name: string;
   profilePicture?: string;
-  role?: 'employee' | 'hr' | 'admin';
+  role?: string; // Keep raw role from database for accurate privilege checks
+  department?: string;
 }
 
 interface AuthContextType {
@@ -45,11 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const profile = await apiClient.getProfile(userId);
 
-      // Normalize the role from database (handle both 'Employee' and 'employee')
-      const normalizedRole = profile?.role
-        ? profile.role.toLowerCase() as 'employee' | 'hr' | 'admin'
-        : 'employee';
-
+      // Keep raw role from database for accurate privilege checks (e.g., 'Product Owner')
       const userData: User = {
         id: userId,
         email: email,
@@ -57,7 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || email.split('@')[0]
           : email.split('@')[0],
         profilePicture: profile?.profilePicture || undefined,
-        role: normalizedRole
+        role: profile?.role || undefined,
+        department: profile?.department || undefined
       };
 
       console.log('Loaded user profile:', {
@@ -98,14 +96,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // CRITICAL FIX: Don't log out on profile load errors during migration
       // If we have basic user info, keep them logged in
+      // NOTE: role and department are undefined here, which will cause privileged 
+      // operations to fail safely (user will be treated as unprivileged)
       const userData: User = {
         id: userId,
         email: email,
         name: email.split('@')[0],
-        role: 'employee'
+        role: undefined,
+        department: undefined
       };
       
-      console.warn('Profile load failed, using fallback auth with email only');
+      console.warn('Profile load failed, using fallback auth with email only. User will have no privileges until profile loads.');
       setUser(userData);
       setIsAuthenticated(true);
       setIsLoading(false);

@@ -489,42 +489,54 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/address-change-requests/:id/approve', async (req, res) => {
     try {
+      // Get authenticated user ID from session (DO NOT trust client-supplied reviewerId)
       const userId = (req.session as any).userId;
       if (!userId) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
-      // Check if user has HR/admin privileges
+      // Route-level authorization check (first layer)
       const hasPrivilegedRole = await canManageAnnouncements(userId);
       if (!hasPrivilegedRole) {
         return res.status(403).json({ error: 'Forbidden: Only HR can approve requests' });
       }
 
       const { reviewNotes } = req.body;
+      // Pass authenticated session userId to storage (second layer verifies again)
       const request = await storage.approveAddressChangeRequest(req.params.id, userId, reviewNotes);
       res.json(request);
     } catch (error: any) {
+      // Log security-related errors
+      if (error.message?.includes('Forbidden')) {
+        console.error(`[Security] Address approval denied: ${error.message}`);
+      }
       res.status(500).json({ error: error.message });
     }
   });
 
   app.patch('/api/address-change-requests/:id/reject', async (req, res) => {
     try {
+      // Get authenticated user ID from session (DO NOT trust client-supplied reviewerId)
       const userId = (req.session as any).userId;
       if (!userId) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
-      // Check if user has HR/admin privileges
+      // Route-level authorization check (first layer)
       const hasPrivilegedRole = await canManageAnnouncements(userId);
       if (!hasPrivilegedRole) {
         return res.status(403).json({ error: 'Forbidden: Only HR can reject requests' });
       }
 
       const { reviewNotes } = req.body;
+      // Pass authenticated session userId to storage (second layer verifies again)
       const request = await storage.rejectAddressChangeRequest(req.params.id, userId, reviewNotes);
       res.json(request);
     } catch (error: any) {
+      // Log security-related errors
+      if (error.message?.includes('Forbidden')) {
+        console.error(`[Security] Address rejection denied: ${error.message}`);
+      }
       res.status(500).json({ error: error.message });
     }
   });

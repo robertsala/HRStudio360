@@ -478,37 +478,92 @@ export class DbStorage implements IStorage {
   }
 
   async approveAddressChangeRequest(id: string, reviewedBy: string, reviewNotes?: string): Promise<any> {
-    // First, get the request to apply the address change
+    // DEFENSE-IN-DEPTH: Verify reviewer has HR/Product Owner privileges before approving
+    const reviewer = await this.getProfileById(reviewedBy);
+    if (!reviewer) {
+      throw new Error('Reviewer profile not found');
+    }
+    
+    const hasPrivileges = reviewer.department === 'HR' || reviewer.role === 'Product Owner';
+    if (!hasPrivileges) {
+      console.error(`[Security] Unauthorized approval attempt by user ${reviewedBy} (role: ${reviewer.role}, dept: ${reviewer.department})`);
+      throw new Error('Forbidden: Only HR department or Product Owners can approve address changes');
+    }
+    
+    // Get the request and verify it's still pending
     const requests = await db.select().from(addressChangeRequests).where(eq(addressChangeRequests.id, id));
-    if (!requests.length) throw new Error('Address change request not found');
+    if (!requests.length) {
+      throw new Error('Address change request not found');
+    }
     
     const request = requests[0];
     
-    // Update the profile with the new address
-    await db.update(profiles)
-      .set({
-        address: request.newAddress,
-        city: request.newCity,
-        state: request.newState,
-        zipCode: request.newZipCode
-      })
-      .where(eq(profiles.id, request.profileId));
+    // Verify request is still pending
+    if (request.status !== 'Pending') {
+      throw new Error(`Cannot approve request: current status is ${request.status}`);
+    }
     
-    // Mark the request as approved
-    const result = await db.update(addressChangeRequests)
-      .set({
-        status: 'Approved',
-        reviewedAt: new Date(),
-        reviewedBy,
-        reviewNotes
-      })
-      .where(eq(addressChangeRequests.id, id))
-      .returning();
-    
-    return result[0];
+    // TRANSACTION: Update profile and mark request as approved atomically
+    return await db.transaction(async (tx) => {
+      // Update the profile with the new address
+      await tx.update(profiles)
+        .set({
+          address: request.newAddress,
+          city: request.newCity,
+          state: request.newState,
+          zipCode: request.newZipCode
+        })
+        .where(eq(profiles.id, request.profileId));
+      
+      // Mark the request as approved
+      const result = await tx.update(addressChangeRequests)
+        .set({
+          status: 'Approved',
+          reviewedAt: new Date(),
+          reviewedBy,
+          reviewNotes
+        })
+        .where(and(
+          eq(addressChangeRequests.id, id),
+          eq(addressChangeRequests.status, 'Pending') // Double-check status in transaction
+        ))
+        .returning();
+      
+      if (!result.length) {
+        throw new Error('Failed to approve request - status may have changed');
+      }
+      
+      console.log(`[Audit] Address change approved by ${reviewer.email} (${reviewer.department}/${reviewer.role}) for profile ${request.profileId}`);
+      return result[0];
+    });
   }
 
   async rejectAddressChangeRequest(id: string, reviewedBy: string, reviewNotes?: string): Promise<any> {
+    // DEFENSE-IN-DEPTH: Verify reviewer has HR/Product Owner privileges before rejecting
+    const reviewer = await this.getProfileById(reviewedBy);
+    if (!reviewer) {
+      throw new Error('Reviewer profile not found');
+    }
+    
+    const hasPrivileges = reviewer.department === 'HR' || reviewer.role === 'Product Owner';
+    if (!hasPrivileges) {
+      console.error(`[Security] Unauthorized rejection attempt by user ${reviewedBy} (role: ${reviewer.role}, dept: ${reviewer.department})`);
+      throw new Error('Forbidden: Only HR department or Product Owners can reject address changes');
+    }
+    
+    // Verify request exists and is still pending
+    const requests = await db.select().from(addressChangeRequests).where(eq(addressChangeRequests.id, id));
+    if (!requests.length) {
+      throw new Error('Address change request not found');
+    }
+    
+    const request = requests[0];
+    
+    if (request.status !== 'Pending') {
+      throw new Error(`Cannot reject request: current status is ${request.status}`);
+    }
+    
+    // Update the request status
     const result = await db.update(addressChangeRequests)
       .set({
         status: 'Rejected',
@@ -516,9 +571,17 @@ export class DbStorage implements IStorage {
         reviewedBy,
         reviewNotes
       })
-      .where(eq(addressChangeRequests.id, id))
+      .where(and(
+        eq(addressChangeRequests.id, id),
+        eq(addressChangeRequests.status, 'Pending') // Ensure still pending
+      ))
       .returning();
     
+    if (!result.length) {
+      throw new Error('Failed to reject request - status may have changed');
+    }
+    
+    console.log(`[Audit] Address change rejected by ${reviewer.email} (${reviewer.department}/${reviewer.role}) for profile ${request.profileId}`);
     return result[0];
   }
 
