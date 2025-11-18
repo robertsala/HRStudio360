@@ -360,7 +360,8 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
           }));
         } catch (profileUpdateError: any) {
           console.error("Failed to update profile table:", profileUpdateError);
-          throw new Error(`Failed to update profile information: ${profileUpdateError.message || 'Unknown error'}`);
+          // Re-throw the original error without wrapping it
+          throw profileUpdateError;
         }
       }
 
@@ -373,9 +374,21 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       }
     } catch (error: any) {
       console.error('Error saving employee data:', error);
+      
       // Display the actual error message to the user
-      const errorMessage = error.message || error.error || "Failed to update profile. Please try again.";
-      alert(errorMessage);
+      // Try multiple ways to extract the error message
+      let errorMessage = "Failed to update profile. Please try again.";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      console.log("Displaying error to user:", errorMessage);
+      alert(`Error: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }

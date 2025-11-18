@@ -576,17 +576,20 @@ const Calendar: React.FC<CalendarProps> = ({ holidays = [], onAddEvent }) => {
         {/* Calendar days */}
         {calendarDays.map((day, index) => {
           if (day === null) {
-            return <div key={index} className="p-2 h-32"></div>;
+            return <div key={`empty-${index}`} className="p-2 h-32"></div>;
           }
 
           const holiday = getHolidayForDate(day);
           const leaveEvents = getLeaveEventsForDate(day);
           const birthdayEvents = getBirthdaysForDate(day);
           const todayClass = isToday(day) ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50 dark:bg-blue-900/20' : '';
+          
+          // Create unique key combining month and day
+          const uniqueKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${day}`;
 
           return (
             <div
-              key={day}
+              key={uniqueKey}
               className={`p-2 h-32 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${todayClass} overflow-y-auto bg-white dark:bg-gray-800/50`}
             >
               <div className="flex flex-col h-full">
@@ -605,9 +608,9 @@ const Calendar: React.FC<CalendarProps> = ({ holidays = [], onAddEvent }) => {
                   )}
                   
                   {/* Leave Events */}
-                  {leaveEvents.map((leave, idx) => (
+                  {leaveEvents.map((leave) => (
                     <div 
-                      key={idx} 
+                      key={leave.id} 
                       className={`px-1 py-0.5 rounded text-xs font-medium border ${getLeaveColor(leave.leaveType)}`}
                       title={`${leave.employeeName} - ${leave.leaveType}${leave.isHalfDay ? ' (Half Day)' : ''}\n${leave.department} • ${leave.team}\n${leave.location}`}
                     >
@@ -622,9 +625,9 @@ const Calendar: React.FC<CalendarProps> = ({ holidays = [], onAddEvent }) => {
                   ))}
                   
                   {/* Birthdays */}
-                  {birthdayEvents.map((birthday, idx) => (
+                  {birthdayEvents.map((birthday) => (
                     <div 
-                      key={idx} 
+                      key={birthday.id} 
                       className="px-1 py-0.5 rounded text-xs font-medium border bg-yellow-100 text-yellow-800 border-yellow-200"
                       title={`${birthday.employeeName}'s Birthday${birthday.age ? ` (${birthday.age} years old)` : ''}\n${birthday.department} • ${birthday.team}\n${birthday.location}`}
                     >

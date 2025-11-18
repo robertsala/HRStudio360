@@ -758,7 +758,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                 {isStatsLoading ? (
                   Array.from({ length: 4 }).map((_, index) => (
                     <div
-                      key={index}
+                      key={`skeleton-stat-${index}`}
                       className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700"
                       data-testid={`skeleton-stat-${index}`}
                     >
@@ -777,15 +777,15 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                     </div>
                   ))
                 ) : (
-                  stats.map((stat, index) => {
+                  stats.map((stat) => {
                     const Icon = stat.icon;
                     
                     return (
                       <button
-                        key={index}
+                        key={stat.label}
                         className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
                         onClick={stat.action}
-                        data-testid={`stat-card-${index}`}
+                        data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
