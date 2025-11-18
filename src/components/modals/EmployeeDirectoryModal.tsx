@@ -585,10 +585,17 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
               salary: selectedEmployee.salary?.toString() || '$0',
               employeeId: selectedEmployee.id,
               profileImage: selectedEmployee.profileImage,
-              emergencyContact: {
-                name: 'Emergency Contact',
-                relationship: 'Family',
-                phone: '(555) 000-0000'
+              // Use actual data from backend (available for HR/Product Owner viewing themselves or others)
+              address: (selectedEmployee as any).address,
+              city: (selectedEmployee as any).city,
+              state: (selectedEmployee as any).state,
+              zipCode: (selectedEmployee as any).zipCode,
+              emergencyContact: (selectedEmployee as any).emergencyContact || {
+                firstName: '',
+                lastName: '',
+                middleName: '',
+                relationship: '',
+                phone: ''
               },
               skills: [],
               certifications: [],
