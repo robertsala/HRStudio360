@@ -49,6 +49,12 @@ export const profiles = pgTable('profiles', {
   residenceCity: text('residence_city'), // City of residence
   canAccessOrgChart: boolean('can_access_org_chart').default(false),
   managerId: uuid('manager_id').references((): any => profiles.id, { onDelete: 'set null' }),
+  // Structured emergency contact fields for third-party integration compatibility (SCIM/Azure AD)
+  emergencyContactFirstName: text('emergency_contact_first_name'),
+  emergencyContactLastName: text('emergency_contact_last_name'),
+  emergencyContactMiddleName: text('emergency_contact_middle_name'),
+  emergencyContactRelationship: text('emergency_contact_relationship'), // Spouse, Parent, Sibling, Child, Friend, Other
+  emergencyContactPhone: text('emergency_contact_phone'), // Formatted: (555) 555-5555
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 });

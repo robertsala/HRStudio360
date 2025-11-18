@@ -237,7 +237,7 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
       // Determine if user can directly update addresses
       const canDirectlyUpdateAddress = isHRUser || canTerminateEmployees;
 
-      // Prepare profile table updates (address and other fields)
+      // Prepare profile table updates - WHITELIST ONLY VALID SCHEMA FIELDS
       const profileUpdateData: any = {};
       
       // Handle address fields based on user role
@@ -278,6 +278,26 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
         if (formData.city) profileUpdateData.city = formData.city;
         if (formData.state) profileUpdateData.state = formData.state;
         if (formData.zipCode) profileUpdateData.zipCode = formData.zipCode;
+      }
+
+      // Add other valid profile fields that may have changed
+      // CRITICAL: Only include fields that exist in the profiles table schema
+      if (formData.phone !== undefined && formData.phone !== displayEmployee.phone) {
+        profileUpdateData.phone = formData.phone;
+      }
+      
+      if (formData.profileImage !== undefined && formData.profileImage !== displayEmployee.profileImage) {
+        profileUpdateData.profilePicture = formData.profileImage; // Note: DB column is profilePicture
+      }
+
+      // Emergency contact fields - structured for third-party integrations
+      if (formData.emergencyContact) {
+        const ec = formData.emergencyContact;
+        if (ec.firstName !== undefined) profileUpdateData.emergencyContactFirstName = ec.firstName || null;
+        if (ec.lastName !== undefined) profileUpdateData.emergencyContactLastName = ec.lastName || null;
+        if (ec.middleName !== undefined) profileUpdateData.emergencyContactMiddleName = ec.middleName || null;
+        if (ec.relationship !== undefined) profileUpdateData.emergencyContactRelationship = ec.relationship || null;
+        if (ec.phone !== undefined) profileUpdateData.emergencyContactPhone = ec.phone || null;
       }
 
       // Debug logging
