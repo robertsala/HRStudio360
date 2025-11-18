@@ -5,6 +5,7 @@ import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
 import { performanceReviewService, CompensationHistory } from '../../utils/performanceReviewService';
 import { apiRequest } from '../../lib/queryClient';
+import { formatPhoneNumber, formatZipCode, EMERGENCY_CONTACT_RELATIONSHIPS } from '../../lib/formatters';
 
 interface Employee {
   id: string; // Profile or display ID
@@ -27,7 +28,9 @@ interface Employee {
   state?: string;
   zipCode?: string;
   emergencyContact: {
-    name: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string;
     relationship: string;
     phone: string;
   };
@@ -86,9 +89,11 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     employeeId: 'EMP124',
     profileImage: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
     emergencyContact: {
-      name: 'Carlos Martinez',
+      firstName: 'Carlos',
+      lastName: 'Martinez',
+      middleName: '',
       relationship: 'Spouse',
-      phone: '+1 (555) 987-6543'
+      phone: '(555) 987-6543'
     },
     skills: ['Customer Service', 'Problem Solving', 'Communication', 'CRM Software'],
     certifications: ['Customer Service Excellence', 'Conflict Resolution'],
@@ -106,7 +111,9 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     skills: emp.skills ?? [],
     certifications: emp.certifications ?? [],
     emergencyContact: emp.emergencyContact ?? {
-      name: '',
+      firstName: '',
+      lastName: '',
+      middleName: '',
       relationship: '',
       phone: ''
     },
@@ -865,8 +872,14 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                         <input
                           type="tel"
                           value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          onChange={(e) => {
+                            const formatted = formatPhoneNumber(e.target.value);
+                            setFormData({ ...formData, phone: formatted });
+                          }}
                           className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="(555) 555-5555"
+                          maxLength={14}
+                          data-testid="input-phone"
                         />
                       ) : (
                         <p className="text-gray-900 dark:text-white dark:text-white">{formData.phone}</p>
@@ -952,12 +965,15 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                           <input
                             type="text"
                             value={formData.zipCode || ''}
-                            onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                            onChange={(e) => {
+                              const formatted = formatZipCode(e.target.value);
+                              setFormData({ ...formData, zipCode: formatted });
+                            }}
                             required
                             maxLength={10}
-                            pattern="[0-9]{5}(-[0-9]{4})?"
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="12345 or 12345-6789"
+                            data-testid="input-zipcode"
                           />
                         ) : (
                           <p className="text-gray-900 dark:text-white">{formData.zipCode || 'Not provided'}</p>
@@ -973,53 +989,104 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
 
                   <div>
                     <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Emergency Contact</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Name</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
                         {isEditing ? (
                           <input
                             type="text"
-                            value={formData.emergencyContact.name}
+                            value={formData.emergencyContact.firstName}
                             onChange={(e) => setFormData({ 
                               ...formData, 
-                              emergencyContact: { ...formData.emergencyContact, name: e.target.value }
+                              emergencyContact: { ...formData.emergencyContact, firstName: e.target.value }
                             })}
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="First name"
+                            data-testid="input-emergency-contact-first-name"
                           />
                         ) : (
-                          <p className="text-gray-900 dark:text-white dark:text-white">{formData.emergencyContact.name}</p>
+                          <p className="text-gray-900 dark:text-white" data-testid="text-emergency-contact-first-name">{formData.emergencyContact.firstName || 'Not provided'}</p>
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Relationship</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Middle Name</label>
                         {isEditing ? (
                           <input
                             type="text"
+                            value={formData.emergencyContact.middleName || ''}
+                            onChange={(e) => setFormData({ 
+                              ...formData, 
+                              emergencyContact: { ...formData.emergencyContact, middleName: e.target.value }
+                            })}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Optional"
+                            data-testid="input-emergency-contact-middle-name"
+                          />
+                        ) : (
+                          <p className="text-gray-900 dark:text-white" data-testid="text-emergency-contact-middle-name">{formData.emergencyContact.middleName || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.emergencyContact.lastName}
+                            onChange={(e) => setFormData({ 
+                              ...formData, 
+                              emergencyContact: { ...formData.emergencyContact, lastName: e.target.value }
+                            })}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Last name"
+                            data-testid="input-emergency-contact-last-name"
+                          />
+                        ) : (
+                          <p className="text-gray-900 dark:text-white" data-testid="text-emergency-contact-last-name">{formData.emergencyContact.lastName || 'Not provided'}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Relationship</label>
+                        {isEditing ? (
+                          <select
                             value={formData.emergencyContact.relationship}
                             onChange={(e) => setFormData({ 
                               ...formData, 
                               emergencyContact: { ...formData.emergencyContact, relationship: e.target.value }
                             })}
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
+                            data-testid="select-emergency-contact-relationship"
+                          >
+                            <option value="">Select relationship</option>
+                            {EMERGENCY_CONTACT_RELATIONSHIPS.map((rel) => (
+                              <option key={rel} value={rel}>{rel}</option>
+                            ))}
+                          </select>
                         ) : (
-                          <p className="text-gray-900 dark:text-white dark:text-white">{formData.emergencyContact.relationship}</p>
+                          <p className="text-gray-900 dark:text-white" data-testid="text-emergency-contact-relationship">{formData.emergencyContact.relationship || 'Not provided'}</p>
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300 mb-1">Phone</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
                         {isEditing ? (
                           <input
                             type="tel"
                             value={formData.emergencyContact.phone}
-                            onChange={(e) => setFormData({ 
-                              ...formData, 
-                              emergencyContact: { ...formData.emergencyContact, phone: e.target.value }
-                            })}
+                            onChange={(e) => {
+                              const formatted = formatPhoneNumber(e.target.value);
+                              setFormData({ 
+                                ...formData, 
+                                emergencyContact: { ...formData.emergencyContact, phone: formatted }
+                              });
+                            }}
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="(555) 555-5555"
+                            maxLength={14}
+                            data-testid="input-emergency-contact-phone"
                           />
                         ) : (
-                          <p className="text-gray-900 dark:text-white dark:text-white">{formData.emergencyContact.phone}</p>
+                          <p className="text-gray-900 dark:text-white" data-testid="text-emergency-contact-phone">{formData.emergencyContact.phone || 'Not provided'}</p>
                         )}
                       </div>
                     </div>
