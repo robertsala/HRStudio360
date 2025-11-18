@@ -67,21 +67,38 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
 ## Recent Changes
 
-### November 18, 2025 - Critical Bug Fixes
+### November 18, 2025 - Critical Bug Fixes & Manager Assignment Investigation
 
 **Fixed Application Crash (ReferenceError: useToast is not defined):**
 - Removed orphaned `const { toast } = useToast();` declaration from ComprehensiveEmployeeProfileModal
 - Replaced toast notifications with console.log/alert for temporary fix
 - Application now loads without ErrorBoundary crash
-- Pending: Investigate PATCH /api/profiles/:id 500 errors
-- Pending: Implement proper toast notification system
 
-**Manager Persistence Implementation:**
-- Exposed userId field in getEmployeesWithProfiles() for proper foreign key mapping
-- Manager dropdown now uses profile UUID (userId) instead of employee table UUID
-- Added validation guards to prevent undefined managerId from wiping existing manager
-- Fixed self-selection prevention using employeeRecordId comparison
-- Separated employee table UUID (employeeRecordId) from profile UUID (id/userId) for clarity
+**Fixed emergencyContact Undefined Error:**
+- Added default initialization for emergencyContact in normalizeEmployee function
+- Personal Info tab now loads without TypeError crashes
+- Empty emergencyContact fields properly initialized with blank strings
+
+**Manager Assignment Deep Debugging:**
+- Fixed manager dropdown to use employee table IDs (employeeRecordId) instead of profile UUIDs
+- Updated fetchManagerName to look up managers from directory API by employee table ID
+- Fixed select value binding to use formData.managerId instead of employee?.managerId
+- Added comprehensive debug logging throughout save workflow
+- Identified root cause: managerId being set to manager display name instead of UUID somewhere in data pipeline
+- Architect analysis revealed transformation happening in Dashboard.openMyProfile or modal initialization
+- STATUS: Manager dropdown correctly sets UUID in onChange but handleSave receives name - requires data flow audit
+
+**Profile Picture Persistence Investigation:**
+- Identified that /api/objects/upload only echoes base64 string without database persistence
+- Profile picture uploads don't save to profiles.profilePicture column
+- Directory reads from cached profiles causing uploads to vanish after refresh
+- STATUS: Requires extending upload endpoint to call storage.updateProfile()
+
+**Pending Issues:**
+- Complete manager assignment data flow fix (UUID vs name transformation)
+- Implement profile picture database persistence
+- Investigate PATCH /api/profiles/:id 500 errors
+- Implement proper toast notification system
 
 ### November 17, 2025 - Navigation & UX Improvements
 
