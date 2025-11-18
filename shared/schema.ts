@@ -8,6 +8,7 @@ export const employmentTypeEnum = pgEnum('employment_type', ['Full-time', 'Part-
 export const employeeStatusEnum = pgEnum('employee_status', ['Active', 'On Leave', 'Terminated', 'Pending']);
 export const leaveTypeEnum = pgEnum('leave_type', ['Vacation', 'Sick', 'Personal', 'Bereavement', 'Maternity', 'Paternity', 'FMLA']);
 export const leaveStatusEnum = pgEnum('leave_status', ['Pending', 'Approved', 'Denied', 'Cancelled']);
+export const addressChangeStatusEnum = pgEnum('address_change_status', ['Pending', 'Approved', 'Rejected']);
 export const userRoleEnum = pgEnum('user_role', ['HR', 'Manager', 'Employee', 'Product Owner']);
 export const dashboardWidgetCategoryEnum = pgEnum('dashboard_widget_category', ['stats', 'team', 'analytics', 'notifications', 'quick-actions', 'calendar', 'ai']);
 export const timesheetStatusEnum = pgEnum('timesheet_status', ['Draft', 'Pending_Approval', 'Approved', 'Rejected', 'Locked']);
@@ -81,6 +82,30 @@ export const passwordAuditLog = pgTable('password_audit_log', {
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   success: boolean('success').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Address change requests table - for employee address updates requiring HR approval
+export const addressChangeRequests = pgTable('address_change_requests', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  requestedBy: uuid('requested_by').references(() => profiles.id).notNull(),
+  // Old address fields (current values)
+  oldAddress: text('old_address'),
+  oldCity: text('old_city'),
+  oldState: text('old_state'),
+  oldZipCode: text('old_zip_code'),
+  // New address fields (requested values)
+  newAddress: text('new_address').notNull(),
+  newCity: text('new_city').notNull(),
+  newState: text('new_state').notNull(),
+  newZipCode: text('new_zip_code').notNull(),
+  // Approval workflow
+  status: addressChangeStatusEnum('status').default('Pending').notNull(),
+  submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewedBy: uuid('reviewed_by').references(() => profiles.id),
+  reviewNotes: text('review_notes'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -969,6 +994,7 @@ export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true,
 export const insertAuthCredentialSchema = createInsertSchema(authCredentials).omit({ passwordUpdatedAt: true });
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 export const insertPasswordAuditLogSchema = createInsertSchema(passwordAuditLog).omit({ id: true, createdAt: true });
+export const insertAddressChangeRequestSchema = createInsertSchema(addressChangeRequests).omit({ id: true, createdAt: true, submittedAt: true, reviewedAt: true });
 export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true });
 export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
