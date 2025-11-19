@@ -35,7 +35,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
       role: 'Product Owner',
       canAccessOrgChart: true,
       hireDate: '2024-01-15',
-      profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DemoUser&backgroundColor=b6e3f4',
+      profilePicture: 'https://img.icons8.com/fluency/96/chatbot.png',
     }).returning();
     console.log(`   ✓ Demo User created with ID: ${demoUser.id}`);
 
@@ -64,7 +64,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'Senior Engineer',
         canAccessOrgChart: true,
         hireDate: '2023-06-15',
-        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=ffd5dc',
+        profilePicture: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
       },
       {
         email: 'michael.chen@hrstudio360.com',
@@ -74,7 +74,7 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         role: 'Product Manager',
         canAccessOrgChart: true,
         hireDate: '2023-08-01',
-        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MichaelChen&backgroundColor=d1d4f9',
+        profilePicture: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
       },
       {
         email: 'emily.rodriguez@hrstudio360.com',
