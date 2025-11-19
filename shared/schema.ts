@@ -307,6 +307,203 @@ export const newHires = pgTable('new_hires', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Onboarding checklists - Overall onboarding progress per new hire
+export const onboardingChecklists = pgTable('onboarding_checklists', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  newHireId: uuid('new_hire_id').references(() => newHires.id, { onDelete: 'cascade' }).notNull(),
+  status: text('status').default('In Progress').notNull(), // In Progress, Completed, Blocked
+  overallProgress: integer('overall_progress').default(0), // Percentage 0-100
+  i9Status: text('i9_status').default('Not Started'), // Not Started, In Progress, Completed, Needs Review
+  stateTaxFormStatus: text('state_tax_form_status').default('Not Started'),
+  workstationStatus: text('workstation_status').default('Not Started'),
+  benefitsStatus: text('benefits_status').default('Not Started'),
+  trainingStatus: text('training_status').default('Not Started'),
+  orientationStatus: text('orientation_status').default('Not Started'),
+  dueDate: date('due_date'),
+  completedDate: timestamp('completed_date'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  newHireIdx: index('onboarding_checklists_new_hire_idx').on(table.newHireId)
+}));
+
+// Onboarding tasks - Individual checklist items
+export const onboardingTasks = pgTable('onboarding_tasks', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  checklistId: uuid('checklist_id').references(() => onboardingChecklists.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  category: text('category').notNull(), // I-9 Verification, Tax Forms, IT Setup, HR Paperwork, Training, Benefits, etc.
+  assigneeType: text('assignee_type').notNull(), // New Hire, HR, IT, Manager
+  assigneeId: uuid('assignee_id').references(() => profiles.id),
+  status: text('status').default('Pending').notNull(), // Pending, In Progress, Completed, Blocked
+  priority: text('priority').default('Medium'), // Low, Medium, High, Critical
+  dueDate: date('due_date'),
+  completedDate: timestamp('completed_date'),
+  completedBy: uuid('completed_by').references(() => profiles.id),
+  estimatedMinutes: integer('estimated_minutes'),
+  notes: text('notes'),
+  order: integer('order').default(0),
+  dependencies: uuid('dependencies').array(), // IDs of tasks that must be completed first
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  checklistIdx: index('onboarding_tasks_checklist_idx').on(table.checklistId),
+  statusIdx: index('onboarding_tasks_status_idx').on(table.status)
+}));
+
+// I-9 Forms - Federal Employment Eligibility Verification (same for all 50 states + territories)
+export const i9Forms = pgTable('i9_forms', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  newHireId: uuid('new_hire_id').references(() => newHires.id, { onDelete: 'cascade' }).notNull().unique(),
+  
+  // Section 1: Employee Information and Attestation (completed by employee)
+  section1Status: text('section1_status').default('Not Started'), // Not Started, In Progress, Completed
+  lastName: text('last_name'),
+  firstName: text('first_name'),
+  middleInitial: text('middle_initial'),
+  otherLastNames: text('other_last_names'),
+  addressLine1: text('address_line1'),
+  addressLine2: text('address_line2'),
+  city: text('city'),
+  state: text('state'),
+  zipCode: text('zip_code'),
+  dateOfBirth: date('date_of_birth'),
+  socialSecurityNumber: text('social_security_number'), // Encrypted in production
+  email: text('email'),
+  phoneNumber: text('phone_number'),
+  
+  // Citizenship status attestation (employee selects one)
+  citizenshipStatus: text('citizenship_status'), // US_CITIZEN, NONCITIZEN_NATIONAL, PERMANENT_RESIDENT, AUTHORIZED_ALIEN
+  uscisNumber: text('uscis_number'), // For permanent residents/authorized aliens
+  formI94Number: text('form_i94_number'),
+  foreignPassportNumber: text('foreign_passport_number'),
+  countryOfIssuance: text('country_of_issuance'),
+  authorizationExpirationDate: date('authorization_expiration_date'),
+  
+  section1Signature: text('section1_signature'), // Digital signature data
+  section1SignatureDate: date('section1_signature_date'),
+  section1CompletedAt: timestamp('section1_completed_at'),
+  
+  // Section 2: Employer Review and Verification (completed by HR)
+  section2Status: text('section2_status').default('Not Started'),
+  listADocumentTitle: text('list_a_document_title'), // Single document proving identity AND employment authorization
+  listAIssuingAuthority: text('list_a_issuing_authority'),
+  listADocumentNumber: text('list_a_document_number'),
+  listAExpirationDate: date('list_a_expiration_date'),
+  listADocumentUrl: text('list_a_document_url'), // Object storage URL
+  
+  listBDocumentTitle: text('list_b_document_title'), // Document proving identity
+  listBIssuingAuthority: text('list_b_issuing_authority'),
+  listBDocumentNumber: text('list_b_document_number'),
+  listBExpirationDate: date('list_b_expiration_date'),
+  listBDocumentUrl: text('list_b_document_url'),
+  
+  listCDocumentTitle: text('list_c_document_title'), // Document proving employment authorization
+  listCIssuingAuthority: text('list_c_issuing_authority'),
+  listCDocumentNumber: text('list_c_document_number'),
+  listCExpirationDate: date('list_c_expiration_date'),
+  listCDocumentUrl: text('list_c_document_url'),
+  
+  additionalInformation: text('additional_information'),
+  firstDayOfEmployment: date('first_day_of_employment'),
+  employerSignature: text('employer_signature'),
+  employerSignatureDate: date('employer_signature_date'),
+  employerTitle: text('employer_title'),
+  employerLastName: text('employer_last_name'),
+  employerFirstName: text('employer_first_name'),
+  employerBusinessName: text('employer_business_name'),
+  employerAddress: text('employer_address'),
+  employerCity: text('employer_city'),
+  employerState: text('employer_state'),
+  employerZipCode: text('employer_zip_code'),
+  section2CompletedAt: timestamp('section2_completed_at'),
+  section2CompletedBy: uuid('section2_completed_by').references(() => profiles.id),
+  
+  // Section 3: Reverification and Rehires (if applicable)
+  section3Status: text('section3_status').default('Not Applicable'),
+  rehireDate: date('rehire_date'),
+  section3Signature: text('section3_signature'),
+  section3SignatureDate: date('section3_signature_date'),
+  section3CompletedAt: timestamp('section3_completed_at'),
+  section3CompletedBy: uuid('section3_completed_by').references(() => profiles.id),
+  
+  // E-Verify integration fields (optional)
+  eVerifyStatus: text('e_verify_status'), // Not Started, In Progress, Verified, Needs Correction
+  eVerifyCaseNumber: text('e_verify_case_number'),
+  eVerifyDate: timestamp('e_verify_date'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  newHireIdx: index('i9_forms_new_hire_idx').on(table.newHireId)
+}));
+
+// State tax withholding forms (state-specific: M-4 for MA, W-4 federal, etc.)
+export const stateTaxForms = pgTable('state_tax_forms', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  newHireId: uuid('new_hire_id').references(() => newHires.id, { onDelete: 'cascade' }).notNull(),
+  
+  // State information
+  state: text('state').notNull(), // MA, CA, NY, etc. (includes all 50 states + DC, PR, GU, VI, AS, MP)
+  formType: text('form_type').notNull(), // M-4, DE-4, IT-2104, W-4, etc.
+  formVersion: text('form_version'), // e.g., "2024", "Rev. 01/24"
+  
+  // Universal fields (most state forms have these)
+  filingStatus: text('filing_status'), // Single, Married, Head of Household, etc.
+  totalAllowances: integer('total_allowances').default(0),
+  additionalWithholding: numeric('additional_withholding', { precision: 10, scale: 2 }).default('0.00'),
+  exemptStatus: boolean('exempt_status').default(false),
+  
+  // State-specific JSON data (flexible for each state's unique fields)
+  stateSpecificData: json('state_specific_data'),
+  
+  // Signature and completion
+  employeeSignature: text('employee_signature'),
+  signatureDate: date('signature_date'),
+  status: text('status').default('Not Started'), // Not Started, In Progress, Completed, Needs Review
+  completedAt: timestamp('completed_at'),
+  reviewedBy: uuid('reviewed_by').references(() => profiles.id),
+  reviewedAt: timestamp('reviewed_at'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  newHireStateIdx: index('state_tax_forms_new_hire_state_idx').on(table.newHireId, table.state)
+}));
+
+// Onboarding documents - General document uploads (ID verification, certifications, etc.)
+export const onboardingDocuments = pgTable('onboarding_documents', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  newHireId: uuid('new_hire_id').references(() => newHires.id, { onDelete: 'cascade' }).notNull(),
+  taskId: uuid('task_id').references(() => onboardingTasks.id, { onDelete: 'set null' }), // Optional link to specific task
+  
+  documentType: text('document_type').notNull(), // ID_Verification, Tax_Form, Background_Check, Certification, etc.
+  documentName: text('document_name').notNull(),
+  description: text('description'),
+  fileUrl: text('file_url').notNull(), // Object storage URL
+  fileName: text('file_name').notNull(),
+  fileSize: integer('file_size'), // bytes
+  mimeType: text('mime_type'),
+  
+  uploadedBy: uuid('uploaded_by').references(() => profiles.id).notNull(),
+  uploadedAt: timestamp('uploaded_at').defaultNow(),
+  
+  // Review/approval workflow
+  status: text('status').default('Pending Review'), // Pending Review, Approved, Rejected, Needs Revision
+  reviewedBy: uuid('reviewed_by').references(() => profiles.id),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewNotes: text('review_notes'),
+  
+  expirationDate: date('expiration_date'), // For documents like certifications
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  newHireIdx: index('onboarding_documents_new_hire_idx').on(table.newHireId),
+  typeIdx: index('onboarding_documents_type_idx').on(table.documentType)
+}));
+
 // Currencies table (for payroll)
 export const currencies = pgTable('currencies', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -1026,6 +1223,11 @@ export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
 export const insertLeaveBalanceSchema = createInsertSchema(leaveBalances).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCandidateSchema = createInsertSchema(candidates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertNewHireSchema = createInsertSchema(newHires).omit({ id: true, createdAt: true });
+export const insertOnboardingChecklistSchema = createInsertSchema(onboardingChecklists).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOnboardingTaskSchema = createInsertSchema(onboardingTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertI9FormSchema = createInsertSchema(i9Forms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStateTaxFormSchema = createInsertSchema(stateTaxForms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOnboardingDocumentSchema = createInsertSchema(onboardingDocuments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCurrencySchema = createInsertSchema(currencies).omit({ id: true, createdAt: true });
 export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({ id: true, createdAt: true });
 export const insertExpenseVendorSchema = createInsertSchema(expenseVendors).omit({ id: true, createdAt: true });
@@ -1098,6 +1300,16 @@ export type Candidate = typeof candidates.$inferSelect;
 export type InsertCandidate = z.infer<typeof insertCandidateSchema>;
 export type NewHire = typeof newHires.$inferSelect;
 export type InsertNewHire = z.infer<typeof insertNewHireSchema>;
+export type OnboardingChecklist = typeof onboardingChecklists.$inferSelect;
+export type InsertOnboardingChecklist = z.infer<typeof insertOnboardingChecklistSchema>;
+export type OnboardingTask = typeof onboardingTasks.$inferSelect;
+export type InsertOnboardingTask = z.infer<typeof insertOnboardingTaskSchema>;
+export type I9Form = typeof i9Forms.$inferSelect;
+export type InsertI9Form = z.infer<typeof insertI9FormSchema>;
+export type StateTaxForm = typeof stateTaxForms.$inferSelect;
+export type InsertStateTaxForm = z.infer<typeof insertStateTaxFormSchema>;
+export type OnboardingDocument = typeof onboardingDocuments.$inferSelect;
+export type InsertOnboardingDocument = z.infer<typeof insertOnboardingDocumentSchema>;
 export type Currency = typeof currencies.$inferSelect;
 export type InsertCurrency = z.infer<typeof insertCurrencySchema>;
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;

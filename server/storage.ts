@@ -46,11 +46,17 @@ import type {
   EmployeeAccessAssignment, InsertEmployeeAccessAssignment,
   CallSession, InsertCallSession,
   CallParticipant, InsertCallParticipant,
-  CallSignaling, InsertCallSignaling
+  CallSignaling, InsertCallSignaling,
+  OnboardingChecklist, InsertOnboardingChecklist,
+  OnboardingTask, InsertOnboardingTask,
+  I9Form, InsertI9Form,
+  StateTaxForm, InsertStateTaxForm,
+  OnboardingDocument, InsertOnboardingDocument
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, addressChangeRequests, announcements, employees, leaveRequests, leaveBalances,
-  candidates, newHires, expenseCategories, expenses, departments,
+  candidates, newHires, onboardingChecklists, onboardingTasks, i9Forms, stateTaxForms, onboardingDocuments,
+  expenseCategories, expenses, departments,
   chatChannels, channelMembers, chatMessages, messageReactions, typingIndicators, userPresence,
   userNotifications, collaboratorInvitations,
   changeLog, historicalChanges, changeNotifications,
@@ -273,6 +279,42 @@ export interface IStorage {
   createNewHire(newHire: import('../shared/schema.js').InsertNewHire): Promise<import('../shared/schema.js').NewHire>;
   getNewHireByEmail(email: string): Promise<import('../shared/schema.js').NewHire | undefined>;
   updateNewHire(id: string, newHire: Partial<import('../shared/schema.js').InsertNewHire>): Promise<import('../shared/schema.js').NewHire | undefined>;
+  
+  // Onboarding Checklists
+  getOnboardingChecklists(): Promise<OnboardingChecklist[]>;
+  getOnboardingChecklistById(id: string): Promise<OnboardingChecklist | undefined>;
+  getOnboardingChecklistByNewHireId(newHireId: string): Promise<OnboardingChecklist | undefined>;
+  createOnboardingChecklist(checklist: InsertOnboardingChecklist): Promise<OnboardingChecklist>;
+  updateOnboardingChecklist(id: string, checklist: Partial<InsertOnboardingChecklist>): Promise<OnboardingChecklist | undefined>;
+  
+  // Onboarding Tasks
+  getOnboardingTasks(checklistId: string): Promise<OnboardingTask[]>;
+  getOnboardingTaskById(id: string): Promise<OnboardingTask | undefined>;
+  createOnboardingTask(task: InsertOnboardingTask): Promise<OnboardingTask>;
+  updateOnboardingTask(id: string, task: Partial<InsertOnboardingTask>): Promise<OnboardingTask | undefined>;
+  completeOnboardingTask(id: string, completedBy: string): Promise<OnboardingTask | undefined>;
+  
+  // I-9 Forms
+  getI9Forms(): Promise<I9Form[]>;
+  getI9FormById(id: string): Promise<I9Form | undefined>;
+  getI9FormByNewHireId(newHireId: string): Promise<I9Form | undefined>;
+  createI9Form(form: InsertI9Form): Promise<I9Form>;
+  updateI9Form(id: string, form: Partial<InsertI9Form>): Promise<I9Form | undefined>;
+  updateI9FormSection1(id: string, data: any): Promise<I9Form | undefined>;
+  updateI9FormSection2(id: string, data: any, completedBy: string): Promise<I9Form | undefined>;
+  
+  // State Tax Forms
+  getStateTaxForms(newHireId: string): Promise<StateTaxForm[]>;
+  getStateTaxFormById(id: string): Promise<StateTaxForm | undefined>;
+  getStateTaxFormByNewHireAndState(newHireId: string, state: string): Promise<StateTaxForm | undefined>;
+  createStateTaxForm(form: InsertStateTaxForm): Promise<StateTaxForm>;
+  updateStateTaxForm(id: string, form: Partial<InsertStateTaxForm>): Promise<StateTaxForm | undefined>;
+  
+  // Onboarding Documents
+  getOnboardingDocuments(newHireId: string): Promise<OnboardingDocument[]>;
+  getOnboardingDocumentById(id: string): Promise<OnboardingDocument | undefined>;
+  createOnboardingDocument(document: InsertOnboardingDocument): Promise<OnboardingDocument>;
+  updateOnboardingDocument(id: string, document: Partial<InsertOnboardingDocument>): Promise<OnboardingDocument | undefined>;
   
   // Analytics
   getWorkforceMetrics(timeRange: string): Promise<import('../shared/schema.js').WorkforceMetrics>;
@@ -1637,6 +1679,186 @@ export class DbStorage implements IStorage {
 
   async updateNewHire(id: string, newHire: Partial<import('../shared/schema.js').InsertNewHire>): Promise<import('../shared/schema.js').NewHire | undefined> {
     const result = await db.update(newHires).set(newHire).where(eq(newHires.id, id)).returning();
+    return result[0];
+  }
+
+  // Onboarding Checklists
+  async getOnboardingChecklists(): Promise<OnboardingChecklist[]> {
+    return db.select().from(onboardingChecklists).orderBy(desc(onboardingChecklists.createdAt));
+  }
+
+  async getOnboardingChecklistById(id: string): Promise<OnboardingChecklist | undefined> {
+    const result = await db.select().from(onboardingChecklists).where(eq(onboardingChecklists.id, id));
+    return result[0];
+  }
+
+  async getOnboardingChecklistByNewHireId(newHireId: string): Promise<OnboardingChecklist | undefined> {
+    const result = await db.select().from(onboardingChecklists).where(eq(onboardingChecklists.newHireId, newHireId));
+    return result[0];
+  }
+
+  async createOnboardingChecklist(checklist: InsertOnboardingChecklist): Promise<OnboardingChecklist> {
+    const result = await db.insert(onboardingChecklists).values(checklist).returning();
+    return result[0];
+  }
+
+  async updateOnboardingChecklist(id: string, checklist: Partial<InsertOnboardingChecklist>): Promise<OnboardingChecklist | undefined> {
+    const result = await db.update(onboardingChecklists)
+      .set({ ...checklist, updatedAt: new Date() })
+      .where(eq(onboardingChecklists.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Onboarding Tasks
+  async getOnboardingTasks(checklistId: string): Promise<OnboardingTask[]> {
+    return db.select().from(onboardingTasks)
+      .where(eq(onboardingTasks.checklistId, checklistId))
+      .orderBy(onboardingTasks.order, onboardingTasks.createdAt);
+  }
+
+  async getOnboardingTaskById(id: string): Promise<OnboardingTask | undefined> {
+    const result = await db.select().from(onboardingTasks).where(eq(onboardingTasks.id, id));
+    return result[0];
+  }
+
+  async createOnboardingTask(task: InsertOnboardingTask): Promise<OnboardingTask> {
+    const result = await db.insert(onboardingTasks).values(task).returning();
+    return result[0];
+  }
+
+  async updateOnboardingTask(id: string, task: Partial<InsertOnboardingTask>): Promise<OnboardingTask | undefined> {
+    const result = await db.update(onboardingTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(onboardingTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async completeOnboardingTask(id: string, completedBy: string): Promise<OnboardingTask | undefined> {
+    const result = await db.update(onboardingTasks)
+      .set({ 
+        status: 'Completed',
+        completedDate: new Date(),
+        completedBy,
+        updatedAt: new Date()
+      })
+      .where(eq(onboardingTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // I-9 Forms
+  async getI9Forms(): Promise<I9Form[]> {
+    return db.select().from(i9Forms).orderBy(desc(i9Forms.createdAt));
+  }
+
+  async getI9FormById(id: string): Promise<I9Form | undefined> {
+    const result = await db.select().from(i9Forms).where(eq(i9Forms.id, id));
+    return result[0];
+  }
+
+  async getI9FormByNewHireId(newHireId: string): Promise<I9Form | undefined> {
+    const result = await db.select().from(i9Forms).where(eq(i9Forms.newHireId, newHireId));
+    return result[0];
+  }
+
+  async createI9Form(form: InsertI9Form): Promise<I9Form> {
+    const result = await db.insert(i9Forms).values(form).returning();
+    return result[0];
+  }
+
+  async updateI9Form(id: string, form: Partial<InsertI9Form>): Promise<I9Form | undefined> {
+    const result = await db.update(i9Forms)
+      .set({ ...form, updatedAt: new Date() })
+      .where(eq(i9Forms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateI9FormSection1(id: string, data: any): Promise<I9Form | undefined> {
+    const result = await db.update(i9Forms)
+      .set({ 
+        ...data,
+        section1Status: 'Completed',
+        section1CompletedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(i9Forms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateI9FormSection2(id: string, data: any, completedBy: string): Promise<I9Form | undefined> {
+    const result = await db.update(i9Forms)
+      .set({ 
+        ...data,
+        section2Status: 'Completed',
+        section2CompletedAt: new Date(),
+        section2CompletedBy: completedBy,
+        updatedAt: new Date()
+      })
+      .where(eq(i9Forms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // State Tax Forms
+  async getStateTaxForms(newHireId: string): Promise<StateTaxForm[]> {
+    return db.select().from(stateTaxForms)
+      .where(eq(stateTaxForms.newHireId, newHireId))
+      .orderBy(stateTaxForms.state);
+  }
+
+  async getStateTaxFormById(id: string): Promise<StateTaxForm | undefined> {
+    const result = await db.select().from(stateTaxForms).where(eq(stateTaxForms.id, id));
+    return result[0];
+  }
+
+  async getStateTaxFormByNewHireAndState(newHireId: string, state: string): Promise<StateTaxForm | undefined> {
+    const result = await db.select().from(stateTaxForms)
+      .where(and(
+        eq(stateTaxForms.newHireId, newHireId),
+        eq(stateTaxForms.state, state)
+      ));
+    return result[0];
+  }
+
+  async createStateTaxForm(form: InsertStateTaxForm): Promise<StateTaxForm> {
+    const result = await db.insert(stateTaxForms).values(form).returning();
+    return result[0];
+  }
+
+  async updateStateTaxForm(id: string, form: Partial<InsertStateTaxForm>): Promise<StateTaxForm | undefined> {
+    const result = await db.update(stateTaxForms)
+      .set({ ...form, updatedAt: new Date() })
+      .where(eq(stateTaxForms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Onboarding Documents
+  async getOnboardingDocuments(newHireId: string): Promise<OnboardingDocument[]> {
+    return db.select().from(onboardingDocuments)
+      .where(eq(onboardingDocuments.newHireId, newHireId))
+      .orderBy(desc(onboardingDocuments.uploadedAt));
+  }
+
+  async getOnboardingDocumentById(id: string): Promise<OnboardingDocument | undefined> {
+    const result = await db.select().from(onboardingDocuments).where(eq(onboardingDocuments.id, id));
+    return result[0];
+  }
+
+  async createOnboardingDocument(document: InsertOnboardingDocument): Promise<OnboardingDocument> {
+    const result = await db.insert(onboardingDocuments).values(document).returning();
+    return result[0];
+  }
+
+  async updateOnboardingDocument(id: string, document: Partial<InsertOnboardingDocument>): Promise<OnboardingDocument | undefined> {
+    const result = await db.update(onboardingDocuments)
+      .set({ ...document, updatedAt: new Date() })
+      .where(eq(onboardingDocuments.id, id))
+      .returning();
     return result[0];
   }
 
