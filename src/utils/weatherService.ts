@@ -1,11 +1,6 @@
-import { supabase } from './supabaseClient';
 import { geocodingService } from './geocodingService';
-import { getWeatherDescription, getAnimatedIconType } from './metnoWeatherMapping';
+import { getWeatherDescription, getAnimatedIconType} from './metnoWeatherMapping';
 import { apiClient } from '../lib/api';
-
-const METNO_API_BASE = 'https://api.met.no/weatherapi/locationforecast/2.0';
-const USER_AGENT = 'HR-Studio-Weather-Widget/1.0';
-const CACHE_DURATION_MS = 30 * 60 * 1000;
 
 export interface WeatherData {
   location: {
@@ -335,56 +330,16 @@ class WeatherService {
     return tempF;
   }
 
-  private async cacheWeatherData(userId: string, weatherData: WeatherData): Promise<void> {
-    try {
-      const cacheExpiresAt = new Date(Date.now() + CACHE_DURATION_MS).toISOString();
-
-      const { error } = await supabase
-        .from('weather_cache')
-        .upsert({
-          user_id: userId,
-          location_lat: weatherData.location.lat,
-          location_lon: weatherData.location.lon,
-          location_name: `${weatherData.location.name}, ${weatherData.location.region}`,
-          temperature: weatherData.current.temperature,
-          temperature_unit: weatherData.current.temperatureUnit,
-          weather_condition: weatherData.current.condition,
-          weather_icon: weatherData.current.icon,
-          wind_speed: weatherData.current.windSpeed,
-          humidity: weatherData.current.humidity,
-          feels_like: weatherData.current.feelsLike,
-          forecast_data: weatherData.forecast || [],
-          last_updated: new Date().toISOString(),
-          cache_expires_at: cacheExpiresAt,
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) {
-        console.error('Error caching weather data:', error);
-      }
-    } catch (error) {
-      console.error('Error caching weather data:', error);
-    }
+  private async cacheWeatherData(_userId: string, _weatherData: WeatherData): Promise<void> {
+    // Caching disabled during Supabase migration
+    // Weather data will be fetched fresh from the API each time
+    return;
   }
 
-  private async getCachedWeather(userId: string): Promise<any | null> {
-    try {
-      const { data, error } = await supabase
-        .from('weather_cache')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error || !data) {
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error getting cached weather:', error);
-      return null;
-    }
+  private async getCachedWeather(_userId: string): Promise<any | null> {
+    // Caching disabled during Supabase migration
+    // Weather data is fetched fresh from the API
+    return null;
   }
 
   private isCacheExpired(expiresAt: string): boolean {
@@ -458,68 +413,25 @@ class WeatherService {
     }
   }
 
-  async invalidateWeatherCache(userId: string): Promise<void> {
-    try {
-      await supabase
-        .from('weather_cache')
-        .delete()
-        .eq('user_id', userId);
-    } catch (error) {
-      console.error('Error invalidating weather cache:', error);
-    }
+  async invalidateWeatherCache(_userId: string): Promise<void> {
+    // Cache invalidation disabled during Supabase migration
+    return;
   }
 
   async getWeatherPreferences(userId: string): Promise<any> {
-    try {
-      const { data, error } = await supabase
-        .from('user_weather_preferences')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error || !data) {
-        const { data: newPrefs } = await supabase
-          .from('user_weather_preferences')
-          .insert({
-            user_id: userId,
-            auto_detect_location: true,
-            preferred_temperature_unit: 'fahrenheit',
-            show_extended_forecast: false,
-          })
-          .select()
-          .single();
-
-        return newPrefs;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error getting weather preferences:', error);
-      return null;
-    }
+    // Weather preferences disabled during Supabase migration
+    // Return default preferences
+    return {
+      user_id: userId,
+      auto_detect_location: true,
+      preferred_temperature_unit: 'fahrenheit',
+      show_extended_forecast: false,
+    };
   }
 
-  async updateWeatherPreferences(userId: string, preferences: any): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('user_weather_preferences')
-        .upsert({
-          user_id: userId,
-          ...preferences,
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) {
-        console.error('Error updating weather preferences:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error updating weather preferences:', error);
-      return false;
-    }
+  async updateWeatherPreferences(_userId: string, _preferences: any): Promise<boolean> {
+    // Weather preferences disabled during Supabase migration
+    return true;
   }
 
   async detectUserLocation(): Promise<{ lat: number; lon: number } | null> {
