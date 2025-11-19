@@ -16,57 +16,34 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
     if (options.force) {
       console.log('🔥 Force mode enabled - deleting existing data...');
       
+      // Helper function to safely delete from a table
+      const safeDelete = async (table: any, tableName: string) => {
+        try {
+          await db.delete(table);
+          console.log(`   ✓ Deleted ${tableName}`);
+        } catch (error: any) {
+          console.log(`   ⚠️  Skipped ${tableName} (${error.message})`);
+        }
+      };
+      
       // Delete in reverse dependency order
-      await db.delete(reviewResponses);
-      console.log('   ✓ Deleted review responses');
-      
-      await db.delete(reviewGoalsComments);
-      console.log('   ✓ Deleted review goals/comments');
-      
-      await db.delete(performanceReviews);
-      console.log('   ✓ Deleted performance reviews');
-      
-      await db.delete(reviewQuestionAssignments);
-      console.log('   ✓ Deleted review question assignments');
-      
-      await db.delete(reviewQuestionsLibrary);
-      console.log('   ✓ Deleted review questions');
-      
-      await db.delete(reviewQuestionTemplates);
-      console.log('   ✓ Deleted review templates');
-      
-      await db.delete(reviewCycles);
-      console.log('   ✓ Deleted review cycles');
-      
-      await db.delete(leaveRequests);
-      console.log('   ✓ Deleted leave requests');
-      
-      await db.delete(leaveBalances);
-      console.log('   ✓ Deleted leave balances');
-      
-      await db.delete(newHires);
-      console.log('   ✓ Deleted new hires');
-      
-      await db.delete(candidates);
-      console.log('   ✓ Deleted candidates');
-      
-      await db.delete(employees);
-      console.log('   ✓ Deleted employees');
-      
-      await db.delete(authCredentials);
-      console.log('   ✓ Deleted auth credentials');
-      
-      await db.delete(announcements);
-      console.log('   ✓ Deleted announcements');
-      
-      await db.delete(jobTitles);
-      console.log('   ✓ Deleted job titles');
-      
-      await db.delete(departments);
-      console.log('   ✓ Deleted departments');
-      
-      await db.delete(profiles);
-      console.log('   ✓ Deleted profiles');
+      await safeDelete(reviewResponses, 'review responses');
+      await safeDelete(reviewGoalsComments, 'review goals/comments');
+      await safeDelete(performanceReviews, 'performance reviews');
+      await safeDelete(reviewQuestionAssignments, 'review question assignments');
+      await safeDelete(reviewQuestionsLibrary, 'review questions');
+      await safeDelete(reviewQuestionTemplates, 'review templates');
+      await safeDelete(reviewCycles, 'review cycles');
+      await safeDelete(leaveRequests, 'leave requests');
+      await safeDelete(leaveBalances, 'leave balances');
+      await safeDelete(newHires, 'new hires');
+      await safeDelete(candidates, 'candidates');
+      await safeDelete(employees, 'employees');
+      await safeDelete(authCredentials, 'auth credentials');
+      await safeDelete(announcements, 'announcements');
+      await safeDelete(jobTitles, 'job titles');
+      await safeDelete(departments, 'departments');
+      await safeDelete(profiles, 'profiles');
       
       console.log('✅ Force cleanup completed successfully!');
     }
