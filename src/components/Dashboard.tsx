@@ -36,7 +36,6 @@ import AIAssistantModal from './modals/AIAssistantModal';
 import OffboardingModal from './modals/OffboardingModal';
 import TerminationRequestModal from './modals/TerminationRequestModal';
 import AnnouncementsModal from './modals/AnnouncementsModal';
-import OnboardingModal from './modals/OnboardingModal';
 import OfferManagementModal from './modals/OfferManagementModal';
 import HRKPIDashboardModal from './modals/HRKPIDashboardModal';
 import AddressChangeApprovalModal from './modals/AddressChangeApprovalModal';
