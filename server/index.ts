@@ -12,6 +12,11 @@ initSentry();
 
 const app = express();
 
+// Health check endpoint for deployment checks (responds immediately, before ANY middleware)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Trust proxy for secure cookies behind TLS
 app.set('trust proxy', 1);
 
@@ -65,11 +70,6 @@ app.use((req, res, next) => {
   });
 
   next();
-});
-
-// Health check endpoint for deployment checks (responds immediately, before Vite)
-app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Register API routes BEFORE Vite middleware
