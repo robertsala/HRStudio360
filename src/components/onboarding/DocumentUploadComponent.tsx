@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Upload, FileText, CheckCircle, X, AlertCircle, Clock, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useQuery } from '@tanstack/react-query';
-import { Storage } from '@google-cloud/storage';
+import { useQuery, useMutation } from '@tanstack/react-query';
 
 interface DocumentUploadComponentProps {
   newHireId: string;

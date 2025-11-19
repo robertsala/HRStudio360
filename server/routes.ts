@@ -3871,6 +3871,23 @@ export function registerRoutes(app: Express) {
   });
 
   // Onboarding Documents
+  app.get('/api/onboarding/upload-url', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      
+      const { ObjectStorageService } = await import('./objectStorage.js');
+      const objectStorageService = new ObjectStorageService();
+      const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
+      
+      res.json({ uploadUrl });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/onboarding/documents/new-hire/:newHireId', async (req, res) => {
     try {
       const { newHireId } = req.params;
