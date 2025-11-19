@@ -83,7 +83,7 @@ export const mockEmployees: Employee[] = [
     location: 'Denver, CO',
     startDate: '2023-05-20',
     status: 'Remote',
-    profileImage: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '7',
@@ -119,7 +119,7 @@ export const mockEmployees: Employee[] = [
     location: 'Miami, FL',
     startDate: '2023-02-28',
     status: 'Remote',
-    profileImage: 'https://images.pexels.com/photos/1024311/pexels-photo-1024311.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/1587009/pexels-photo-1587009.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '10',
@@ -167,7 +167,7 @@ export const mockEmployees: Employee[] = [
     location: 'San Francisco, CA',
     startDate: '2020-05-20',
     status: 'Active',
-    profileImage: 'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/1300402/pexels-photo-1300402.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '14',
@@ -179,7 +179,7 @@ export const mockEmployees: Employee[] = [
     location: 'Los Angeles, CA',
     startDate: '2023-01-10',
     status: 'Remote',
-    profileImage: 'https://images.pexels.com/photos/1181690/pexels-photo-1181690.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '15',
@@ -203,7 +203,7 @@ export const mockEmployees: Employee[] = [
     location: 'Boston, MA',
     startDate: '2021-04-12',
     status: 'Active',
-    profileImage: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '17',
@@ -215,7 +215,7 @@ export const mockEmployees: Employee[] = [
     location: 'Seattle, WA',
     startDate: '2022-11-20',
     status: 'Active',
-    profileImage: 'https://images.pexels.com/photos/1102341/pexels-photo-1102341.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/1438081/pexels-photo-1438081.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '18',
@@ -227,7 +227,7 @@ export const mockEmployees: Employee[] = [
     location: 'Chicago, IL',
     startDate: '2023-03-05',
     status: 'Active',
-    profileImage: 'https://images.pexels.com/photos/1181424/pexels-photo-1181424.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
+    profileImage: 'https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
   },
   {
     id: '19',
