@@ -786,7 +786,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                     return (
                       <button
                         key={stat.label}
-                        className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
+                        className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all transform hover:scale-105 text-left w-full focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-100 dark:border-gray-700"
                         onClick={stat.action}
                         data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
                       >
@@ -796,8 +796,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                               <Icon className="h-6 w-6 text-white" />
                             </div>
                             <div className="ml-4">
-                              <p className="text-2xl font-bold text-gray-900 dark:text-white dark:text-white">{stat.value}</p>
-                              <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm">{stat.label}</p>
+                              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
+                              <p className="text-gray-600 dark:text-gray-400 text-sm">{stat.label}</p>
                             </div>
                           </div>
                           <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
@@ -813,7 +813,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
             {renderWidget('team-overview', () => 
               (userRole === 'Manager' || userRole === 'HR') && personalizedData.teamStats ? (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4">Team Overview</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Team Overview</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <button
                     onClick={() => {
@@ -885,8 +885,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
               <div className="lg:col-span-1 space-y-6">
                 {/* Quick Access Modules */}
                 {renderWidget('quick-actions', () => (
-                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-6 flex items-center">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
                       <Zap className="h-5 w-5 mr-2 text-blue-500" />
                       {t('dashboard.quickAccess')}
                     </h3>
@@ -897,14 +897,14 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                         return (
                           <button
                             key={module.id}
-                            className="bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg p-4 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             onClick={module.action}
                           >
                             <div className={`p-2 rounded-lg mb-2 inline-block ${module.color} shadow-md`}>
                               <Icon className="h-5 w-5 text-white" />
                             </div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white text-sm mb-1">{module.title}</h4>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 dark:text-gray-400">{module.description}</p>
+                            <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">{module.title}</h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">{module.description}</p>
                           </button>
                         );
                       })}
@@ -914,16 +914,16 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
 
                 {/* Pending Tasks */}
                 {renderWidget('pending-tasks', () => (
-                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                       <Clock className="h-5 w-5 mr-2 text-purple-500" />
                       {t('dashboard.yourPendingTasks')}
                     </h3>
                     <div className="space-y-3">
                       {personalizedData.pendingTasks.map((task) => (
-                        <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
+                        <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                           <div className="flex-1">
-                            <p className="font-medium text-gray-900 dark:text-white dark:text-white text-sm">{task.title}</p>
+                            <p className="font-medium text-gray-900 dark:text-white text-sm">{task.title}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.due')}: {new Date(task.dueDate).toLocaleDateString(i18n.language)}</p>
                           </div>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -947,14 +947,14 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
 
                 {/* Recent Notifications */}
                 {renderWidget('recent-notifications', () => (
-                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                       <Bell className="h-5 w-5 mr-2 text-yellow-500" />
                       {t('dashboard.recentNotifications')}
                     </h3>
                   <div className="space-y-3">
                     {personalizedData.recentNotifications.map((notification) => (
-                      <div key={notification.id} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
+                      <div key={notification.id} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                         <div className={`p-1 rounded-full ${
                           notification.type === 'success' ? 'bg-green-100' :
                           notification.type === 'warning' ? 'bg-yellow-100' :
@@ -969,7 +969,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white dark:text-white">{notification.title}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{notification.title}</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">{notification.time}</p>
                         </div>
                       </div>
@@ -1002,24 +1002,24 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                 {/* KPI Dashboard - HR/Product Owner Only */}
                 {renderWidget('kpi-dashboard', () => (
                   <div className="bg-gradient-to-br from-blue-50 via-emerald-50 to-blue-50 dark:from-blue-900/30 dark:via-emerald-900/30 dark:to-blue-900/30 rounded-xl p-6 shadow-sm border border-blue-100 dark:border-blue-800">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-4 flex items-center">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                       <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
                       {t('dashboard.hrKPIDashboard')}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-400 mb-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                       {t('dashboard.hrKPIDashboardIntro')}
                     </p>
                     <div className="grid grid-cols-2 gap-3 mb-4">
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 dark:border-gray-700">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.headcount')}</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white dark:text-white">247</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white">247</p>
                           </div>
                           <Users className="h-8 w-8 text-blue-500 opacity-50" />
                         </div>
                       </div>
-                      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 dark:border-gray-700">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.turnover')}</p>
@@ -1043,8 +1043,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
               <div className="lg:col-span-2 space-y-6">
                 {/* Company Announcements & News Feed */}
                 {renderWidget('company-announcements', () => (
-                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-6 flex items-center">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center">
                       <Globe className="h-5 w-5 mr-2 text-blue-500" />
                       {t('dashboard.companyAnnouncements')}
                     </h3>
@@ -1068,8 +1068,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                           <div key={announcement.id} className="border-l-4 border-blue-500 pl-4 py-2" data-testid={`announcement-${announcement.id}`}>
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white mb-1">{announcement.title}</h4>
-                                <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm mb-2">{announcement.excerpt}</p>
+                                <h4 className="font-semibold text-gray-900 dark:text-white mb-1">{announcement.title}</h4>
+                                <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{announcement.excerpt}</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">{announcement.date}</p>
                               </div>
                               <button
@@ -1106,9 +1106,9 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
 
                 {/* Upcoming Events & Calendar Integration */}
                 {renderWidget('upcoming-events', () => (
-                  <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white flex items-center">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                         <CalendarIcon className="h-5 w-5 mr-2 text-purple-500" />
                         {t('dashboard.upcomingEvents')}
                       </h3>
@@ -1122,7 +1122,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                     
                     <div className="space-y-3 mb-6">
                       {personalizedData.upcomingEvents.slice(0, 4).map((event) => (
-                        <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg">
+                        <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                           <div className="flex items-center space-x-3">
                             <div className={`p-2 rounded-lg ${
                               event.type === 'Holiday' ? 'bg-red-100' :
@@ -1142,7 +1142,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                               )}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-white dark:text-white text-sm">{event.title}</p>
+                              <p className="font-medium text-gray-900 dark:text-white text-sm">{event.title}</p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(event.date).toLocaleDateString(i18n.language)}</p>
                             </div>
                           </div>
@@ -1158,7 +1158,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                     </div>
 
                     {/* Mini Calendar */}
-                    <div className="bg-gray-50 dark:bg-gray-900 dark:bg-gray-700 rounded-lg p-4">
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
                       <Calendar
                         holidays={[
                           {
@@ -1382,11 +1382,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
             </div>
 
             {/* Bottom Action Bar */}
-            <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white dark:text-white mb-1">{t('dashboard.needHelp')}</h3>
-                  <p className="text-gray-600 dark:text-gray-400 dark:text-gray-400 text-sm">{t('dashboard.needHelpDesc')}</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{t('dashboard.needHelp')}</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">{t('dashboard.needHelpDesc')}</p>
                 </div>
                 <button
                   onClick={() => openModal('aiAssistant')}
