@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json, smallint, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, uuid, timestamp, integer, numeric, date, boolean, pgEnum, json, smallint, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
@@ -130,7 +130,9 @@ export const announcements = pgTable('announcements', {
   expirationDate: timestamp('expiration_date'),
   creatorUserId: uuid('creator_user_id').references(() => profiles.id).notNull(),
   createdAt: timestamp('created_at').defaultNow()
-});
+}, (table) => ({
+  publishedCreatedIdx: index('announcements_published_created_idx').on(table.published, table.createdAt)
+}));
 
 // Departments table
 export const departments = pgTable('departments', {
@@ -165,7 +167,9 @@ export const employees = pgTable('employees', {
   benefits: text('benefits').array(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
-});
+}, (table) => ({
+  userIdIdx: index('employees_user_id_idx').on(table.userId)
+}));
 
 export type EmployeeWithProfile = Employee & {
   profile?: {
@@ -221,7 +225,9 @@ export const leaveBalances = pgTable('leave_balances', {
   year: integer('year').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
-});
+}, (table) => ({
+  employeeYearIdx: index('leave_balances_employee_year_idx').on(table.employeeId, table.year)
+}));
 
 // Candidates table (for hiring/recruitment)
 // NOTE: position and department are optional here since candidates can apply to multiple jobs
@@ -608,7 +614,8 @@ export const userDashboardPreferences = pgTable('user_dashboard_preferences', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => ({
-  uniqueUserWidget: sql`unique (user_id, widget_id)`
+  uniqueUserWidget: sql`unique (user_id, widget_id)`,
+  userIdIdx: index('user_dashboard_preferences_user_id_idx').on(table.userId)
 }));
 
 // Performance Review System Tables
