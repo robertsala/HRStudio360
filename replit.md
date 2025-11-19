@@ -11,6 +11,13 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes (November 2025)
 
+### UI/UX Polish & Code Quality Improvements (November 19, 2025)
+-   **Dark Mode Cleanup** (`Dashboard.tsx`): Removed duplicate and conflicting Tailwind dark mode classes, improving code quality and reducing LSP diagnostics from 115 to 86
+-   **Weather Widget Fix** (`weatherService.ts`): Removed failing Supabase cache calls causing console errors; weather now fetches fresh data cleanly
+-   **Comprehensive UI Audit**: Verified consistent button styling (emerald for primary, red for danger), spacing patterns (p-6 cards, gap-6 grids), and responsive layouts across all components
+-   **Mobile Responsiveness Review**: Confirmed Dashboard uses proper responsive grid patterns (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4`) with adaptive padding; identified edge cases for future optimization (BodyDiagram fixed width, wide modals)
+-   **Data-testid Coverage**: Verified Dashboard has 9 data-testid attributes on key interactive elements for testing support
+
 ### Production Deployment Configuration (November 19, 2025)
 -   **Changed deployment target from autoscale to VM** to support native Node.js modules (argon2 password hashing)
 -   **Added `/health` endpoint** (`server/index.ts`) that responds immediately before Vite middleware initializes, ensuring deployment health checks pass within timeout limits
