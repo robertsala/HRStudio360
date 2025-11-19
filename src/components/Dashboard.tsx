@@ -677,7 +677,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       case 'offboarding':
         return <OffboardingModal isOpen={true} onClose={closeInlineContent} />;
       case 'onboarding':
-        return <OnboardingModal onClose={closeInlineContent} />;
+        return <NewHireOnboardingModal isOpen={true} onClose={closeInlineContent} />;
       case 'systemSettings':
         return <SystemSettingsModal onClose={closeInlineContent} initialTab={systemSettingsTab} />;
       case 'announcements':

@@ -8,7 +8,7 @@ import I9FormComponent from '../onboarding/I9FormComponent';
 import I9EmployerVerificationComponent from '../onboarding/I9EmployerVerificationComponent';
 import StateTaxFormComponent from '../onboarding/StateTaxFormComponent';
 import DocumentUploadComponent from '../onboarding/DocumentUploadComponent';
-import type { NewHire, OnboardingChecklist, OnboardingTask } from '@shared/schema';
+import type { NewHire, OnboardingChecklist, OnboardingTask } from '../../../shared/schema';
 
 interface NewHireOnboardingModalProps {
   isOpen: boolean;
@@ -76,7 +76,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
     mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
       return apiRequest('PATCH', `/api/onboarding/tasks/${taskId}`, {
         status,
-        completedAt: status === 'completed' ? new Date().toISOString() : null,
+        completedDate: status === 'completed' ? new Date().toISOString() : null,
       });
     },
     onSuccess: () => {
@@ -123,7 +123,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
     const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
     const matchesCategory = filterCategory === 'all' || task.category === filterCategory;
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         task.description.toLowerCase().includes(searchTerm.toLowerCase());
+                         task.description?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesCategory && matchesSearch;
   });
 
@@ -277,7 +277,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                                 {hire.firstName} {hire.lastName}
                               </h3>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">{hire.positionTitle}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">{hire.position}</p>
                               <p className="text-xs text-gray-500">{hire.department}</p>
                             </div>
                           </div>
@@ -327,7 +327,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                             {selectedNewHire.firstName} {selectedNewHire.lastName}
                           </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.positionTitle} - {selectedNewHire.department}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.position} - {selectedNewHire.department}</p>
                           <p className="text-xs text-gray-500 mt-1">Start Date: {new Date(selectedNewHire.startDate).toLocaleDateString()}</p>
                         </div>
                       </div>
@@ -357,11 +357,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.i9Status}</p>
                         </div>
                         <div className="text-center">
-                          <div className={`text-2xl font-bold ${checklist.taxFormsStatus?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                            {checklist.taxFormsStatus?.toLowerCase() === 'completed' ? '✓' : '○'}
+                          <div className={`text-2xl font-bold ${checklist.stateTaxFormStatus?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {checklist.stateTaxFormStatus?.toLowerCase() === 'completed' ? '✓' : '○'}
                           </div>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Tax Forms</p>
-                          <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.taxFormsStatus}</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.stateTaxFormStatus}</p>
                         </div>
                         <div className="text-center">
                           <div className={`text-2xl font-bold ${checklist.workstationStatus?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
@@ -444,9 +444,9 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           <h4 className="font-semibold text-gray-900 dark:text-white mb-1">State Tax Withholding</h4>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Massachusetts M-4 Form</p>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            checklist?.taxFormsStatus?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                            checklist?.stateTaxFormStatus?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
                           }`}>
-                            {checklist?.taxFormsStatus || 'Not Started'}
+                            {checklist?.stateTaxFormStatus || 'Not Started'}
                           </span>
                         </div>
                         <ChevronRight className="h-5 w-5 text-gray-400" />
@@ -541,7 +541,6 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
 
               <DocumentUploadComponent 
                 newHireId={selectedNewHire.id}
-                newHireName={`${selectedNewHire.firstName} ${selectedNewHire.lastName}`}
               />
             </div>
           )}
@@ -559,7 +558,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                         {selectedNewHire.firstName} {selectedNewHire.lastName}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.positionTitle} - {selectedNewHire.department}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.position} - {selectedNewHire.department}</p>
                       <p className="text-xs text-gray-500 mt-1">Start Date: {new Date(selectedNewHire.startDate).toLocaleDateString()}</p>
                     </div>
                   </div>
@@ -671,10 +670,10 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           <option value="blocked">Blocked</option>
                         </select>
                       </div>
-                      {task.completedAt && (
+                      {task.completedDate && (
                         <div className="text-xs text-green-600 dark:text-green-400 flex items-center space-x-1">
                           <CheckCircle className="h-3 w-3" />
-                          <span>Completed on {new Date(task.completedAt).toLocaleDateString()}</span>
+                          <span>Completed on {new Date(task.completedDate).toLocaleDateString()}</span>
                         </div>
                       )}
                     </div>
