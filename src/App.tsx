@@ -14,6 +14,7 @@ import BirthdayCelebrationModal from './components/modals/BirthdayCelebrationMod
 import AnniversaryCelebrationModal from './components/modals/AnniversaryCelebrationModal';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CareersPage from './pages/CareersPage';
+import OnboardingPage from './pages/OnboardingPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -91,6 +92,15 @@ function App() {
           <Layout currentView="profile" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <ProtectedRoute>
               <UserProfile onNavigate={handleNavigation} />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        {/* Onboarding route - protected */}
+        <Route path="/onboarding">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <OnboardingPage />
             </ProtectedRoute>
           </Layout>
         </Route>
