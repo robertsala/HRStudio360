@@ -60,61 +60,41 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         email: 'sarah.johnson@hrstudio360.com',
         firstName: 'Sarah',
         lastName: 'Johnson',
-        department: 'Engineering',
-        role: 'Senior Engineer',
+        department: 'HR',
+        role: 'HR Specialist',
         canAccessOrgChart: true,
         hireDate: '2023-06-15',
-        profilePicture: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+        profilePicture: 'https://images.pexels.com/photos/1065084/pexels-photo-1065084.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
       },
       {
-        email: 'michael.chen@hrstudio360.com',
-        firstName: 'Michael',
-        lastName: 'Chen',
-        department: 'Product',
-        role: 'Product Manager',
+        email: 'jessica.williams@hrstudio360.com',
+        firstName: 'Jessica',
+        lastName: 'Williams',
+        department: 'HR',
+        role: 'HR Manager',
         canAccessOrgChart: true,
         hireDate: '2023-08-01',
-        profilePicture: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+        profilePicture: 'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
       },
       {
-        email: 'emily.rodriguez@hrstudio360.com',
-        firstName: 'Emily',
-        lastName: 'Rodriguez',
-        department: 'Design',
-        role: 'UX Designer',
+        email: 'mike.chen@hrstudio360.com',
+        firstName: 'Mike',
+        lastName: 'Chen',
+        department: 'Sales',
+        role: 'Sales Director',
         canAccessOrgChart: true,
         hireDate: '2024-02-10',
-        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=EmilyRodriguez&backgroundColor=ffdfbf',
+        profilePicture: 'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
       },
       {
-        email: 'james.wilson@hrstudio360.com',
-        firstName: 'James',
-        lastName: 'Wilson',
-        department: 'People',
-        role: 'HR Manager',
+        email: 'victor.martinez@company.com',
+        firstName: 'Victor',
+        lastName: 'Martinez',
+        department: 'Finance',
+        role: 'CFO',
         canAccessOrgChart: true,
         hireDate: '2023-04-20',
-        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=JamesWilson&backgroundColor=c7ede6',
-      },
-      {
-        email: 'lisa.anderson@hrstudio360.com',
-        firstName: 'Lisa',
-        lastName: 'Anderson',
-        department: 'Marketing',
-        role: 'Marketing Director',
-        canAccessOrgChart: true,
-        hireDate: '2023-09-15',
-        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=LisaAnderson&backgroundColor=feca57',
-      },
-      {
-        email: 'hradmin@hrstudio360.com',
-        firstName: 'HR',
-        lastName: 'Admin',
-        department: 'People',
-        role: 'HR Manager',
-        canAccessOrgChart: true,
-        hireDate: '2024-01-01',
-        profilePicture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HRAdmin&backgroundColor=a8dadc',
+        profilePicture: 'https://images.pexels.com/photos/1261427/pexels-photo-1261427.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
       },
     ];
 
@@ -142,11 +122,10 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
     // Step 4: Create Departments
     console.log('4️⃣  Creating departments...');
     const departmentData = [
-      { name: 'Engineering', description: 'Software development and technical teams', managerId: robertSala.id },
+      { name: 'HR', description: 'Human Resources', managerId: robertSala.id },
+      { name: 'Sales', description: 'Sales and business development', managerId: robertSala.id },
+      { name: 'Finance', description: 'Financial management and accounting', managerId: robertSala.id },
       { name: 'Product', description: 'Product management and strategy', managerId: robertSala.id },
-      { name: 'Design', description: 'UX/UI design team', managerId: robertSala.id },
-      { name: 'People', description: 'Human Resources', managerId: robertSala.id },
-      { name: 'Marketing', description: 'Marketing and communications', managerId: robertSala.id },
       { name: 'Executive', description: 'Executive leadership', managerId: null },
     ];
 
@@ -155,21 +134,19 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
 
     // Step 5: Create Job Titles
     console.log('5️⃣  Creating job titles...');
-    const engineeringDept = createdDepartments.find(d => d.name === 'Engineering');
+    const hrDept = createdDepartments.find(d => d.name === 'HR');
+    const salesDept = createdDepartments.find(d => d.name === 'Sales');
+    const financeDept = createdDepartments.find(d => d.name === 'Finance');
     const productDept = createdDepartments.find(d => d.name === 'Product');
-    const designDept = createdDepartments.find(d => d.name === 'Design');
-    const peopleDept = createdDepartments.find(d => d.name === 'People');
-    const marketingDept = createdDepartments.find(d => d.name === 'Marketing');
     const executiveDept = createdDepartments.find(d => d.name === 'Executive');
 
     const jobTitleData = [
       { title: 'CEO', departmentId: executiveDept?.id, description: 'Chief Executive Officer' },
-      { title: 'Senior Engineer', departmentId: engineeringDept?.id, description: 'Senior software engineer' },
-      { title: 'Product Manager', departmentId: productDept?.id, description: 'Product management' },
+      { title: 'CFO', departmentId: financeDept?.id, description: 'Chief Financial Officer' },
       { title: 'Product Owner', departmentId: productDept?.id, description: 'Product ownership' },
-      { title: 'UX Designer', departmentId: designDept?.id, description: 'User experience design' },
-      { title: 'HR Manager', departmentId: peopleDept?.id, description: 'Human resources management' },
-      { title: 'Marketing Director', departmentId: marketingDept?.id, description: 'Marketing leadership' },
+      { title: 'HR Manager', departmentId: hrDept?.id, description: 'Human resources management' },
+      { title: 'HR Specialist', departmentId: hrDept?.id, description: 'HR specialist' },
+      { title: 'Sales Director', departmentId: salesDept?.id, description: 'Sales leadership' },
     ];
 
     const createdJobTitles = await db.insert(jobTitles).values(jobTitleData).returning();
@@ -204,18 +181,16 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
     const currentYear = new Date().getFullYear();
     
     const ceoJobTitle = createdJobTitles.find(jt => jt.title === 'CEO');
-    const seniorEngJobTitle = createdJobTitles.find(jt => jt.title === 'Senior Engineer');
-    const pmJobTitle = createdJobTitles.find(jt => jt.title === 'Product Manager');
+    const cfoJobTitle = createdJobTitles.find(jt => jt.title === 'CFO');
     const poJobTitle = createdJobTitles.find(jt => jt.title === 'Product Owner');
-    const uxJobTitle = createdJobTitles.find(jt => jt.title === 'UX Designer');
-    const hrJobTitle = createdJobTitles.find(jt => jt.title === 'HR Manager');
-    const mdJobTitle = createdJobTitles.find(jt => jt.title === 'Marketing Director');
+    const hrManagerJobTitle = createdJobTitles.find(jt => jt.title === 'HR Manager');
+    const hrSpecialistJobTitle = createdJobTitles.find(jt => jt.title === 'HR Specialist');
+    const salesDirectorJobTitle = createdJobTitles.find(jt => jt.title === 'Sales Director');
     
-    const engineeringDeptFull = createdDepartments.find(d => d.name === 'Engineering');
+    const hrDeptFull = createdDepartments.find(d => d.name === 'HR');
+    const salesDeptFull = createdDepartments.find(d => d.name === 'Sales');
+    const financeDeptFull = createdDepartments.find(d => d.name === 'Finance');
     const productDeptFull = createdDepartments.find(d => d.name === 'Product');
-    const designDeptFull = createdDepartments.find(d => d.name === 'Design');
-    const peopleDeptFull = createdDepartments.find(d => d.name === 'People');
-    const marketingDeptFull = createdDepartments.find(d => d.name === 'Marketing');
     const executiveDeptFull = createdDepartments.find(d => d.name === 'Executive');
 
     const employeeRecords = [
@@ -242,63 +217,42 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
       {
         userId: createdTeamMembers[0].id, // Sarah Johnson
         employeeId: 'EMP003',
-        departmentId: engineeringDeptFull?.id,
-        jobTitleId: seniorEngJobTitle?.id,
+        departmentId: hrDeptFull?.id,
+        jobTitleId: hrSpecialistJobTitle?.id,
         startDate: '2023-06-15',
         employmentType: 'Full-time' as const,
-        salary: '140000',
+        salary: '85000',
         status: 'Active' as const
       },
       {
-        userId: createdTeamMembers[1].id, // Michael Chen
+        userId: createdTeamMembers[1].id, // Jessica Williams
         employeeId: 'EMP004',
-        departmentId: productDeptFull?.id,
-        jobTitleId: pmJobTitle?.id,
+        departmentId: hrDeptFull?.id,
+        jobTitleId: hrManagerJobTitle?.id,
         startDate: '2023-08-01',
+        employmentType: 'Full-time' as const,
+        salary: '105000',
+        status: 'Active' as const
+      },
+      {
+        userId: createdTeamMembers[2].id, // Mike Chen
+        employeeId: 'EMP005',
+        departmentId: salesDeptFull?.id,
+        jobTitleId: salesDirectorJobTitle?.id,
+        startDate: '2024-02-10',
         employmentType: 'Full-time' as const,
         salary: '130000',
         status: 'Active' as const
       },
       {
-        userId: createdTeamMembers[2].id, // Emily Rodriguez
-        employeeId: 'EMP005',
-        departmentId: designDeptFull?.id,
-        jobTitleId: uxJobTitle?.id,
-        startDate: '2024-02-10',
-        employmentType: 'Full-time' as const,
-        salary: '110000',
-        status: 'Active' as const
-      },
-      {
-        userId: createdTeamMembers[3].id, // James Wilson
+        userId: createdTeamMembers[3].id, // Victor Martinez
         employeeId: 'EMP006',
-        departmentId: peopleDeptFull?.id,
-        jobTitleId: hrJobTitle?.id,
+        departmentId: financeDeptFull?.id,
+        jobTitleId: cfoJobTitle?.id,
         startDate: '2023-04-20',
         employmentType: 'Full-time' as const,
-        salary: '105000',
+        salary: '220000',
         status: 'Active' as const
-      },
-      {
-        userId: createdTeamMembers[4].id, // Lisa Anderson
-        employeeId: 'EMP007',
-        departmentId: marketingDeptFull?.id,
-        jobTitleId: mdJobTitle?.id,
-        startDate: '2023-09-15',
-        employmentType: 'Full-time' as const,
-        salary: '115000',
-        status: 'Active' as const
-      },
-      {
-        userId: createdTeamMembers[5].id, // HR Admin
-        employeeId: 'EMP008',
-        departmentId: peopleDeptFull?.id,
-        jobTitleId: hrJobTitle?.id,
-        startDate: '2024-01-01',
-        employmentType: 'Full-time' as const,
-        salary: '105000',
-        status: 'Active' as const,
-        role: 'HR Manager' // Ensure role is set for authorization checks
       }
     ];
 
