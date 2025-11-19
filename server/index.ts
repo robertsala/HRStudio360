@@ -67,6 +67,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check endpoint for deployment checks (responds immediately, before Vite)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Register API routes BEFORE Vite middleware
 registerRoutes(app);
 

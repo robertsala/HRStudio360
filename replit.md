@@ -11,6 +11,12 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 
 ## Recent Changes (November 2025)
 
+### Production Deployment Configuration (November 19, 2025)
+-   **Changed deployment target from autoscale to VM** to support native Node.js modules (argon2 password hashing)
+-   **Added `/health` endpoint** (`server/index.ts`) that responds immediately before Vite middleware initializes, ensuring deployment health checks pass within timeout limits
+-   Fixed production login crashes caused by cryptographic function failures in autoscale environment
+-   Health check endpoint returns JSON status with timestamp for monitoring purposes
+
 ### Production Database Seed Update
 -   **Updated `server/seed-production.ts`** to match development environment exactly with the correct 6 database employees:
     -   **Demo User** (demo@hrstudio360.com) - Product Owner with AI chatbot avatar
