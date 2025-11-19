@@ -1,57 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, Calendar, CheckCircle, Clock, AlertTriangle, Users, Briefcase, ChevronRight, Filter, Search } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
+import { useState, useEffect } from 'react';
+import { X, User, Calendar, CheckCircle, Users, Briefcase, ChevronRight, Search, FileText, DollarSign, Upload } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import I9FormComponent from '../onboarding/I9FormComponent';
+import I9EmployerVerificationComponent from '../onboarding/I9EmployerVerificationComponent';
+import StateTaxFormComponent from '../onboarding/StateTaxFormComponent';
+import DocumentUploadComponent from '../onboarding/DocumentUploadComponent';
+import type { NewHire, OnboardingChecklist, OnboardingTask } from '@shared/schema';
 
 interface NewHireOnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface NewHire {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  role: string;
-  department: string;
-  start_date: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  manager_id: string;
-  tasks_total: number;
-  tasks_completed: number;
-}
-
-interface OnboardingTask {
-  id: string;
-  title: string;
-  description: string;
-  assignee_type: string;
-  due_date: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  category: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'blocked';
-  completed_at: string | null;
-  assignee_id: string;
-  notes: string;
-}
+type TabType = 'overview' | 'forms' | 'documents' | 'tasks';
+type FormView = 'menu' | 'i9_section1' | 'i9_section2' | 'tax_forms' | 'documents';
 
 export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboardingModalProps) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks'>('overview');
-  const [newHires, setNewHires] = useState<NewHire[]>([]);
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedNewHire, setSelectedNewHire] = useState<NewHire | null>(null);
-  const [tasks, setTasks] = useState<OnboardingTask[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [formView, setFormView] = useState<FormView>('menu');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Reset formView when tab changes or new hire changes
+  useEffect(() => {
+    setFormView('menu');
+  }, [activeTab, selectedNewHire?.id]);
+
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
-        if (selectedNewHire) {
+        if (formView !== 'menu') {
+          setFormView('menu');
+        } else if (selectedNewHire) {
           setSelectedNewHire(null);
+          setActiveTab('overview');
         } else {
           onClose();
         }
@@ -62,140 +51,71 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [isOpen, selectedNewHire, onClose]);
+  }, [isOpen, selectedNewHire, formView, onClose]);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchNewHires();
-    }
-  }, [isOpen]);
+  // Fetch new hires
+  const { data: newHires = [], isLoading: loadingHires } = useQuery<NewHire[]>({
+    queryKey: ['/api/new-hires'],
+    enabled: isOpen,
+  });
 
-  useEffect(() => {
-    if (selectedNewHire) {
-      fetchTasks(selectedNewHire.id);
-    }
-  }, [selectedNewHire]);
+  // Fetch checklist for selected new hire
+  const { data: checklist } = useQuery<OnboardingChecklist>({
+    queryKey: ['/api/onboarding/checklists/new-hire', selectedNewHire?.id],
+    enabled: !!selectedNewHire?.id,
+  });
 
-  const fetchNewHires = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('new_hires')
-        .select(`
-          *,
-          tasks:onboarding_tasks(count)
-        `)
-        .order('created_at', { ascending: false });
+  // Fetch tasks for selected new hire
+  const { data: tasks = [], isLoading: loadingTasks } = useQuery<OnboardingTask[]>({
+    queryKey: ['/api/onboarding/tasks/new-hire', selectedNewHire?.id],
+    enabled: !!selectedNewHire?.id && activeTab === 'tasks',
+  });
 
-      if (error) throw error;
-
-      const formattedHires = await Promise.all((data || []).map(async (hire: any) => {
-        const { count: completedCount } = await supabase
-          .from('onboarding_tasks')
-          .select('*', { count: 'exact', head: true })
-          .eq('new_hire_id', hire.id)
-          .eq('status', 'completed');
-
-        const { count: totalCount } = await supabase
-          .from('onboarding_tasks')
-          .select('*', { count: 'exact', head: true })
-          .eq('new_hire_id', hire.id);
-
-        return {
-          ...hire,
-          tasks_total: totalCount || 0,
-          tasks_completed: completedCount || 0
-        };
-      }));
-
-      setNewHires(formattedHires);
-    } catch (error) {
-      console.error('Error fetching new hires:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTasks = async (newHireId: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('onboarding_tasks')
-        .select('*')
-        .eq('new_hire_id', newHireId)
-        .order('due_date', { ascending: true });
-
-      if (error) throw error;
-      setTasks(data || []);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateTaskStatus = async (taskId: string, status: string) => {
-    try {
-      const updates: any = { status, updated_at: new Date().toISOString() };
-
-      if (status === 'completed') {
-        const { data: { user } } = await supabase.auth.getUser();
-        updates.completed_at = new Date().toISOString();
-        updates.completed_by = user?.id;
-      }
-
-      const { error } = await supabase
-        .from('onboarding_tasks')
-        .update(updates)
-        .eq('id', taskId);
-
-      if (error) throw error;
-
+  // Update task status mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
+      return apiRequest('PATCH', `/api/onboarding/tasks/${taskId}`, {
+        status,
+        completedAt: status === 'completed' ? new Date().toISOString() : null,
+      });
+    },
+    onSuccess: () => {
       if (selectedNewHire) {
-        fetchTasks(selectedNewHire.id);
-        fetchNewHires();
+        queryClient.invalidateQueries({ queryKey: ['/api/onboarding/tasks/new-hire', selectedNewHire.id] });
+        queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', selectedNewHire.id] });
       }
-    } catch (error) {
-      console.error('Error updating task:', error);
-    }
-  };
-
-  const updateTaskNotes = async (taskId: string, notes: string) => {
-    try {
-      const { error } = await supabase
-        .from('onboarding_tasks')
-        .update({ notes, updated_at: new Date().toISOString() })
-        .eq('id', taskId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating task notes:', error);
-    }
-  };
+      toast({
+        title: 'Task Updated',
+        description: 'Task status updated successfully.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update task status.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100';
-      case 'in_progress': return 'text-blue-600 bg-blue-100';
-      case 'pending': return 'text-gray-600 bg-gray-100';
-      case 'blocked': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'completed': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+      case 'in_progress': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/30';
+      case 'pending': return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
+      case 'blocked': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'critical': return 'text-red-600 bg-red-100';
-      case 'high': return 'text-orange-600 bg-orange-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'low': return 'text-green-600 bg-green-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'critical': return 'text-red-600 bg-red-100 dark:bg-red-900/30';
+      case 'high': return 'text-orange-600 bg-orange-100 dark:bg-orange-900/30';
+      case 'medium': return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30';
+      case 'low': return 'text-green-600 bg-green-100 dark:bg-green-900/30';
+      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-700';
     }
-  };
-
-  const getProgressPercentage = (completed: number, total: number) => {
-    if (total === 0) return 0;
-    return Math.round((completed / total) * 100);
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -208,63 +128,119 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
 
   const categories = ['all', ...Array.from(new Set(tasks.map(t => t.category)))];
 
+  const handleFormComplete = () => {
+    setFormView('menu');
+    if (selectedNewHire) {
+      // Invalidate all cache entries for this specific new hire
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', selectedNewHire.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/tasks/new-hire', selectedNewHire.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/documents/new-hire', selectedNewHire.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms', selectedNewHire.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/state-tax-forms', selectedNewHire.id] });
+    }
+    toast({
+      title: 'Form Completed',
+      description: 'Your information has been saved successfully.',
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" data-testid="modal-new-hire-onboarding">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
         <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Users className="h-8 w-8" />
             <div>
-              <h2 className="text-2xl font-bold">New Hire Onboarding</h2>
-              <p className="text-teal-100 text-sm">Manage onboarding process and tasks</p>
+              <h2 className="text-2xl font-bold" data-testid="text-modal-title">New Hire Onboarding</h2>
+              <p className="text-teal-100 text-sm">Manage onboarding process and compliance forms</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white dark:bg-gray-800 dark:bg-gray-800 hover:bg-opacity-20 p-2 rounded-lg transition-colors"
+            className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-colors"
+            data-testid="button-close-modal"
           >
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="border-b border-gray-200 dark:border-gray-700 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <div className="flex space-x-1 p-2">
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => {
+                setActiveTab('overview');
+                setFormView('menu');
+              }}
               className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                 activeTab === 'overview'
-                  ? 'bg-white text-teal-600 shadow-sm'
-                  : 'text-gray-600 hover:bg-white hover:bg-opacity-50'
+                  ? 'bg-white dark:bg-gray-800 text-teal-600 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:bg-opacity-50'
               }`}
+              data-testid="button-tab-overview"
             >
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4" />
-                <span>New Hires Overview</span>
+                <span>New Hires</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('forms')}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                activeTab === 'forms'
+                  ? 'bg-white dark:bg-gray-800 text-teal-600 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:bg-opacity-50'
+              }`}
+              disabled={!selectedNewHire}
+              data-testid="button-tab-forms"
+            >
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4" />
+                <span>Forms & Compliance</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                activeTab === 'documents'
+                  ? 'bg-white dark:bg-gray-800 text-teal-600 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:bg-opacity-50'
+              }`}
+              disabled={!selectedNewHire}
+              data-testid="button-tab-documents"
+            >
+              <div className="flex items-center space-x-2">
+                <Upload className="h-4 w-4" />
+                <span>Documents</span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('tasks')}
               className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                 activeTab === 'tasks'
-                  ? 'bg-white text-teal-600 shadow-sm'
-                  : 'text-gray-600 hover:bg-white hover:bg-opacity-50'
+                  ? 'bg-white dark:bg-gray-800 text-teal-600 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:bg-opacity-50'
               }`}
               disabled={!selectedNewHire}
+              data-testid="button-tab-tasks"
             >
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4" />
-                <span>Onboarding Tasks</span>
+                <span>Tasks</span>
               </div>
             </button>
           </div>
         </div>
 
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="space-y-4">
-              {loading ? (
+              {loadingHires ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
                   <p className="mt-4 text-gray-600 dark:text-gray-400">Loading new hires...</p>
@@ -278,28 +254,28 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
               ) : (
                 <div className="grid gap-4">
                   {newHires.map((hire) => {
-                    const progress = getProgressPercentage(hire.tasks_completed, hire.tasks_total);
-                    const daysUntilStart = Math.ceil((new Date(hire.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    const daysUntilStart = Math.ceil((new Date(hire.startDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
                     return (
                       <div
                         key={hire.id}
                         onClick={() => {
                           setSelectedNewHire(hire);
-                          setActiveTab('tasks');
+                          setActiveTab('forms');
                         }}
-                        className="bg-white dark:bg-gray-800 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-xl p-6 hover:border-teal-500 hover:shadow-lg transition-all cursor-pointer"
+                        className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:border-teal-500 hover:shadow-lg transition-all cursor-pointer"
+                        data-testid={`card-new-hire-${hire.id}`}
                       >
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-start space-x-4">
                             <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-full h-12 w-12 flex items-center justify-center text-lg font-bold">
-                              {hire.first_name[0]}{hire.last_name[0]}
+                              {hire.firstName[0]}{hire.lastName[0]}
                             </div>
                             <div>
-                              <h3 className="text-lg font-bold text-gray-900 dark:text-white dark:text-white">
-                                {hire.first_name} {hire.last_name}
+                              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {hire.firstName} {hire.lastName}
                               </h3>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">{hire.role}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">{hire.positionTitle}</p>
                               <p className="text-xs text-gray-500">{hire.department}</p>
                             </div>
                           </div>
@@ -313,26 +289,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           </div>
                         </div>
 
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">Onboarding Progress</span>
-                            <span className="font-medium text-gray-900 dark:text-white dark:text-white">
-                              {hire.tasks_completed} / {hire.tasks_total} tasks
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                           <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-center space-x-1">
                               <Calendar className="h-4 w-4" />
-                              <span>Start: {new Date(hire.start_date).toLocaleDateString()}</span>
+                              <span>Start: {new Date(hire.startDate).toLocaleDateString()}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <User className="h-4 w-4" />
@@ -349,25 +310,263 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
             </div>
           )}
 
-          {activeTab === 'tasks' && selectedNewHire && (
+          {/* Forms Tab */}
+          {activeTab === 'forms' && selectedNewHire && (
             <div className="space-y-6">
-              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-200">
+              {formView === 'menu' && (
+                <>
+                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-4">
+                        <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-full h-14 w-14 flex items-center justify-center text-xl font-bold">
+                          {selectedNewHire.firstName[0]}{selectedNewHire.lastName[0]}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                            {selectedNewHire.firstName} {selectedNewHire.lastName}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.positionTitle} - {selectedNewHire.department}</p>
+                          <p className="text-xs text-gray-500 mt-1">Start Date: {new Date(selectedNewHire.startDate).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedNewHire(null);
+                          setActiveTab('overview');
+                        }}
+                        className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        data-testid="button-back-to-overview"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Onboarding Progress Summary */}
+                  {checklist && (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Onboarding Progress</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${checklist.i9Status?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {checklist.i9Status?.toLowerCase() === 'completed' ? '✓' : '○'}
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">I-9 Form</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.i9Status}</p>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${checklist.taxFormsStatus?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {checklist.taxFormsStatus?.toLowerCase() === 'completed' ? '✓' : '○'}
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Tax Forms</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.taxFormsStatus}</p>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${checklist.workstationStatus?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {checklist.workstationStatus?.toLowerCase() === 'completed' ? '✓' : '○'}
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Workstation</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.workstationStatus}</p>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold ${checklist.benefitsStatus?.toLowerCase() === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {checklist.benefitsStatus?.toLowerCase() === 'completed' ? '✓' : '○'}
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Benefits</p>
+                          <p className="text-xs font-medium text-gray-900 dark:text-white">{checklist.benefitsStatus}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* I-9 Section 1 Card */}
+                    <div
+                      onClick={() => setFormView('i9_section1')}
+                      className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:border-indigo-500 hover:shadow-lg transition-all cursor-pointer"
+                      data-testid="card-form-i9-section1"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 p-3 rounded-lg">
+                          <FileText className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-1">I-9 Section 1</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Employee Information & Attestation</p>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            checklist?.i9Status?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                          }`}>
+                            {checklist?.i9Status || 'Not Started'}
+                          </span>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-gray-400" />
+                      </div>
+                    </div>
+
+                    {/* I-9 Section 2 Card (HR Only) */}
+                    {user?.role !== 'Employee' && (
+                      <div
+                        onClick={() => setFormView('i9_section2')}
+                        className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:border-purple-500 hover:shadow-lg transition-all cursor-pointer"
+                        data-testid="card-form-i9-section2"
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 p-3 rounded-lg">
+                            <FileText className="h-6 w-6" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 dark:text-white mb-1">I-9 Section 2 (HR)</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Employer Verification</p>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              checklist?.i9Status?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              HR Only
+                            </span>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-gray-400" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* State Tax Form Card */}
+                    <div
+                      onClick={() => setFormView('tax_forms')}
+                      className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:border-green-500 hover:shadow-lg transition-all cursor-pointer"
+                      data-testid="card-form-tax"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 p-3 rounded-lg">
+                          <DollarSign className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-1">State Tax Withholding</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Massachusetts M-4 Form</p>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            checklist?.taxFormsStatus?.toLowerCase() === 'completed' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                          }`}>
+                            {checklist?.taxFormsStatus || 'Not Started'}
+                          </span>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {formView === 'i9_section1' && (
+                <div>
+                  <button
+                    onClick={() => setFormView('menu')}
+                    className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center space-x-2"
+                    data-testid="button-back-to-menu"
+                  >
+                    <ChevronRight className="h-4 w-4 transform rotate-180" />
+                    <span>Back to Forms Menu</span>
+                  </button>
+                  <I9FormComponent
+                    newHireId={selectedNewHire.id}
+                    onComplete={handleFormComplete}
+                  />
+                </div>
+              )}
+
+              {formView === 'i9_section2' && (
+                <div>
+                  <button
+                    onClick={() => setFormView('menu')}
+                    className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center space-x-2"
+                    data-testid="button-back-to-menu"
+                  >
+                    <ChevronRight className="h-4 w-4 transform rotate-180" />
+                    <span>Back to Forms Menu</span>
+                  </button>
+                  <I9EmployerVerificationComponent
+                    newHireId={selectedNewHire.id}
+                    newHireName={`${selectedNewHire.firstName} ${selectedNewHire.lastName}`}
+                    onComplete={handleFormComplete}
+                  />
+                </div>
+              )}
+
+              {formView === 'tax_forms' && (
+                <div>
+                  <button
+                    onClick={() => setFormView('menu')}
+                    className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center space-x-2"
+                    data-testid="button-back-to-menu"
+                  >
+                    <ChevronRight className="h-4 w-4 transform rotate-180" />
+                    <span>Back to Forms Menu</span>
+                  </button>
+                  <StateTaxFormComponent
+                    newHireId={selectedNewHire.id}
+                    state="MA"
+                    onComplete={handleFormComplete}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Documents Tab */}
+          {activeTab === 'documents' && selectedNewHire && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4">
                     <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-full h-14 w-14 flex items-center justify-center text-xl font-bold">
-                      {selectedNewHire.first_name[0]}{selectedNewHire.last_name[0]}
+                      {selectedNewHire.firstName[0]}{selectedNewHire.lastName[0]}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white dark:text-white">
-                        {selectedNewHire.first_name} {selectedNewHire.last_name}
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {selectedNewHire.firstName} {selectedNewHire.lastName}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.role} - {selectedNewHire.department}</p>
-                      <p className="text-xs text-gray-500 mt-1">Start Date: {new Date(selectedNewHire.start_date).toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Document Uploads</p>
                     </div>
                   </div>
                   <button
-                    onClick={() => setSelectedNewHire(null)}
-                    className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white dark:text-white"
+                    onClick={() => {
+                      setSelectedNewHire(null);
+                      setActiveTab('overview');
+                    }}
+                    className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              <DocumentUploadComponent
+                newHireId={selectedNewHire.id}
+                onComplete={handleFormComplete}
+              />
+            </div>
+          )}
+
+          {/* Tasks Tab */}
+          {activeTab === 'tasks' && selectedNewHire && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-full h-14 w-14 flex items-center justify-center text-xl font-bold">
+                      {selectedNewHire.firstName[0]}{selectedNewHire.lastName[0]}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {selectedNewHire.firstName} {selectedNewHire.lastName}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{selectedNewHire.positionTitle} - {selectedNewHire.department}</p>
+                      <p className="text-xs text-gray-500 mt-1">Start Date: {new Date(selectedNewHire.startDate).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedNewHire(null);
+                      setActiveTab('overview');
+                    }}
+                    className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -383,13 +582,15 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                       placeholder="Search tasks..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      data-testid="input-search-tasks"
                     />
                   </div>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    data-testid="select-filter-status"
                   >
                     <option value="all">All Status</option>
                     <option value="pending">Pending</option>
@@ -400,7 +601,8 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                   <select
                     value={filterCategory}
                     onChange={(e) => setFilterCategory(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    data-testid="select-filter-category"
                   >
                     {categories.map(cat => (
                       <option key={cat} value={cat}>
@@ -411,7 +613,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                 </div>
               </div>
 
-              {loading ? (
+              {loadingTasks ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
                   <p className="mt-4 text-gray-600 dark:text-gray-400">Loading tasks...</p>
@@ -426,12 +628,13 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                   {filteredTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="bg-white dark:bg-gray-800 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:border-gray-700 rounded-lg p-5 hover:shadow-md transition-shadow"
+                      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:shadow-md transition-shadow"
+                      data-testid={`card-task-${task.id}`}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
-                            <h4 className="font-semibold text-gray-900 dark:text-white dark:text-white">{task.title}</h4>
+                            <h4 className="font-semibold text-gray-900 dark:text-white">{task.title}</h4>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
@@ -443,11 +646,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           <div className="flex items-center space-x-4 text-xs text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Briefcase className="h-3 w-3" />
-                              <span className="capitalize">{task.assignee_type.replace('_', ' ')}</span>
+                              <span className="capitalize">{task.assigneeType.replace('_', ' ')}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <Calendar className="h-3 w-3" />
-                              <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                              <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <span className="font-medium">{task.category}</span>
@@ -456,8 +659,9 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                         </div>
                         <select
                           value={task.status}
-                          onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                          className="ml-4 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                          onChange={(e) => updateTaskMutation.mutate({ taskId: task.id, status: e.target.value })}
+                          className="ml-4 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          data-testid={`select-task-status-${task.id}`}
                         >
                           <option value="pending">Pending</option>
                           <option value="in_progress">In Progress</option>
@@ -465,21 +669,12 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                           <option value="blocked">Blocked</option>
                         </select>
                       </div>
-                      {task.completed_at && (
-                        <div className="text-xs text-green-600 mb-2 flex items-center space-x-1">
+                      {task.completedAt && (
+                        <div className="text-xs text-green-600 dark:text-green-400 flex items-center space-x-1">
                           <CheckCircle className="h-3 w-3" />
-                          <span>Completed on {new Date(task.completed_at).toLocaleDateString()}</span>
+                          <span>Completed on {new Date(task.completedAt).toLocaleDateString()}</span>
                         </div>
                       )}
-                      <div className="mt-3">
-                        <textarea
-                          placeholder="Add notes..."
-                          value={task.notes}
-                          onChange={(e) => updateTaskNotes(task.id, e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
-                          rows={2}
-                        />
-                      </div>
                     </div>
                   ))}
                 </div>
