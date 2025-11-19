@@ -3780,9 +3780,10 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      // Run the seed function
+      // Run the seed function with optional force parameter
       console.log('🔐 Admin seed endpoint called with valid credentials');
-      const result = await seedProductionDatabase();
+      const force = req.body.force === true;
+      const result = await seedProductionDatabase({ force });
       
       res.json(result);
     } catch (error: any) {
