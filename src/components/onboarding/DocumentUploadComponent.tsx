@@ -3,6 +3,9 @@ import { Upload, FileText, CheckCircle, X, AlertCircle, Clock, Eye } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import type { OnboardingDocument } from '@shared/schema';
 
 interface DocumentUploadComponentProps {
   newHireId: string;
@@ -42,88 +45,74 @@ const DOCUMENT_TYPES = {
 
 type DocumentList = 'LIST_A' | 'LIST_B' | 'LIST_C' | 'OTHER';
 
-interface UploadedDocument {
-  id: string;
-  documentType: string;
-  documentList: DocumentList;
-  fileName: string;
-  fileUrl: string;
-  uploadedAt: string;
-  status: 'Pending Review' | 'Approved' | 'Rejected';
-  reviewNotes?: string;
-}
-
 export default function DocumentUploadComponent({ newHireId, onComplete }: DocumentUploadComponentProps) {
   const { toast } = useToast();
   const [selectedList, setSelectedList] = useState<DocumentList>('LIST_A');
   const [selectedDocType, setSelectedDocType] = useState('');
-  const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch existing documents
-  const { data: documents = [], isLoading, refetch } = useQuery<UploadedDocument[]>({
+  const { data: documents = [], isLoading, refetch } = useQuery<OnboardingDocument[]>({
     queryKey: ['/api/onboarding/documents', newHireId],
     queryFn: async () => {
       const response = await fetch(`/api/onboarding/documents/new-hire/${newHireId}`);
-      if (!response.ok) throw new Error('Failed to fetch documents');
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error('Failed to fetch documents');
+      }
       return response.json();
     }
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!selectedDocType) {
+        throw new Error('Please select a document type');
+      }
 
-    if (!selectedDocType) {
-      toast({
-        title: 'Document Type Required',
-        description: 'Please select a document type before uploading.',
-        variant: 'destructive',
+      // Validate file
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('Maximum file size is 10MB');
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Please upload a PDF, JPG, or PNG file');
+      }
+
+      setUploadProgress(10);
+
+      // Get signed upload URL from backend (GET request doesn't need body)
+      const response = await fetch('/api/onboarding/upload-url');
+      if (!response.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+      const { uploadUrl } = await response.json();
+      
+      setUploadProgress(20);
+
+      // Upload file to object storage
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
       });
-      return;
-    }
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: 'File Too Large',
-        description: 'Maximum file size is 10MB.',
-        variant: 'destructive',
-      });
-      return;
-    }
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: 'Invalid File Type',
-        description: 'Please upload a PDF, JPG, or PNG file.',
-        variant: 'destructive',
-      });
-      return;
-    }
+      setUploadProgress(80);
 
-    setUploading(true);
-    setUploadProgress(0);
-
-    try {
-      // For demo purposes, we'll create a mock upload
-      // In production, you would upload to your object storage service
-      const mockProgressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(mockProgressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 100);
-
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      clearInterval(mockProgressInterval);
-      setUploadProgress(100);
+      // Parse object path from signed URL
+      // URL format: https://.../b/{bucket}/o/{encoded-object-path}?...
+      const urlObj = new URL(uploadUrl);
+      const pathParts = urlObj.pathname.split('/o/');
+      const objectPath = pathParts.length > 1 
+        ? `/objects/${decodeURIComponent(pathParts[1])}`
+        : `/objects/uploads/${Date.now()}-${file.name}`;
 
       // Create document record in database
       const documentData = {
@@ -131,32 +120,41 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
         documentType: selectedDocType,
         documentList: selectedList,
         fileName: file.name,
-        fileUrl: `/uploads/documents/${newHireId}/${Date.now()}-${file.name}`, // Mock URL
-        status: 'Pending Review'
+        fileUrl: objectPath,
+        status: 'Pending Review' as const
       };
 
-      await apiRequest('POST', '/api/onboarding/documents', documentData);
-
+      const result = await apiRequest<OnboardingDocument>('POST', '/api/onboarding/documents', documentData);
+      
+      setUploadProgress(100);
+      return result;
+    },
+    onSuccess: () => {
       toast({
         title: 'Upload Successful',
         description: `${selectedDocType} uploaded and pending HR review.`,
       });
-
-      // Reset form
       setSelectedDocType('');
-      e.target.value = '';
+      setUploadProgress(0);
       refetch();
-      
-    } catch (error: any) {
+      onComplete?.();
+    },
+    onError: (error: any) => {
       toast({
         title: 'Upload Failed',
         description: error.message || 'Failed to upload document',
         variant: 'destructive',
       });
-    } finally {
-      setUploading(false);
       setUploadProgress(0);
-    }
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    uploadMutation.mutate(file);
+    e.target.value = '';
   };
 
   const getStatusColor = (status: string) => {
@@ -188,7 +186,7 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
         <div className="flex items-center space-x-3">
           <Upload className="h-8 w-8" />
           <div>
-            <h2 className="text-2xl font-bold">Document Upload & Verification</h2>
+            <h2 className="text-2xl font-bold" data-testid="text-document-upload-title">Document Upload & Verification</h2>
             <p className="text-emerald-100 text-sm">Upload required identification and employment documents</p>
           </div>
         </div>
@@ -215,24 +213,21 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">Upload New Document</h3>
           
           {/* Document List Selection */}
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
             {(['LIST_A', 'LIST_B', 'LIST_C', 'OTHER'] as DocumentList[]).map(list => (
-              <button
+              <Button
                 key={list}
                 type="button"
                 onClick={() => {
                   setSelectedList(list);
                   setSelectedDocType('');
                 }}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  selectedList === list
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
+                variant={selectedList === list ? 'default' : 'outline'}
+                className={selectedList === list ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
                 data-testid={`button-select-${list}`}
               >
                 {list.replace('_', ' ')}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -241,17 +236,16 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Document Type <span className="text-red-500">*</span>
             </label>
-            <select
-              value={selectedDocType}
-              onChange={(e) => setSelectedDocType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              data-testid="select-document-type"
-            >
-              <option value="">Choose a document type...</option>
-              {DOCUMENT_TYPES[selectedList].map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+            <Select value={selectedDocType} onValueChange={setSelectedDocType}>
+              <SelectTrigger data-testid="select-document-type">
+                <SelectValue placeholder="Choose a document type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {DOCUMENT_TYPES[selectedList].map(type => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* File Upload */}
@@ -275,7 +269,7 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     onChange={handleFileUpload}
-                    disabled={uploading || !selectedDocType}
+                    disabled={uploadMutation.isPending || !selectedDocType}
                     className="hidden"
                     data-testid="input-file-upload"
                   />
@@ -284,16 +278,17 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
             </div>
 
             {/* Upload Progress */}
-            {uploading && (
+            {uploadMutation.isPending && uploadProgress > 0 && (
               <div className="mt-4">
                 <div className="flex items-center justify-between text-sm mb-2">
                   <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
-                  <span className="font-medium text-emerald-600">{uploadProgress}%</span>
+                  <span className="font-medium text-emerald-600" data-testid="text-upload-progress">{uploadProgress}%</span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                   <div
                     className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
+                    data-testid="progress-bar-upload"
                   ></div>
                 </div>
               </div>
@@ -307,7 +302,7 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
           
           {isLoading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-600 border-t-transparent mx-auto"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-600 border-t-transparent mx-auto" data-testid="loader-documents"></div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Loading documents...</p>
             </div>
           ) : documents.length === 0 ? (
@@ -327,10 +322,10 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
                   <div className="flex items-center space-x-3 flex-1">
                     <FileText className="h-8 w-8 text-emerald-600" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                      <p className="font-medium text-gray-900 dark:text-white truncate" data-testid={`text-document-type-${doc.id}`}>
                         {doc.documentType}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid={`text-document-filename-${doc.id}`}>
                         {doc.fileName}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -340,14 +335,14 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
                   </div>
 
                   <div className="flex items-center space-x-3">
-                    <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor(doc.status)}`}>
+                    <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor(doc.status)}`} data-testid={`status-document-${doc.id}`}>
                       {getStatusIcon(doc.status)}
                       <span>{doc.status}</span>
                     </div>
                     
                     {doc.reviewNotes && (
                       <div className="group relative">
-                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 cursor-pointer" />
+                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 cursor-pointer" data-testid={`button-view-notes-${doc.id}`} />
                         <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-10">
                           <p className="font-semibold mb-1">Review Notes:</p>
                           <p>{doc.reviewNotes}</p>
