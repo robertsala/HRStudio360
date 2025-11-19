@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'wouter';
 import { User, Settings, BarChart3, Users, Calendar as CalendarIcon, Bell, LogOut, Brain, TrendingUp, TrendingDown, FileText, Inbox, Clock, Plus, DollarSign, Star, Shield, Smartphone, GraduationCap, Award, Heart, Bot, UserX, Search, ChevronRight, MapPin, Building, Mail, Phone, Briefcase, Target, AlertTriangle, CheckCircle, Zap, Globe, Sparkles, GitBranch, CreditCard, History, MessageCircle } from 'lucide-react';
 import ChangeLogNotificationBadge from './ChangeLogNotificationBadge';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +64,7 @@ import { mapEmployeeFromBackend } from '../lib/employeeDataMapper';
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; openMyProfile: () => void }>((props, ref) => {
   const { t } = useTranslation();
   const { user, signOut, isImpersonating } = useAuth();
+  const [, setLocation] = useLocation();
   
   // Active content state for inline views
   const [activeContent, setActiveContent] = React.useState<string | null>(null);
@@ -233,6 +235,13 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
     console.log(`Opening modal: ${modalName}`);
     console.log('Current activeContent:', activeContent);
     console.log('Is in modals object?', modalName in modals);
+
+    // Special handling for onboarding - navigate to full-view page
+    if (modalName === 'onboarding' || modalName === 'newHireOnboarding') {
+      console.log('Navigating to onboarding page');
+      setLocation('/onboarding');
+      return;
+    }
 
     // Special handling for systemSettings with tab parameter (e.g., "systemSettings:changelog")
     if (modalName.startsWith('systemSettings:')) {
@@ -659,7 +668,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
           }
         />;
       case 'hiring':
-        return <HiringModal onNavigateToOnboarding={() => setActiveContent('onboarding')} onClose={closeInlineContent} onOpenStudioAI={() => {
+        return <HiringModal onNavigateToOnboarding={() => openModal('onboarding')} onClose={closeInlineContent} onOpenStudioAI={() => {
           setStudioAIContext('recruitment');
           openModal('studioAIChat');
         }} />;
@@ -675,8 +684,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         return <AIAssistantModal isOpen={true} onClose={closeInlineContent} />;
       case 'offboarding':
         return <OffboardingModal isOpen={true} onClose={closeInlineContent} />;
-      case 'onboarding':
-        return <NewHireOnboardingModal isOpen={true} onClose={closeInlineContent} />;
       case 'systemSettings':
         return <SystemSettingsModal onClose={closeInlineContent} initialTab={systemSettingsTab} />;
       case 'announcements':
@@ -691,8 +698,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         return <UserManagementModal onClose={closeInlineContent} />;
       case 'orgChart':
         return <OrgChartModal onClose={closeInlineContent} />;
-      case 'newHireOnboarding':
-        return <NewHireOnboardingModal isOpen={true} onClose={closeInlineContent} />;
       case 'expenseManagement':
         return <ComprehensiveExpenseModal isOpen={true} onClose={closeInlineContent} userRole={userRole.toLowerCase()} />;
       case 'expenseEnrollment':
