@@ -14,6 +14,8 @@ import {
   insertPermissionTemplateSchema, insertRoleHierarchySchema,
   insertTimeBasedPermissionGrantSchema, insertPermissionRequestSchema,
   insertCallSessionSchema, insertCallParticipantSchema, insertCallSignalingSchema,
+  insertOnboardingChecklistSchema, insertOnboardingTaskSchema,
+  insertI9FormSchema, insertStateTaxFormSchema, insertOnboardingDocumentSchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -3569,6 +3571,358 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: 'New hire not found' });
       }
       res.json(updatedHire);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========================================
+  // ONBOARDING SYSTEM ENDPOINTS
+  // ========================================
+
+  // Onboarding Checklists
+  app.get('/api/onboarding/checklists', async (_req, res) => {
+    try {
+      const checklists = await storage.getOnboardingChecklists();
+      res.json(checklists);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/checklists/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const checklist = await storage.getOnboardingChecklistById(id);
+      if (!checklist) {
+        return res.status(404).json({ error: 'Onboarding checklist not found' });
+      }
+      res.json(checklist);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/checklists/new-hire/:newHireId', async (req, res) => {
+    try {
+      const { newHireId } = req.params;
+      const checklist = await storage.getOnboardingChecklistByNewHireId(newHireId);
+      if (!checklist) {
+        return res.status(404).json({ error: 'Onboarding checklist not found for this new hire' });
+      }
+      res.json(checklist);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/checklists', async (req, res) => {
+    try {
+      const validatedData = insertOnboardingChecklistSchema.parse(req.body);
+      const checklist = await storage.createOnboardingChecklist(validatedData);
+      res.status(201).json(checklist);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/onboarding/checklists/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertOnboardingChecklistSchema.partial().parse(req.body);
+      const checklist = await storage.updateOnboardingChecklist(id, validatedData);
+      if (!checklist) {
+        return res.status(404).json({ error: 'Onboarding checklist not found' });
+      }
+      res.json(checklist);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Onboarding Tasks
+  app.get('/api/onboarding/tasks/checklist/:checklistId', async (req, res) => {
+    try {
+      const { checklistId } = req.params;
+      const tasks = await storage.getOnboardingTasks(checklistId);
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/tasks/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const task = await storage.getOnboardingTaskById(id);
+      if (!task) {
+        return res.status(404).json({ error: 'Onboarding task not found' });
+      }
+      res.json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/tasks', async (req, res) => {
+    try {
+      const validatedData = insertOnboardingTaskSchema.parse(req.body);
+      const task = await storage.createOnboardingTask(validatedData);
+      res.status(201).json(task);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/onboarding/tasks/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertOnboardingTaskSchema.partial().parse(req.body);
+      const task = await storage.updateOnboardingTask(id, validatedData);
+      if (!task) {
+        return res.status(404).json({ error: 'Onboarding task not found' });
+      }
+      res.json(task);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/tasks/:id/complete', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const { id } = req.params;
+      const task = await storage.completeOnboardingTask(id, userId);
+      if (!task) {
+        return res.status(404).json({ error: 'Onboarding task not found' });
+      }
+      res.json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // I-9 Forms
+  app.get('/api/onboarding/i9-forms', async (_req, res) => {
+    try {
+      const forms = await storage.getI9Forms();
+      res.json(forms);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/i9-forms/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const form = await storage.getI9FormById(id);
+      if (!form) {
+        return res.status(404).json({ error: 'I-9 form not found' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/i9-forms/new-hire/:newHireId', async (req, res) => {
+    try {
+      const { newHireId } = req.params;
+      const form = await storage.getI9FormByNewHireId(newHireId);
+      if (!form) {
+        return res.status(404).json({ error: 'I-9 form not found for this new hire' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/i9-forms', async (req, res) => {
+    try {
+      const validatedData = insertI9FormSchema.parse(req.body);
+      const form = await storage.createI9Form(validatedData);
+      res.status(201).json(form);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/onboarding/i9-forms/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertI9FormSchema.partial().parse(req.body);
+      const form = await storage.updateI9Form(id, validatedData);
+      if (!form) {
+        return res.status(404).json({ error: 'I-9 form not found' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/i9-forms/:id/section1', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const form = await storage.updateI9FormSection1(id, req.body);
+      if (!form) {
+        return res.status(404).json({ error: 'I-9 form not found' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/i9-forms/:id/section2', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const { id } = req.params;
+      const form = await storage.updateI9FormSection2(id, req.body, userId);
+      if (!form) {
+        return res.status(404).json({ error: 'I-9 form not found' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // State Tax Forms
+  app.get('/api/onboarding/state-tax-forms/new-hire/:newHireId', async (req, res) => {
+    try {
+      const { newHireId } = req.params;
+      const forms = await storage.getStateTaxForms(newHireId);
+      res.json(forms);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/state-tax-forms/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const form = await storage.getStateTaxFormById(id);
+      if (!form) {
+        return res.status(404).json({ error: 'State tax form not found' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/state-tax-forms', async (req, res) => {
+    try {
+      const validatedData = insertStateTaxFormSchema.parse(req.body);
+      const form = await storage.createStateTaxForm(validatedData);
+      res.status(201).json(form);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/onboarding/state-tax-forms/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertStateTaxFormSchema.partial().parse(req.body);
+      const form = await storage.updateStateTaxForm(id, validatedData);
+      if (!form) {
+        return res.status(404).json({ error: 'State tax form not found' });
+      }
+      res.json(form);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Onboarding Documents
+  app.get('/api/onboarding/documents/new-hire/:newHireId', async (req, res) => {
+    try {
+      const { newHireId } = req.params;
+      const documents = await storage.getOnboardingDocuments(newHireId);
+      res.json(documents);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/onboarding/documents/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const document = await storage.getOnboardingDocumentById(id);
+      if (!document) {
+        return res.status(404).json({ error: 'Onboarding document not found' });
+      }
+      res.json(document);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/onboarding/documents', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const validatedData = insertOnboardingDocumentSchema.parse({
+        ...req.body,
+        uploadedBy: userId
+      });
+      const document = await storage.createOnboardingDocument(validatedData);
+      res.status(201).json(document);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: 'Invalid request data', details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/onboarding/documents/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertOnboardingDocumentSchema.partial().parse(req.body);
+      const document = await storage.updateOnboardingDocument(id, validatedData);
+      if (!document) {
+        return res.status(404).json({ error: 'Onboarding document not found' });
+      }
+      res.json(document);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         return res.status(400).json({ error: 'Invalid request data', details: error.errors });
