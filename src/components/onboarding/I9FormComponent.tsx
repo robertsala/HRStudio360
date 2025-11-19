@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
 import { FileText, CheckCircle, AlertCircle } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '../../hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '../../lib/queryClient';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../../components/ui/form';
-import { Input } from '../../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
-import { Button } from '../../components/ui/button';
 import type { InsertI9Form, I9Form } from '@shared/schema';
 
 interface I9FormComponentProps {
@@ -56,6 +49,30 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
   const { toast } = useToast();
   const [currentSection, setCurrentSection] = useState<1 | 2>(1);
   const [i9FormId, setI9FormId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Form state
+  const [formData, setFormData] = useState<Section1FormData>({
+    lastName: '',
+    firstName: '',
+    middleInitial: '',
+    otherLastNames: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    dateOfBirth: '',
+    socialSecurityNumber: '',
+    email: '',
+    phoneNumber: '',
+    citizenshipStatus: 'US_CITIZEN',
+    uscisNumber: '',
+    formI94Number: '',
+    foreignPassportNumber: '',
+    countryOfIssuance: '',
+    authorizationExpirationDate: '',
+  });
 
   // Fetch existing I-9 form
   const { data: existingForm } = useQuery<I9Form>({
@@ -70,39 +87,14 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
     },
   });
 
-  const form = useForm<Section1FormData>({
-    resolver: zodResolver(section1Schema),
-    defaultValues: {
-      lastName: existingForm?.lastName || '',
-      firstName: existingForm?.firstName || '',
-      middleInitial: existingForm?.middleInitial || '',
-      otherLastNames: existingForm?.otherLastNames || '',
-      addressLine1: existingForm?.addressLine1 || '',
-      addressLine2: existingForm?.addressLine2 || '',
-      city: existingForm?.city || '',
-      state: existingForm?.state || '',
-      zipCode: existingForm?.zipCode || '',
-      dateOfBirth: existingForm?.dateOfBirth || '',
-      socialSecurityNumber: existingForm?.socialSecurityNumber || '',
-      email: existingForm?.email || '',
-      phoneNumber: existingForm?.phoneNumber || '',
-      citizenshipStatus: existingForm?.citizenshipStatus as any || 'US_CITIZEN',
-      uscisNumber: existingForm?.uscisNumber || '',
-      formI94Number: existingForm?.formI94Number || '',
-      foreignPassportNumber: existingForm?.foreignPassportNumber || '',
-      countryOfIssuance: existingForm?.countryOfIssuance || '',
-      authorizationExpirationDate: existingForm?.authorizationExpirationDate || '',
-    },
-  });
-
+  // Load existing form data
   useEffect(() => {
     if (existingForm?.id) {
       setI9FormId(existingForm.id);
       if (existingForm.section1Status === 'Completed') {
         setCurrentSection(2);
       }
-      // Reset form with loaded data
-      form.reset({
+      setFormData({
         lastName: existingForm.lastName || '',
         firstName: existingForm.firstName || '',
         middleInitial: existingForm.middleInitial || '',
@@ -116,7 +108,7 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
         socialSecurityNumber: existingForm.socialSecurityNumber || '',
         email: existingForm.email || '',
         phoneNumber: existingForm.phoneNumber || '',
-        citizenshipStatus: existingForm.citizenshipStatus as any || 'US_CITIZEN',
+        citizenshipStatus: (existingForm.citizenshipStatus as any) || 'US_CITIZEN',
         uscisNumber: existingForm.uscisNumber || '',
         formI94Number: existingForm.formI94Number || '',
         foreignPassportNumber: existingForm.foreignPassportNumber || '',
@@ -124,7 +116,7 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
         authorizationExpirationDate: existingForm.authorizationExpirationDate || '',
       });
     }
-  }, [existingForm, form]);
+  }, [existingForm]);
 
   const submitMutation = useMutation({
     mutationFn: async (data: Section1FormData) => {
@@ -151,6 +143,7 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
       toast({
         title: 'Section 1 Completed',
         description: 'Employee information and attestation saved successfully.',
+        variant: 'default',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms', newHireId] });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', newHireId] });
@@ -166,11 +159,30 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
     },
   });
 
-  const onSubmit = (data: Section1FormData) => {
-    submitMutation.mutate(data);
-  };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
 
-  const citizenshipStatus = form.watch('citizenshipStatus');
+    // Validate using Zod schema
+    const result = section1Schema.safeParse(formData);
+    if (!result.success) {
+      const newErrors: Record<string, string> = {};
+      result.error.errors.forEach((error) => {
+        if (error.path[0]) {
+          newErrors[error.path[0].toString()] = error.message;
+        }
+      });
+      setErrors(newErrors);
+      toast({
+        title: 'Validation Error',
+        description: 'Please check the form for errors',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    submitMutation.mutate(formData);
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -221,358 +233,372 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
             </div>
           </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Personal Information */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">Personal Information</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name (Family Name) <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-i9-lastname" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Personal Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">Personal Information</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Last Name (Family Name) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-lastname"
                   />
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name (Given Name) <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-i9-firstname" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  {errors.lastName && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.lastName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    First Name (Given Name) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-firstname"
                   />
-                  <FormField
-                    control={form.control}
-                    name="middleInitial"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Middle Initial</FormLabel>
-                        <FormControl>
-                          <Input {...field} maxLength={1} data-testid="input-i9-middleinitial" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  {errors.firstName && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.firstName}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Middle Initial
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.middleInitial}
+                    onChange={(e) => setFormData({ ...formData, middleInitial: e.target.value })}
+                    maxLength={1}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-middleinitial"
                   />
                 </div>
+              </div>
 
-                <FormField
-                  control={form.control}
-                  name="otherLastNames"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Other Last Names Used (if any)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Previous names, maiden name, etc." data-testid="input-i9-otherlastnames" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-1 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="addressLine1"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address (Street Number and Name) <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-i9-address1" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="addressLine2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Apt. Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-i9-address2" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City or Town <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-i9-city" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State <span className="text-red-500">*</span></FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-i9-state">
-                              <SelectValue placeholder="Select State/Territory" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {US_STATES_AND_TERRITORIES.map(state => (
-                              <SelectItem key={state} value={state}>{state}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="zipCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ZIP Code <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="12345 or 12345-6789" data-testid="input-i9-zipcode" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="dateOfBirth"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date of Birth <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-i9-dob" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="socialSecurityNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Social Security Number <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="###-##-####" data-testid="input-i9-ssn" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address <span className="text-red-500">*</span></FormLabel>
-                        <FormControl>
-                          <Input type="email" {...field} data-testid="input-i9-email" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="tel" placeholder="(555) 555-5555" data-testid="input-i9-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Other Last Names Used (if any)
+                </label>
+                <input
+                  type="text"
+                  value={formData.otherLastNames}
+                  onChange={(e) => setFormData({ ...formData, otherLastNames: e.target.value })}
+                  placeholder="Previous names, maiden name, etc."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  data-testid="input-i9-otherlastnames"
                 />
               </div>
 
-              {/* Citizenship Status */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">Citizenship/Immigration Status <span className="text-red-500">*</span></h3>
-                
-                <FormField
-                  control={form.control}
-                  name="citizenshipStatus"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormControl>
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="space-y-3">
-                          <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
-                            <RadioGroupItem value="US_CITIZEN" id="us-citizen" data-testid="radio-i9-citizenship-US_CITIZEN" />
-                            <label htmlFor="us-citizen" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
-                              1. A citizen of the United States
-                            </label>
-                          </div>
-                          <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
-                            <RadioGroupItem value="NONCITIZEN_NATIONAL" id="noncitizen-national" data-testid="radio-i9-citizenship-NONCITIZEN_NATIONAL" />
-                            <label htmlFor="noncitizen-national" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
-                              2. A noncitizen national of the United States
-                            </label>
-                          </div>
-                          <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
-                            <RadioGroupItem value="PERMANENT_RESIDENT" id="permanent-resident" data-testid="radio-i9-citizenship-PERMANENT_RESIDENT" />
-                            <label htmlFor="permanent-resident" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
-                              3. A lawful permanent resident
-                            </label>
-                          </div>
-                          <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
-                            <RadioGroupItem value="AUTHORIZED_ALIEN" id="authorized-alien" data-testid="radio-i9-citizenship-AUTHORIZED_ALIEN" />
-                            <label htmlFor="authorized-alien" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
-                              4. An alien authorized to work
-                            </label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Address (Street Number and Name) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.addressLine1}
+                    onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-address1"
+                  />
+                  {errors.addressLine1 && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.addressLine1}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Apt. Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.addressLine2}
+                    onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-address2"
+                  />
+                </div>
+              </div>
 
-                {/* Additional fields for non-US citizens */}
-                {(citizenshipStatus === 'PERMANENT_RESIDENT' || citizenshipStatus === 'AUTHORIZED_ALIEN') && (
-                  <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-md space-y-4">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Additional Information Required</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="uscisNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>USCIS Number (if applicable)</FormLabel>
-                            <FormControl>
-                              <Input {...field} data-testid="input-i9-uscis" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="formI94Number"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Form I-94 Admission Number</FormLabel>
-                            <FormControl>
-                              <Input {...field} data-testid="input-i9-i94" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    City or Town <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-city"
+                  />
+                  {errors.city && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.city}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    State <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="select-i9-state"
+                  >
+                    <option value="">Select State/Territory</option>
+                    {US_STATES_AND_TERRITORIES.map(state => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                  {errors.state && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.state}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    ZIP Code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.zipCode}
+                    onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                    placeholder="12345 or 12345-6789"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-zipcode"
+                  />
+                  {errors.zipCode && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.zipCode}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-dob"
+                  />
+                  {errors.dateOfBirth && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.dateOfBirth}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Social Security Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.socialSecurityNumber}
+                    onChange={(e) => setFormData({ ...formData, socialSecurityNumber: e.target.value })}
+                    placeholder="###-##-####"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-ssn"
+                  />
+                  {errors.socialSecurityNumber && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.socialSecurityNumber}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-i9-email"
+                  />
+                  {errors.email && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.email}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                  placeholder="(555) 555-5555"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  data-testid="input-i9-phone"
+                />
+              </div>
+            </div>
+
+            {/* Citizenship Status */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">Citizenship/Immigration Status <span className="text-red-500">*</span></h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                  <input
+                    type="radio"
+                    id="us-citizen"
+                    name="citizenshipStatus"
+                    value="US_CITIZEN"
+                    checked={formData.citizenshipStatus === 'US_CITIZEN'}
+                    onChange={(e) => setFormData({ ...formData, citizenshipStatus: e.target.value as any })}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    data-testid="radio-i9-citizenship-US_CITIZEN"
+                  />
+                  <label htmlFor="us-citizen" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
+                    1. A citizen of the United States
+                  </label>
+                </div>
+                <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                  <input
+                    type="radio"
+                    id="noncitizen-national"
+                    name="citizenshipStatus"
+                    value="NONCITIZEN_NATIONAL"
+                    checked={formData.citizenshipStatus === 'NONCITIZEN_NATIONAL'}
+                    onChange={(e) => setFormData({ ...formData, citizenshipStatus: e.target.value as any })}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    data-testid="radio-i9-citizenship-NONCITIZEN_NATIONAL"
+                  />
+                  <label htmlFor="noncitizen-national" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
+                    2. A noncitizen national of the United States
+                  </label>
+                </div>
+                <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                  <input
+                    type="radio"
+                    id="permanent-resident"
+                    name="citizenshipStatus"
+                    value="PERMANENT_RESIDENT"
+                    checked={formData.citizenshipStatus === 'PERMANENT_RESIDENT'}
+                    onChange={(e) => setFormData({ ...formData, citizenshipStatus: e.target.value as any })}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    data-testid="radio-i9-citizenship-PERMANENT_RESIDENT"
+                  />
+                  <label htmlFor="permanent-resident" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
+                    3. A lawful permanent resident
+                  </label>
+                </div>
+                <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                  <input
+                    type="radio"
+                    id="authorized-alien"
+                    name="citizenshipStatus"
+                    value="AUTHORIZED_ALIEN"
+                    checked={formData.citizenshipStatus === 'AUTHORIZED_ALIEN'}
+                    onChange={(e) => setFormData({ ...formData, citizenshipStatus: e.target.value as any })}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    data-testid="radio-i9-citizenship-AUTHORIZED_ALIEN"
+                  />
+                  <label htmlFor="authorized-alien" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
+                    4. An alien authorized to work
+                  </label>
+                </div>
+              </div>
+
+              {/* Additional fields for non-US citizens */}
+              {(formData.citizenshipStatus === 'PERMANENT_RESIDENT' || formData.citizenshipStatus === 'AUTHORIZED_ALIEN') && (
+                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-md space-y-4">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Additional Information Required</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        USCIS Number (if applicable)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.uscisNumber}
+                        onChange={(e) => setFormData({ ...formData, uscisNumber: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        data-testid="input-i9-uscis"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Form I-94 Admission Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.formI94Number}
+                        onChange={(e) => setFormData({ ...formData, formI94Number: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        data-testid="input-i9-i94"
+                      />
+                    </div>
+                  </div>
 
-                    {citizenshipStatus === 'AUTHORIZED_ALIEN' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="foreignPassportNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Foreign Passport Number</FormLabel>
-                              <FormControl>
-                                <Input {...field} data-testid="input-i9-passport" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="countryOfIssuance"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Country of Issuance</FormLabel>
-                              <FormControl>
-                                <Input {...field} data-testid="input-i9-country" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="authorizationExpirationDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Work Authorization Expiration Date</FormLabel>
-                              <FormControl>
-                                <Input type="date" {...field} data-testid="input-i9-auth-expiration" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                  {formData.citizenshipStatus === 'AUTHORIZED_ALIEN' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Foreign Passport Number
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.foreignPassportNumber}
+                          onChange={(e) => setFormData({ ...formData, foreignPassportNumber: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          data-testid="input-i9-passport"
                         />
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Digital Signature Agreement */}
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                  <strong>Attestation:</strong> I attest, under penalty of perjury, that I am (check one of the boxes above) and that the information I have provided is true and correct. I understand that knowingly and willfully providing false or misleading information or documentation may subject me to criminal penalties.
-                </p>
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button
-                  type="submit"
-                  disabled={submitMutation.isPending}
-                  className="bg-blue-600 hover:bg-blue-700"
-                  data-testid="button-submit-i9-section1"
-                >
-                  {submitMutation.isPending ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Complete Section 1
-                    </>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Country of Issuance
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.countryOfIssuance}
+                          onChange={(e) => setFormData({ ...formData, countryOfIssuance: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          data-testid="input-i9-country"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Work Authorization Expiration Date
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.authorizationExpirationDate}
+                          onChange={(e) => setFormData({ ...formData, authorizationExpirationDate: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          data-testid="input-i9-auth-expiration"
+                        />
+                      </div>
+                    </div>
                   )}
-                </Button>
-              </div>
-            </form>
-          </Form>
+                </div>
+              )}
+            </div>
+
+            {/* Digital Signature Agreement */}
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <p className="text-sm text-yellow-900 dark:text-yellow-100">
+                <strong>Attestation:</strong> I attest, under penalty of perjury, that I am (check one of the boxes above) and that the information I have provided is true and correct. I understand that knowingly and willfully providing false or misleading information or documentation may subject me to criminal penalties.
+              </p>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <button
+                type="submit"
+                disabled={submitMutation.isPending}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                data-testid="button-submit-i9-section1"
+              >
+                {submitMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Complete Section 1
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

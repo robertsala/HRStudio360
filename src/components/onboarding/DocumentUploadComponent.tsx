@@ -3,8 +3,6 @@ import { Upload, FileText, CheckCircle, X, AlertCircle, Clock, Eye } from 'lucid
 import { useToast } from '../../hooks/use-toast';
 import { apiRequest, queryClient } from '../../lib/queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Button } from '../../components/ui/button';
 import type { OnboardingDocument } from '@shared/schema';
 
 interface DocumentUploadComponentProps {
@@ -133,6 +131,7 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
       toast({
         title: 'Upload Successful',
         description: `${selectedDocType} uploaded and pending HR review.`,
+        variant: 'default',
       });
       setSelectedDocType('');
       setUploadProgress(0);
@@ -216,19 +215,22 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
           {/* Document List Selection */}
           <div className="flex flex-wrap gap-2">
             {(['LIST_A', 'LIST_B', 'LIST_C', 'OTHER'] as DocumentList[]).map(list => (
-              <Button
+              <button
                 key={list}
                 type="button"
                 onClick={() => {
                   setSelectedList(list);
                   setSelectedDocType('');
                 }}
-                variant={selectedList === list ? 'default' : 'outline'}
-                className={selectedList === list ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedList === list 
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
                 data-testid={`button-select-${list}`}
               >
                 {list.replace('_', ' ')}
-              </Button>
+              </button>
             ))}
           </div>
 
@@ -237,16 +239,17 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Document Type <span className="text-red-500">*</span>
             </label>
-            <Select value={selectedDocType} onValueChange={setSelectedDocType}>
-              <SelectTrigger data-testid="select-document-type">
-                <SelectValue placeholder="Choose a document type..." />
-              </SelectTrigger>
-              <SelectContent>
-                {DOCUMENT_TYPES[selectedList].map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={selectedDocType}
+              onChange={(e) => setSelectedDocType(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              data-testid="select-document-type"
+            >
+              <option value="">Choose a document type...</option>
+              {DOCUMENT_TYPES[selectedList].map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
           </div>
 
           {/* File Upload */}
@@ -256,7 +259,11 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
             </label>
             <div className="flex items-center space-x-3">
               <label className="flex-1 cursor-pointer">
-                <div className="flex items-center justify-center w-full px-4 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors">
+                <div className={`flex items-center justify-center w-full px-4 py-8 border-2 border-dashed rounded-lg transition-colors ${
+                  uploadMutation.isPending || !selectedDocType
+                    ? 'border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-50'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-emerald-500 dark:hover:border-emerald-400'
+                }`}>
                   <div className="text-center">
                     <Upload className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 dark:text-gray-400">

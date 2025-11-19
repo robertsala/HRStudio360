@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, CheckCircle, AlertCircle, FileText } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useToast } from '../../hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '../../lib/queryClient';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../../components/ui/form';
-import { Input } from '../../components/ui/input';
-import { RadioGroup, RadioGroupItem } from '../../components/ui/radio-group';
-import { Checkbox } from '../../components/ui/checkbox';
-import { Button } from '../../components/ui/button';
+import { z } from 'zod';
 import type { StateTaxForm } from '@shared/schema';
 
 interface StateTaxFormComponentProps {
@@ -19,7 +12,7 @@ interface StateTaxFormComponentProps {
   onComplete?: () => void;
 }
 
-// Massachusetts M-4 Validation Schema
+// Massachusetts M-4 Validation Schema (kept for helper validation)
 const m4FormSchema = z.object({
   filingStatus: z.enum(['SINGLE', 'MARRIED', 'HEAD_OF_HOUSEHOLD']),
   exemptStatus: z.boolean(),
@@ -41,6 +34,18 @@ const MASSACHUSETTS_FILING_STATUSES = [
 export default function StateTaxFormComponent({ newHireId, state, onComplete }: StateTaxFormComponentProps) {
   const { toast } = useToast();
   const [existingFormId, setExistingFormId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Form state
+  const [formData, setFormData] = useState<M4FormData>({
+    filingStatus: 'SINGLE',
+    exemptStatus: false,
+    dependentAllowances: 0,
+    blindAllowances: 0,
+    age65Allowances: 0,
+    headOfHouseholdAllowance: false,
+    additionalWithholding: '0.00',
+  });
 
   // Fetch existing state tax forms
   const { data: existingForms = [] } = useQuery<StateTaxForm[]>({
@@ -54,25 +59,12 @@ export default function StateTaxFormComponent({ newHireId, state, onComplete }: 
 
   const existingMAForm = existingForms.find(f => f.state === 'MA');
 
-  const form = useForm<M4FormData>({
-    resolver: zodResolver(m4FormSchema),
-    defaultValues: {
-      filingStatus: existingMAForm?.filingStatus as any || 'SINGLE',
-      exemptStatus: existingMAForm?.exemptStatus || false,
-      dependentAllowances: existingMAForm?.stateSpecificData?.dependentAllowances || 0,
-      blindAllowances: existingMAForm?.stateSpecificData?.blindAllowances || 0,
-      age65Allowances: existingMAForm?.stateSpecificData?.age65Allowances || 0,
-      headOfHouseholdAllowance: existingMAForm?.stateSpecificData?.headOfHouseholdAllowance || false,
-      additionalWithholding: existingMAForm?.additionalWithholding || '0.00',
-    },
-  });
-
+  // Load existing form data
   useEffect(() => {
     if (existingMAForm?.id) {
       setExistingFormId(existingMAForm.id);
-      // Reset form with loaded data
-      form.reset({
-        filingStatus: existingMAForm.filingStatus as any || 'SINGLE',
+      setFormData({
+        filingStatus: (existingMAForm.filingStatus as any) || 'SINGLE',
         exemptStatus: existingMAForm.exemptStatus || false,
         dependentAllowances: existingMAForm.stateSpecificData?.dependentAllowances || 0,
         blindAllowances: existingMAForm.stateSpecificData?.blindAllowances || 0,
@@ -81,17 +73,11 @@ export default function StateTaxFormComponent({ newHireId, state, onComplete }: 
         additionalWithholding: existingMAForm.additionalWithholding || '0.00',
       });
     }
-  }, [existingMAForm, form]);
-
-  const exemptStatus = form.watch('exemptStatus');
-  const dependentAllowances = form.watch('dependentAllowances');
-  const blindAllowances = form.watch('blindAllowances');
-  const age65Allowances = form.watch('age65Allowances');
-  const headOfHouseholdAllowance = form.watch('headOfHouseholdAllowance');
+  }, [existingMAForm]);
 
   const calculateTotalAllowances = () => {
-    if (exemptStatus) return 0;
-    return dependentAllowances + blindAllowances + age65Allowances + (headOfHouseholdAllowance ? 1 : 0);
+    if (formData.exemptStatus) return 0;
+    return formData.dependentAllowances + formData.blindAllowances + formData.age65Allowances + (formData.headOfHouseholdAllowance ? 1 : 0);
   };
 
   const submitMutation = useMutation({
@@ -127,6 +113,7 @@ export default function StateTaxFormComponent({ newHireId, state, onComplete }: 
       toast({
         title: 'Form Submitted',
         description: 'Massachusetts M-4 form saved successfully.',
+        variant: 'default',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/state-tax-forms', newHireId] });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', newHireId] });
@@ -141,11 +128,32 @@ export default function StateTaxFormComponent({ newHireId, state, onComplete }: 
     },
   });
 
-  const onSubmit = (data: M4FormData) => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+
+    // Validate using Zod schema
+    const result = m4FormSchema.safeParse(formData);
+    if (!result.success) {
+      const newErrors: Record<string, string> = {};
+      result.error.errors.forEach((error) => {
+        if (error.path[0]) {
+          newErrors[error.path[0].toString()] = error.message;
+        }
+      });
+      setErrors(newErrors);
+      toast({
+        title: 'Validation Error',
+        description: 'Please check the form for errors',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Normalize additionalWithholding to always be a valid string
     const normalizedData = {
-      ...data,
-      additionalWithholding: data.additionalWithholding || '0.00'
+      ...formData,
+      additionalWithholding: formData.additionalWithholding || '0.00'
     };
     submitMutation.mutate(normalizedData);
   };
@@ -176,244 +184,222 @@ export default function StateTaxFormComponent({ newHireId, state, onComplete }: 
             </div>
           </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Filing Status */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Filing Status */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
+                1. Filing Status <span className="text-red-500">*</span>
+              </h3>
+              
+              <div className="space-y-3">
+                {MASSACHUSETTS_FILING_STATUSES.map(status => (
+                  <div key={status.value} className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                    <input
+                      type="radio"
+                      id={status.value}
+                      name="filingStatus"
+                      value={status.value}
+                      checked={formData.filingStatus === status.value}
+                      onChange={(e) => setFormData({ ...formData, filingStatus: e.target.value as any })}
+                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      data-testid={`radio-m4-status-${status.value}`}
+                    />
+                    <label htmlFor={status.value} className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
+                      {status.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {errors.filingStatus && (
+                <p className="text-sm text-red-600 dark:text-red-400">{errors.filingStatus}</p>
+              )}
+            </div>
+
+            {/* Exemption Status */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
+                2. Exemption Status
+              </h3>
+              
+              <div className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                <input
+                  type="checkbox"
+                  id="exemptStatus"
+                  checked={formData.exemptStatus}
+                  onChange={(e) => setFormData({ ...formData, exemptStatus: e.target.checked })}
+                  className="mt-1 h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  data-testid="checkbox-m4-exempt"
+                />
+                <div className="flex-1">
+                  <label htmlFor="exemptStatus" className="font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                    I claim exemption from Massachusetts withholding
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Check this box only if you expect to owe no Massachusetts income tax and had no tax liability last year.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Allowances (only if not exempt) */}
+            {!formData.exemptStatus && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                  1. Filing Status <span className="text-red-500">*</span>
+                  3. Withholding Allowances
                 </h3>
-                
-                <FormField
-                  control={form.control}
-                  name="filingStatus"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormControl>
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="space-y-3">
-                          {MASSACHUSETTS_FILING_STATUSES.map(status => (
-                            <div key={status.value} className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
-                              <RadioGroupItem value={status.value} id={status.value} data-testid={`radio-m4-status-${status.value}`} />
-                              <label htmlFor={status.value} className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1">
-                                {status.label}
-                              </label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
 
-              {/* Exemption Status */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                  2. Exemption Status
-                </h3>
-                
-                <FormField
-                  control={form.control}
-                  name="exemptStatus"
-                  render={({ field }) => (
-                    <FormItem className="flex items-start space-x-3 p-3 border border-gray-300 dark:border-gray-600 rounded-md">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="checkbox-m4-exempt"
-                        />
-                      </FormControl>
-                      <div className="flex-1">
-                        <FormLabel className="font-medium text-gray-700 dark:text-gray-300">
-                          I claim exemption from Massachusetts withholding
-                        </FormLabel>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Check this box only if you expect to owe no Massachusetts income tax and had no tax liability last year.
-                        </p>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Allowances (only if not exempt) */}
-              {!exemptStatus && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                    3. Withholding Allowances
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="dependentAllowances"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Number of Dependents</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              {...field}
-                              onChange={e => field.onChange(parseInt(e.target.value) || 0)}
-                              data-testid="input-m4-dependents"
-                            />
-                          </FormControl>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Enter number of dependents you will claim
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Number of Dependents
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.dependentAllowances}
+                      onChange={(e) => setFormData({ ...formData, dependentAllowances: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      data-testid="input-m4-dependents"
                     />
-
-                    <FormField
-                      control={form.control}
-                      name="blindAllowances"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Blind Allowances</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="2"
-                              {...field}
-                              onChange={e => field.onChange(parseInt(e.target.value) || 0)}
-                              data-testid="input-m4-blind"
-                            />
-                          </FormControl>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            1 if you are blind, 2 if you and spouse are blind
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="age65Allowances"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Age 65+ Allowances</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="2"
-                              {...field}
-                              onChange={e => field.onChange(parseInt(e.target.value) || 0)}
-                              data-testid="input-m4-age65"
-                            />
-                          </FormControl>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            1 if you are 65+, 2 if you and spouse are 65+
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="headOfHouseholdAllowance"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center space-x-2 pt-8">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="checkbox-m4-hoh"
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal cursor-pointer">
-                            Head of Household (1 allowance)
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Enter number of dependents you will claim
+                    </p>
+                    {errors.dependentAllowances && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.dependentAllowances}</p>
+                    )}
                   </div>
 
-                  {/* Total Allowances Display */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-900 dark:text-white">Total Withholding Allowances:</span>
-                      <span className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="text-m4-total-allowances">
-                        {calculateTotalAllowances()}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                      More allowances = less tax withheld from each paycheck
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Blind Allowances
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="2"
+                      value={formData.blindAllowances}
+                      onChange={(e) => setFormData({ ...formData, blindAllowances: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      data-testid="input-m4-blind"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      1 if you are blind, 2 if you and spouse are blind
                     </p>
+                    {errors.blindAllowances && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.blindAllowances}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Age 65+ Allowances
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="2"
+                      value={formData.age65Allowances}
+                      onChange={(e) => setFormData({ ...formData, age65Allowances: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      data-testid="input-m4-age65"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      1 if you are 65+, 2 if you and spouse are 65+
+                    </p>
+                    {errors.age65Allowances && (
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.age65Allowances}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-8">
+                    <input
+                      type="checkbox"
+                      id="headOfHouseholdAllowance"
+                      checked={formData.headOfHouseholdAllowance}
+                      onChange={(e) => setFormData({ ...formData, headOfHouseholdAllowance: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      data-testid="checkbox-m4-hoh"
+                    />
+                    <label htmlFor="headOfHouseholdAllowance" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                      Head of Household (1 allowance)
+                    </label>
                   </div>
                 </div>
-              )}
 
-              {/* Additional Withholding */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                  4. Additional Withholding (Optional)
-                </h3>
-                
-                <FormField
-                  control={form.control}
-                  name="additionalWithholding"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Amount to Withhold Per Pay Period</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                          <Input
-                            {...field}
-                            className="pl-7"
-                            placeholder="0.00"
-                            data-testid="input-m4-additional"
-                          />
-                        </div>
-                      </FormControl>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Enter extra amount if you want additional tax withheld each pay period
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Total Allowances Display */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-900 dark:text-white">Total Withholding Allowances:</span>
+                    <span className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="text-m4-total-allowances">
+                      {calculateTotalAllowances()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    More allowances = less tax withheld from each paycheck
+                  </p>
+                </div>
               </div>
+            )}
 
-              {/* Digital Signature Agreement */}
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                  <strong>Employee Certification:</strong> I certify under penalties of perjury that I am entitled to the number of withholding allowances claimed on this certificate.
+            {/* Additional Withholding */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
+                4. Additional Withholding (Optional)
+              </h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Additional Amount to Withhold Per Pay Period
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                  <input
+                    type="text"
+                    value={formData.additionalWithholding}
+                    onChange={(e) => setFormData({ ...formData, additionalWithholding: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full pl-7 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    data-testid="input-m4-additional"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Enter extra amount if you want additional tax withheld each pay period
                 </p>
+                {errors.additionalWithholding && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.additionalWithholding}</p>
+                )}
               </div>
+            </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-3 pt-4 border-t">
-                <Button
-                  type="submit"
-                  disabled={submitMutation.isPending}
-                  className="bg-purple-600 hover:bg-purple-700"
-                  data-testid="button-submit-m4"
-                >
-                  {submitMutation.isPending ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Submit M-4 Form
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Form>
+            {/* Digital Signature Agreement */}
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <p className="text-sm text-yellow-900 dark:text-yellow-100">
+                <strong>Employee Certification:</strong> I certify under penalties of perjury that I am entitled to the number of withholding allowances claimed on this certificate.
+              </p>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <button
+                type="submit"
+                disabled={submitMutation.isPending}
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                data-testid="button-submit-m4"
+              >
+                {submitMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Submit M-4 Form
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     );
