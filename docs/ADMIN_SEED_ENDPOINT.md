@@ -129,31 +129,28 @@ fetch('/api/admin/seed', {
 
 When you seed the database, it creates:
 
-### 7 User Profiles
-- **Demo User** (`demo@hrstudio360.com`) - Product Owner
-- **Robert Sala** (`robertsala@gmail.com`) - CEO
-- **Sarah Johnson** - Senior Engineer
-- **Michael Chen** - Product Manager
-- **Emily Rodriguez** - UX Designer
-- **James Wilson** - HR Manager
-- **Lisa Anderson** - Marketing Director
+### 6 User Profiles (All with Unique Professional Avatars)
+- **Demo User** (`demo@hrstudio360.com`) - Product Owner (AI chatbot avatar)
+- **Robert Sala** (`robertsala@gmail.com`) - CEO (unique avatar)
+- **Sarah Johnson** (`sarah.johnson@hrstudio360.com`) - HR Specialist (professional headshot)
+- **Jessica Williams** (`jessica.williams@hrstudio360.com`) - HR Manager (professional headshot)
+- **Mike Chen** (`mike.chen@hrstudio360.com`) - Sales Director (professional headshot)
+- **Victor Martinez** (`victor.martinez@company.com`) - CFO (professional headshot)
 
-### 6 Departments
-- Engineering
+### 5 Departments
+- HR
+- Sales
+- Finance
 - Product
-- Design
-- People (HR)
-- Marketing
 - Executive
 
-### 7 Job Titles
+### 6 Job Titles
 - CEO
-- Senior Engineer
-- Product Manager
+- CFO
 - Product Owner
-- UX Designer
 - HR Manager
-- Marketing Director
+- HR Specialist
+- Sales Director
 
 ### 2 Announcements
 - Welcome to HRStudio360
