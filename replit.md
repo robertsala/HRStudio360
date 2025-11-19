@@ -9,6 +9,22 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 -   **Communication style**: Simple, everyday language.
 -   **Change Log**: Automatically add entries to the change log whenever completing new features, fixes, improvements, or system changes.
 
+## Recent Changes (November 2025)
+
+### Production Database Seed Update
+-   **Updated `server/seed-production.ts`** to match development environment exactly with the correct 6 database employees:
+    -   **Demo User** (demo@hrstudio360.com) - Product Owner with AI chatbot avatar
+    -   **Robert Sala** (robertsala@gmail.com) - CEO with unique avatar
+    -   **Sarah Johnson** (sarah.johnson@hrstudio360.com) - HR Specialist with professional headshot
+    -   **Jessica Williams** (jessica.williams@hrstudio360.com) - HR Manager with professional headshot
+    -   **Mike Chen** (mike.chen@hrstudio360.com) - Sales Director with professional headshot
+    -   **Victor Martinez** (victor.martinez@company.com) - CFO with professional headshot
+-   Updated departments to include HR, Sales, Finance, Product, and Executive
+-   Created proper job titles for all roles (CEO, CFO, Product Owner, HR Manager, HR Specialist, Sales Director)
+-   Fixed employee record creation to properly reference all team members with correct department and job title assignments
+-   All employees now have unique, gender-appropriate professional avatars for realistic client demos
+-   Authentication credentials are automatically created for all users with default password: `HRStudio360Demo!`
+
 ## System Architecture
 
 ### UI/UX Decisions
