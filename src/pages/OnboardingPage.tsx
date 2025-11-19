@@ -279,8 +279,8 @@ export default function OnboardingPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(hire.status)}`}>
-                              {hire.status.replace('_', ' ').toUpperCase()}
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(hire.status || 'pending')}`}>
+                              {(hire.status || 'pending').replace('_', ' ').toUpperCase()}
                             </span>
                             <p className="text-xs text-gray-500 mt-2">
                               {daysUntilStart > 0 ? `Starts in ${daysUntilStart} days` : 'Started'}
@@ -501,7 +501,7 @@ export default function OnboardingPage() {
                   </button>
                   <StateTaxFormComponent 
                     newHireId={selectedNewHire.id}
-                    state={selectedNewHire.state || 'MA'}
+                    state={'MA'}
                     onComplete={handleFormComplete}
                   />
                 </div>
@@ -636,8 +636,8 @@ export default function OnboardingPage() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h4 className="font-semibold text-gray-900 dark:text-white">{task.title}</h4>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                              {task.priority}
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority || 'low')}`}>
+                              {task.priority || 'low'}
                             </span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                               {task.status.replace('_', ' ')}
@@ -649,10 +649,12 @@ export default function OnboardingPage() {
                               <Briefcase className="h-3 w-3" />
                               <span className="capitalize">{task.assigneeType.replace('_', ' ')}</span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                            </div>
+                            {task.dueDate && (
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                              </div>
+                            )}
                             <div className="flex items-center space-x-1">
                               <span className="font-medium">{task.category}</span>
                             </div>
