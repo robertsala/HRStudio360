@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { X, User, Calendar, CheckCircle, Users, Briefcase, ChevronRight, Search, FileText, DollarSign, Upload } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest } from '../../lib/queryClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '../../hooks/use-toast';
 import I9FormComponent from '../onboarding/I9FormComponent';
 import I9EmployerVerificationComponent from '../onboarding/I9EmployerVerificationComponent';
 import StateTaxFormComponent from '../onboarding/StateTaxFormComponent';

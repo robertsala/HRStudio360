@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Upload, FileText, CheckCircle, X, AlertCircle, Clock, Eye } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '../../hooks/use-toast';
+import { apiRequest, queryClient } from '../../lib/queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Button } from '../../components/ui/button';
 import type { OnboardingDocument } from '@shared/schema';
 
 interface DocumentUploadComponentProps {
