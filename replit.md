@@ -26,7 +26,12 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Dashboard Customization**: A role-based customizable dashboard widget system allows personalized views.
 -   **Applicant Tracking System (ATS)**: Features a public career portal with resume upload and AI-powered auto-fill. The backend supports job postings, applications, candidates, interview stages, and offer letters with a Kanban-style interface.
 -   **Payroll System**: Features a guided 5-step payroll wizard with an AI Payroll Assistant and interactive timesheet navigation.
--   **Onboarding System**: Comprehensive backend infrastructure for new hire workflows, including database tables for checklists, tasks, I-9 forms, state tax forms, and onboarding documents. Features an object storage integration for document uploads.
+-   **Onboarding System**: Comprehensive end-to-end onboarding infrastructure including:
+    -   **Database**: Complete schema for checklists, tasks, I-9 forms (federal compliance), state tax forms, and onboarding documents
+    -   **API**: 25+ RESTful endpoints for onboarding workflows, form submissions, and document management
+    -   **Components**: 4 production-ready form components (I-9 Section 1 & 2, Massachusetts M-4, document upload with object storage)
+    -   **Modal Interface**: Fully integrated NewHireOnboardingModal with 4-tab navigation (Overview, Forms & Compliance, Documents, Tasks), role-based access control, real-time progress tracking, and hierarchical TanStack Query cache invalidation
+    -   **Federal Compliance**: Complete I-9 verification workflow supporting all 50 states and US territories with conditional validation (List A OR List B+C documents)
 -   **Design Patterns**: Utilizes a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries.
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library.
 -   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors`.
