@@ -31,7 +31,6 @@ import {
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { sendAutoFixNotificationEmail, notificationService } from './notification-service.js';
 import { seedProductionDatabase } from './seed-production.js';
-import { seedEmergency } from './seed-emergency.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
 import rateLimit from 'express-rate-limit';
 import { db } from './db.js';
@@ -3784,12 +3783,7 @@ export function registerRoutes(app: Express) {
       // Run the seed function with optional force parameter
       console.log('🔐 Admin seed endpoint called with valid credentials');
       const force = req.body.force === true;
-      const emergency = req.body.emergency === true;
-      
-      // Use emergency seed for production schema compatibility issues
-      const result = emergency 
-        ? await seedEmergency({ force })
-        : await seedProductionDatabase({ force });
+      const result = await seedProductionDatabase({ force });
       
       res.json(result);
     } catch (error: any) {
