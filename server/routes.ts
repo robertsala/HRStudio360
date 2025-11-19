@@ -50,6 +50,7 @@ import { chatWithStudioAI } from './ai-assistant.js';
 import { taxCalculator } from './tax-calculator.js';
 import { TaxDataService } from './tax-data-service.js';
 import { suggestTaxConfiguration, batchSuggestTaxConfigurations } from './ai-agent.js';
+import { DASHBOARD_WIDGETS } from '../src/config/dashboardWidgets.js';
 import OpenAI from 'openai';
 
 // Initialize OpenAI client for address validation
@@ -3325,9 +3326,6 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: 'role parameter is required' });
       }
 
-      // Import the widget registry
-      const { DASHBOARD_WIDGETS } = await import('../src/config/dashboardWidgets.js');
-      
       // Fetch database presets and user preferences
       const [presets, userPrefs] = await Promise.all([
         storage.getDashboardWidgetPresets(),
