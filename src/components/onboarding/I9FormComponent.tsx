@@ -575,20 +575,23 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
         </div>
       )}
 
-      {/* Section 2 Placeholder (for HR) */}
+      {/* Section 2: Employer Review and Verification (for HR) */}
       {currentSection === 2 && (
         <div className="p-6 text-center">
           <div className="max-w-md mx-auto">
             <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" data-testid="icon-section1-complete" />
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Section 1 Complete!</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Your information has been submitted. Section 2 (Employer Verification) will be completed by HR on or before your first day of employment.
+              Employee information has been submitted successfully. Section 2 (Employer Verification) will be completed by HR.
             </p>
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left">
               <p className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>Next Steps:</strong> HR will review your submitted documents and complete the employer verification section. You'll be notified once the I-9 process is fully complete.
+                <strong>Next Steps:</strong> HR will review the employee's submitted documents (List A, or List B + List C) and complete employer verification within 3 business days of the employee's first day.
               </p>
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+              Section 2 & 3 employer verification forms are accessible via the HR admin panel.
+            </p>
           </div>
         </div>
       )}
