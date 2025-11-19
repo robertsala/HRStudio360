@@ -4,10 +4,11 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '../../lib/queryClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/use-toast';
-import I9FormComponent from '../onboarding/I9FormComponent';
-import I9EmployerVerificationComponent from '../onboarding/I9EmployerVerificationComponent';
-import StateTaxFormComponent from '../onboarding/StateTaxFormComponent';
-import DocumentUploadComponent from '../onboarding/DocumentUploadComponent';
+// TODO: Refactor onboarding components to use plain HTML instead of shadcn UI
+// import I9FormComponent from '../onboarding/I9FormComponent';
+// import I9EmployerVerificationComponent from '../onboarding/I9EmployerVerificationComponent';
+// import StateTaxFormComponent from '../onboarding/StateTaxFormComponent';
+// import DocumentUploadComponent from '../onboarding/DocumentUploadComponent';
 import type { NewHire, OnboardingChecklist, OnboardingTask } from '@shared/schema';
 
 interface NewHireOnboardingModalProps {
@@ -464,10 +465,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                     <ChevronRight className="h-4 w-4 transform rotate-180" />
                     <span>Back to Forms Menu</span>
                   </button>
-                  <I9FormComponent
-                    newHireId={selectedNewHire.id}
-                    onComplete={handleFormComplete}
-                  />
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-yellow-600" />
+                    <h3 className="text-lg font-semibold mb-2">I-9 Section 1 Coming Soon</h3>
+                    <p className="text-gray-600 dark:text-gray-400">This form needs to be refactored to work without shadcn UI library.</p>
+                  </div>
                 </div>
               )}
 
@@ -481,11 +483,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                     <ChevronRight className="h-4 w-4 transform rotate-180" />
                     <span>Back to Forms Menu</span>
                   </button>
-                  <I9EmployerVerificationComponent
-                    newHireId={selectedNewHire.id}
-                    newHireName={`${selectedNewHire.firstName} ${selectedNewHire.lastName}`}
-                    onComplete={handleFormComplete}
-                  />
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-yellow-600" />
+                    <h3 className="text-lg font-semibold mb-2">I-9 Section 2 (HR) Coming Soon</h3>
+                    <p className="text-gray-600 dark:text-gray-400">This form needs to be refactored to work without shadcn UI library.</p>
+                  </div>
                 </div>
               )}
 
@@ -499,11 +501,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                     <ChevronRight className="h-4 w-4 transform rotate-180" />
                     <span>Back to Forms Menu</span>
                   </button>
-                  <StateTaxFormComponent
-                    newHireId={selectedNewHire.id}
-                    state="MA"
-                    onComplete={handleFormComplete}
-                  />
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+                    <DollarSign className="h-12 w-12 mx-auto mb-4 text-yellow-600" />
+                    <h3 className="text-lg font-semibold mb-2">State Tax Form Coming Soon</h3>
+                    <p className="text-gray-600 dark:text-gray-400">This form needs to be refactored to work without shadcn UI library.</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -537,10 +539,11 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
                 </div>
               </div>
 
-              <DocumentUploadComponent
-                newHireId={selectedNewHire.id}
-                onComplete={handleFormComplete}
-              />
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+                <Upload className="h-12 w-12 mx-auto mb-4 text-yellow-600" />
+                <h3 className="text-lg font-semibold mb-2">Document Upload Coming Soon</h3>
+                <p className="text-gray-600 dark:text-gray-400">This component needs to be refactored to work without shadcn UI library.</p>
+              </div>
             </div>
           )}
 
