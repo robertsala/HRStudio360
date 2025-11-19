@@ -26,18 +26,8 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
         }
       };
       
-      // Delete in reverse dependency order
-      await safeDelete(reviewResponses, 'review responses');
-      await safeDelete(reviewGoalsComments, 'review goals/comments');
-      await safeDelete(performanceReviews, 'performance reviews');
-      await safeDelete(reviewQuestionAssignments, 'review question assignments');
-      await safeDelete(reviewQuestionsLibrary, 'review questions');
-      await safeDelete(reviewQuestionTemplates, 'review templates');
-      await safeDelete(reviewCycles, 'review cycles');
-      await safeDelete(leaveRequests, 'leave requests');
-      await safeDelete(leaveBalances, 'leave balances');
-      await safeDelete(newHires, 'new hires');
-      await safeDelete(candidates, 'candidates');
+      // Only delete tables that we actually seed (in reverse dependency order)
+      // Skip all review-related tables to avoid schema compatibility issues
       await safeDelete(employees, 'employees');
       await safeDelete(authCredentials, 'auth credentials');
       await safeDelete(announcements, 'announcements');
