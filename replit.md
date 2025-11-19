@@ -9,103 +9,41 @@ HR Studio 360 is an AI-powered Human Resources management platform designed to s
 -   **Communication style**: Simple, everyday language.
 -   **Change Log**: Automatically add entries to the change log whenever completing new features, fixes, improvements, or system changes.
 
-## Recent Changes (November 2025)
-
-### Comprehensive Onboarding System - Database & API (November 19, 2025)
--   **Enterprise-Grade Onboarding System** - Built complete backend infrastructure for new hire onboarding workflows:
--   **Database Schema** - Created 5 comprehensive tables with full relational integrity:
-    -   `onboarding_checklists` - Overall onboarding progress tracking per new hire with status fields for I-9, tax forms, workstation, benefits, training, and orientation
-    -   `onboarding_tasks` - Individual checklist items with assignee types (New Hire, HR, IT, Manager), priorities, dependencies, and completion tracking
-    -   `i9_forms` - Complete federal I-9 Employment Eligibility Verification (all 3 sections) supporting all 50 states + U.S. territories (PR, GU, VI, AS, MP)
-    -   `state_tax_forms` - State-specific tax withholding forms (M-4 for MA, W-4 federal, etc.) with flexible JSON storage for state-specific fields
-    -   `onboarding_documents` - Document uploads for ID verification (List A/B/C), certifications, background checks with approval workflow
--   **Storage Layer** - Implemented 40+ database methods for complete CRUD operations across all onboarding tables
--   **API Endpoints** - Added 25+ RESTful API routes:
-    -   Onboarding checklists management (GET, POST, PATCH by ID and newHireId)
-    -   Task management with completion tracking
-    -   I-9 form submission (Section 1 employee, Section 2 employer verification)
-    -   State tax form handling for multi-state compliance
-    -   Document upload and approval workflow
--   **Federal Compliance** - I-9 system works identically for all U.S. states and territories (federal requirement)
--   **State Tax Compliance** - Flexible state-specific form system supports unique requirements per state (e.g., Massachusetts M-4)
--   **Performance** - Added database indexes for optimal query performance on checklist and task lookups
--   **Next Steps** - Frontend UI components for I-9 forms, state tax forms, and document uploads
-
-### Database Performance Optimization (November 19, 2025)
--   **Critical Performance Indexes Added** (`shared/schema.ts`): Resolved 2.3-2.6s dashboard load times by adding 4 strategic database indexes
--   **`employees.userId` index**: Optimizes dashboard stats lookup (most critical - queried on every dashboard load)
--   **`leaveBalances.(employeeId, year)` composite index**: Speeds up PTO balance queries for dashboard stats
--   **`announcements.(published, createdAt)` composite index**: Optimizes announcement widget loading with complex filters
--   **`userDashboardPreferences.userId` index**: Accelerates widget preference lookups
--   **Expected Impact**: 80-90% reduction in query execution time, bringing dashboard loads from ~2.5s to <500ms
--   **Schema Migration**: Successfully applied via `npm run db:push` with zero data loss
-
-### UI/UX Polish & Code Quality Improvements (November 19, 2025)
--   **Dark Mode Cleanup** (`Dashboard.tsx`): Removed duplicate and conflicting Tailwind dark mode classes, improving code quality and reducing LSP diagnostics from 115 to 86
--   **Weather Widget Fix** (`weatherService.ts`): Removed failing Supabase cache calls causing console errors; weather now fetches fresh data cleanly
--   **Comprehensive UI Audit**: Verified consistent button styling (emerald for primary, red for danger), spacing patterns (p-6 cards, gap-6 grids), and responsive layouts across all components
--   **Mobile Responsiveness Review**: Confirmed Dashboard uses proper responsive grid patterns (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4`) with adaptive padding; identified edge cases for future optimization (BodyDiagram fixed width, wide modals)
--   **Data-testid Coverage**: Verified Dashboard has 9 data-testid attributes on key interactive elements for testing support
-
-### Production Deployment Configuration (November 19, 2025)
--   **Changed deployment target from autoscale to VM** to support native Node.js modules (argon2 password hashing)
--   **Added `/health` endpoint** (`server/index.ts`) that responds immediately before Vite middleware initializes, ensuring deployment health checks pass within timeout limits
--   Fixed production login crashes caused by cryptographic function failures in autoscale environment
--   Health check endpoint returns JSON status with timestamp for monitoring purposes
-
-### Production Database Seed Update
--   **Updated `server/seed-production.ts`** to match development environment exactly with the correct 6 database employees:
-    -   **Demo User** (demo@hrstudio360.com) - Product Owner with AI chatbot avatar
-    -   **Robert Sala** (robertsala@gmail.com) - CEO with unique avatar
-    -   **Sarah Johnson** (sarah.johnson@hrstudio360.com) - HR Specialist with professional headshot
-    -   **Jessica Williams** (jessica.williams@hrstudio360.com) - HR Manager with professional headshot
-    -   **Mike Chen** (mike.chen@hrstudio360.com) - Sales Director with professional headshot
-    -   **Victor Martinez** (victor.martinez@company.com) - CFO with professional headshot
--   Updated departments to include HR, Sales, Finance, Product, and Executive
--   Created proper job titles for all roles (CEO, CFO, Product Owner, HR Manager, HR Specialist, Sales Director)
--   Fixed employee record creation to properly reference all team members with correct department and job title assignments
--   All employees now have unique, gender-appropriate professional avatars for realistic client demos
--   Authentication credentials are automatically created for all users with default password: `HRStudio360Demo!`
-
 ## System Architecture
 
 ### UI/UX Decisions
 
-The frontend is a React 18 single-page application (SPA) with a modal-based interface. It uses Tailwind CSS for styling with dark mode support. Optimistic UI updates are employed for perceived performance. The UI features a modular dashboard with role-based customizable widgets and a celebration system.
+The frontend is a React 18 single-page application (SPA) with a modal-based interface. It uses Tailwind CSS for styling with dark mode support. Optimistic UI updates are employed for perceived performance. The UI features a modular dashboard with role-based customizable widgets, a celebration system, and responsive layouts. Consistent button styling, spacing patterns, and a mobile-responsive grid are implemented.
 
 ### Technical Implementations
 
 -   **Frontend**: Built with React 18, TypeScript, and Vite. Uses React Context for state management, Wouter for routing, and TanStack Query v5 for data fetching. Internationalization is supported via i18next.
 -   **Backend**: Express.js server providing a RESTful API, using Drizzle ORM for type-safe database interactions.
--   **Data Storage**: PostgreSQL database (Neon-backed) with schema defined by Drizzle ORM.
--   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Role-based access control (RBAC) is implemented.
--   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, and presence tracking. Celebration badges and notifications are integrated. Features robust message deduplication and user-friendly error notifications. Includes an enterprise-grade WebRTC-based calling system with PostgreSQL backend for call state management.
--   **AI Integration**: Powered by OpenAI API (GPT-4o via Replit AI), the "Studio AI" agent provides:
-    -   **Global AI Assistant**: Enterprise-wide conversational AI accessible via Enterprise Chat, providing contextual responses about platform features, HR policies, and workflows. It is employee-aware, securely accessing personalized HR data.
-    -   **Recruitment AI**: Autonomous candidate screening, batch pipeline processing, hiring insights, and AI-powered employee search.
-    -   **Payroll AI**: AI Payroll Assistant for payroll validation, error detection, expense analysis, and tax configuration suggestions.
-    -   AI capabilities are restricted to authorized roles with audit logging and are context-aware.
--   **Dashboard Customization**: A role-based customizable dashboard widget system allows personalized views, merging user preferences, role presets, and a widget registry.
--   **Applicant Tracking System (ATS)**: Features a public career portal with resume upload and AI-powered auto-fill. The backend supports job postings, applications, candidates, interview stages, and offer letters. Includes a Kanban-style interface and contextual AI access.
--   **Payroll System**: Features a guided payroll wizard with a 5-step workflow and an AI Payroll Assistant. Interactive timesheet navigation allows direct access to Leave Management, with persistence and security via a three-table architecture.
--   **Access Control & Permissions**: Enterprise-grade granular permission system with a multi-table architecture supporting three-tier timesheet correction, module-scoped permissions, role-based assignment, permission templates (AI-powered generation), role hierarchy with inheritance, time-based grants, employee-initiated requests, and bulk operations. Enhanced audit trails with timeline visualization and CSV export. AI integration (GPT-4o) provides smart permission suggestions, template generation, risk analysis, and role hierarchy recommendations.
--   **Tutorial System**: A comprehensive, role-based tutorial system integrated into the Training module's Knowledge Base, featuring step-by-step content, interactive checklists, progress tracking, and "Try it now" action buttons.
--   **AI-Assisted Tax Configuration**: Enterprise-grade multi-state tax data integration supporting AI-powered tax jurisdiction suggestions with human approval workflows. Uses a hybrid AI-human model to ensure compliance.
+-   **Data Storage**: PostgreSQL database (Neon-backed) with schema defined by Drizzle ORM. Database performance is optimized with strategic indexing.
+-   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Role-based access control (RBAC) is implemented with a granular permission system, including permission templates, role hierarchy, and time-based grants.
+-   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, presence tracking, and robust message deduplication. Includes an enterprise-grade WebRTC-based calling system.
+-   **AI Integration**: Powered by OpenAI API (GPT-4o), the "Studio AI" agent provides a Global AI Assistant for contextual responses, Recruitment AI for candidate screening and hiring insights, and Payroll AI for validation and expense analysis. AI capabilities are role-restricted, auditable, and context-aware. AI also assists with permission suggestions and tax configuration.
+-   **Dashboard Customization**: A role-based customizable dashboard widget system allows personalized views.
+-   **Applicant Tracking System (ATS)**: Features a public career portal with resume upload and AI-powered auto-fill. The backend supports job postings, applications, candidates, interview stages, and offer letters with a Kanban-style interface.
+-   **Payroll System**: Features a guided 5-step payroll wizard with an AI Payroll Assistant and interactive timesheet navigation.
+-   **Onboarding System**: Comprehensive backend infrastructure for new hire workflows, including database tables for checklists, tasks, I-9 forms, state tax forms, and onboarding documents. Features an object storage integration for document uploads.
 -   **Design Patterns**: Utilizes a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries.
--   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library for frontend unit and backend integration tests.
--   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors` for user-friendly messages.
+-   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library.
+-   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors`.
 -   **Production Monitoring**: Sentry integration for error tracking and performance monitoring.
+-   **Production Deployment**: Configured for VM deployment to support native Node.js modules, with a `/health` endpoint for monitoring.
 
 ### Feature Specifications
 
 -   **Studio AI Agent**: Autonomous candidate screening, batch pipeline processing, hiring insights, and natural language conversations.
 -   **Paycheck Fun Facts**: Creative purchase comparison feature with a smart rotation system.
--   **Change Log System**: Comprehensive change tracking with notification system, stats dashboard, and historical documentation.
--   **Collaboration Features**: Collaborator invitation system with database tracking, backend API, email notifications, in-app notifications, and AI-powered employee search.
--   **Profile Picture Management**: Dual upload system for user self-service and HR administrative uploads, using existing object storage.
--   **Profile Data Loading**: Unified data pipeline across all entry points (Dashboard, Employee Directory, Quick Access) ensures consistent profile data display. Fixed critical bug where saved address, emergency contact, and profile pictures were not loading after modal reopening.
--   **Role-Based Profile Viewing**: HR Manager and Product Owner roles see full employee profiles (address, emergency contact, salary), while regular employees see limited public data (name, email, phone, department, role).
--   **User Impersonation**: "View As" feature allows HR/Product Owner to impersonate employees for troubleshooting, accessible via Employee Directory with visual banner indicating impersonation status.
+-   **Change Log System**: Comprehensive change tracking with notification system and stats dashboard.
+-   **Collaboration Features**: Collaborator invitation system with database tracking, API, email/in-app notifications, and AI-powered employee search.
+-   **Profile Picture Management**: Dual upload system for user self-service and HR administrative uploads.
+-   **Role-Based Profile Viewing**: Granular access to employee profile data based on user roles (e.g., HR/Product Owner vs. regular employee).
+-   **User Impersonation**: "View As" feature for HR/Product Owner to impersonate employees for troubleshooting.
+-   **Tutorial System**: Role-based tutorials integrated into the Training module with interactive checklists and progress tracking.
+-   **AI-Assisted Tax Configuration**: Enterprise-grade multi-state tax data integration with AI-powered jurisdiction suggestions and human approval workflows.
 
 ## External Dependencies
 
