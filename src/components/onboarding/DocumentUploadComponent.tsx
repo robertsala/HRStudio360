@@ -52,7 +52,7 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch existing documents
-  const { data: documents = [], isLoading, refetch } = useQuery<OnboardingDocument[]>({
+  const { data: documents = [], isLoading } = useQuery<OnboardingDocument[]>({
     queryKey: ['/api/onboarding/documents', newHireId],
     queryFn: async () => {
       const response = await fetch(`/api/onboarding/documents/new-hire/${newHireId}`);
@@ -136,7 +136,8 @@ export default function DocumentUploadComponent({ newHireId, onComplete }: Docum
       });
       setSelectedDocType('');
       setUploadProgress(0);
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/documents', newHireId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', newHireId] });
       onComplete?.();
     },
     onError: (error: any) => {

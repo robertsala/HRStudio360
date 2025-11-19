@@ -236,7 +236,8 @@ export default function I9EmployerVerificationComponent({ newHireId, newHireName
         title: 'Section 2 Completed',
         description: 'Employer verification completed successfully.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms', newHireId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', newHireId] });
       onComplete?.();
     },
     onError: (error: any) => {

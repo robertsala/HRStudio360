@@ -128,7 +128,8 @@ export default function StateTaxFormComponent({ newHireId, state, onComplete }: 
         title: 'Form Submitted',
         description: 'Massachusetts M-4 form saved successfully.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/state-tax-forms'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/state-tax-forms', newHireId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', newHireId] });
       onComplete?.();
     },
     onError: (error: any) => {

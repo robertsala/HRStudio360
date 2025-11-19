@@ -152,7 +152,8 @@ export default function I9FormComponent({ newHireId, onComplete }: I9FormCompone
         title: 'Section 1 Completed',
         description: 'Employee information and attestation saved successfully.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms', newHireId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', newHireId] });
       setCurrentSection(2);
       onComplete?.();
     },

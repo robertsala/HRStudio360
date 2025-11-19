@@ -134,7 +134,7 @@ export default function NewHireOnboardingModal({ isOpen, onClose }: NewHireOnboa
       // Invalidate all cache entries for this specific new hire
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/checklists/new-hire', selectedNewHire.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/tasks/new-hire', selectedNewHire.id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/documents/new-hire', selectedNewHire.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/documents', selectedNewHire.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/i9-forms', selectedNewHire.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/state-tax-forms', selectedNewHire.id] });
     }
