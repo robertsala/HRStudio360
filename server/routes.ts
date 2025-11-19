@@ -608,19 +608,25 @@ export function registerRoutes(app: Express) {
 
       const employees = await storage.getEmployeesWithProfiles();
       
-      // Get current user's employee record to determine their role and department
+      // Get current user's employee record to determine their role, department, and email
       const currentUserEmployee = employees.find((e: any) => e.userId === userId);
       const viewerRole = currentUserEmployee?.profile?.role || currentUserEmployee?.role || 'Employee';
       const viewerDepartment = currentUserEmployee?.profile?.department || currentUserEmployee?.department || '';
+      const viewerEmail = currentUserEmployee?.profile?.email || '';
       
-      // Determine if viewer can see full profiles (HR, Product Owner, CEO, or Executive department)
-      const privilegedRoles = ['HR Manager', 'HR', 'Product Owner', 'Executive', 'CEO'];
-      const privilegedDepartments = ['HR', 'Executive'];
-      const canViewFullProfiles = privilegedRoles.includes(viewerRole) || privilegedDepartments.includes(viewerDepartment);
+      // Determine if viewer can see full profiles (specific users + privileged roles)
+      // Allowed: HR Staff, Product Owner role, Demo Account, Robert Sala
+      const privilegedEmails = ['demo@hrstudio360.com', 'robertsala@gmail.com'];
+      const privilegedRoles = ['HR Manager', 'HR', 'Product Owner'];
+      const privilegedDepartments = ['HR'];
+      const canViewFullProfiles = 
+        privilegedEmails.includes(viewerEmail) ||
+        privilegedRoles.includes(viewerRole) || 
+        privilegedDepartments.includes(viewerDepartment);
       
       // Format each employee with role-based field filtering
       const formattedEmployees = employees.map((employee: any) => {
-        // For authorized viewers (HR/Product Owner), return full profile
+        // For authorized viewers (HR/Product Owner/Demo/Robert Sala), return full profile
         if (canViewFullProfiles) {
           return {
             ...employee,
@@ -641,6 +647,7 @@ export function registerRoutes(app: Express) {
             city: employee.profile?.city || null,
             state: employee.profile?.state || null,
             zipCode: employee.profile?.zipCode || null,
+            managerName: employee.profile?.managerName || 'Not assigned',
             emergencyContact: {
               firstName: employee.profile?.emergencyContactFirstName || '',
               lastName: employee.profile?.emergencyContactLastName || '',
@@ -725,6 +732,8 @@ export function registerRoutes(app: Express) {
         city: employee.profile?.city || null,
         state: employee.profile?.state || null,
         zipCode: employee.profile?.zipCode || null,
+        // Include manager name from profiles table
+        managerName: employee.profile?.managerName || 'Not assigned',
         // Include emergency contact from profiles table (always return object even when blank)
         emergencyContact: {
           firstName: employee.profile?.emergencyContactFirstName || '',

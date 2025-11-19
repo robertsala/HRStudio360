@@ -81,12 +81,13 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
           salary: parseFloat(emp.salary?.toString() || '0'),
           employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried',
           managerId: emp.managerId || null,
-          // IMPORTANT: Preserve address and emergency contact data from backend
+          // IMPORTANT: Preserve address, emergency contact, and manager data from backend
           address: emp.address,
           city: emp.city,
           state: emp.state,
           zipCode: emp.zipCode,
-          emergencyContact: emp.emergencyContact
+          emergencyContact: emp.emergencyContact,
+          managerNameFromBackend: emp.managerName // Preserve manager name from backend
         } as any; // Cast to any since we're adding extra fields
       });
 
@@ -118,10 +119,10 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
         }
       }
       
-      // Add manager names to employees
+      // Add manager names to employees (prefer backend managerName, fallback to fetched manager names)
       const employeesWithManagers = formattedEmployees.map(emp => ({
         ...emp,
-        managerName: emp.managerId ? (managerMap.get(emp.managerId) || 'Not assigned') : 'Not assigned'
+        managerName: (emp as any).managerNameFromBackend || (emp.managerId ? (managerMap.get(emp.managerId) || 'Not assigned') : 'Not assigned')
       }));
 
       // Merge with mock employees for comprehensive directory
