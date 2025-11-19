@@ -59,6 +59,7 @@ import CollaboratorModal from './modals/CollaboratorModal';
 import JobManagementModal from './modals/JobManagementModal';
 import StudioAIChatModal from './modals/StudioAIChatModal';
 import AgentActivityModal from './modals/AgentActivityModal';
+import { mapEmployeeFromBackend } from '../lib/employeeDataMapper';
 
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; openMyProfile: () => void }>((props, ref) => {
   const { t } = useTranslation();
@@ -295,7 +296,9 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       const response = await fetch(`/api/employees/user/${user?.id}`);
       if (response.ok) {
         const employeeData = await response.json();
-        setActiveEmployee(employeeData);
+        // Transform backend response using shared mapper for consistent data structure
+        const mappedEmployee = mapEmployeeFromBackend(employeeData);
+        setActiveEmployee(mappedEmployee);
         setActiveContent('comprehensiveProfile');
       } else {
         console.error('Failed to fetch employee data for My Profile');

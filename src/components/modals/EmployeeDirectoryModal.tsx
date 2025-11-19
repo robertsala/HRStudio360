@@ -5,23 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUserPresence } from '../../hooks/useUserPresence';
 import ComprehensiveEmployeeProfileModal from './ComprehensiveEmployeeProfileModal';
 import { mockEmployees } from '../../data/mockEmployees';
-
-interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  department: string;
-  role: string;
-  location: string;
-  startDate: string;
-  status: 'Active' | 'Remote' | 'On Leave';
-  profileImage?: string;
-  salary?: number;
-  employmentType?: 'Salaried' | 'Hourly';
-  managerId?: string;
-  managerName?: string;
-}
+import { mapEmployeesFromBackend, type MappedEmployee } from '../../lib/employeeDataMapper';
 
 interface EmployeeDirectoryModalProps {
   isOpen: boolean;
@@ -34,7 +18,7 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
   const [filterDepartment, setFilterDepartment] = useState('All');
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Derive modal visibility from selectedEmployee to avoid race condition
@@ -54,86 +38,41 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
       // Use directory endpoint which includes profile data via JOIN
       const data = await apiClient.getEmployeesWithProfiles();
 
-      const formattedEmployees: Employee[] = (data || []).map((emp: any) => {
-        // Profile data comes from the joined profile object
-        const firstName = emp.profile?.firstName ?? '';
-        const lastName = emp.profile?.lastName ?? '';
-        const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Employee';
-        
-        // Normalize status (case-insensitive mapping)
-        const normalizedStatus = emp.status?.toLowerCase() === 'active' 
-          ? 'Active' 
-          : emp.status?.toLowerCase() === 'remote'
-          ? 'Remote'
-          : 'On Leave';
-        
-        return {
-          id: emp.userId || emp.id.toString(),
-          name: fullName,
-          email: emp.profile?.email || `${firstName?.toLowerCase()}.${lastName?.toLowerCase()}@company.com`,
-          phone: emp.profile?.phone || '(555) 000-0000',
-          department: emp.profile?.department || 'General',
-          role: emp.profile?.role || 'Employee',
-          location: emp.location || 'Remote', // Use location from enriched endpoint
-          startDate: emp.startDate || new Date().toISOString().split('T')[0],
-          status: normalizedStatus as 'Active' | 'Remote' | 'On Leave',
-          profileImage: emp.profileImage || null, // Use profileImage from enriched endpoint (base64 data)
-          salary: parseFloat(emp.salary?.toString() || '0'),
-          employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried',
-          managerId: emp.managerId || null,
-          // IMPORTANT: Preserve address, emergency contact, and manager data from backend
-          address: emp.address,
-          city: emp.city,
-          state: emp.state,
-          zipCode: emp.zipCode,
-          emergencyContact: emp.emergencyContact,
-          managerNameFromBackend: emp.managerName // Preserve manager name from backend
-        } as any; // Cast to any since we're adding extra fields
-      });
+      // Use shared mapper to transform backend data consistently
+      const formattedEmployees = mapEmployeesFromBackend(data || []);
 
-      // Fetch manager names for all employees with managers
-      const managerIds = [...new Set(formattedEmployees.map(e => e.managerId).filter(Boolean))];
-      const managerMap = new Map<string, string>();
-      
-      if (managerIds.length > 0) {
-        try {
-          await Promise.all(
-            managerIds.map(async (managerId) => {
-              if (!managerId) return;
-              try {
-                const response = await fetch(`/api/profiles/${managerId}`);
-                if (response.ok) {
-                  const profile = await response.json();
-                  const managerName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
-                  if (managerName) {
-                    managerMap.set(managerId, managerName);
-                  }
-                }
-              } catch (err) {
-                console.error(`Error fetching manager ${managerId}:`, err);
-              }
-            })
-          );
-        } catch (err) {
-          console.error('Error fetching managers:', err);
+      // Transform mock employees through the same mapper for consistency
+      // First, convert mock employee shape to backend response shape
+      const mockAsBackendFormat = mockEmployees.map((mock: any) => ({
+        id: `mock-${mock.id}`,
+        userId: `mock-${mock.id}`,
+        employeeId: mock.employeeId,
+        status: mock.status,
+        startDate: mock.startDate,
+        salary: mock.salary,
+        employmentType: 'Salaried',
+        location: mock.location,
+        managerId: null,
+        managerName: 'Not assigned',
+        profileImage: mock.profileImage,
+        profile: {
+          firstName: mock.name?.split(' ')[0] || '',
+          lastName: mock.name?.split(' ').slice(1).join(' ') || '',
+          email: mock.email,
+          phone: mock.phone,
+          department: mock.department,
+          role: mock.role,
+          city: mock.location?.split(', ')[0] || '',
+          state: mock.location?.split(', ')[1] || '',
+          managerName: 'Not assigned',
+          profilePicture: mock.profileImage
         }
-      }
+      }));
       
-      // Add manager names to employees (prefer backend managerName, fallback to fetched manager names)
-      const employeesWithManagers = formattedEmployees.map(emp => ({
-        ...emp,
-        managerName: (emp as any).managerNameFromBackend || (emp.managerId ? (managerMap.get(emp.managerId) || 'Not assigned') : 'Not assigned')
-      }));
+      // Now pass through mapper for consistent formatting
+      const mockEmployeesFormatted = mapEmployeesFromBackend(mockAsBackendFormat);
 
-      // Merge with mock employees for comprehensive directory
-      const mockEmployeesFormatted = mockEmployees.map(mock => ({
-        ...mock,
-        id: `mock-${mock.id}`, // Prefix to avoid ID conflicts with real employees
-        managerId: undefined,
-        managerName: 'Not assigned'
-      }));
-
-      const allEmployees = [...employeesWithManagers, ...mockEmployeesFormatted];
+      const allEmployees = [...formattedEmployees, ...mockEmployeesFormatted];
       
       // Keep all employees - filtering can be done by user via filter controls
       setEmployees(allEmployees);
