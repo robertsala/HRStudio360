@@ -80,8 +80,14 @@ const EmployeeDirectoryModal: React.FC<EmployeeDirectoryModalProps> = ({ isOpen,
           profileImage: emp.profileImage || null, // Use profileImage from enriched endpoint (base64 data)
           salary: parseFloat(emp.salary?.toString() || '0'),
           employmentType: emp.employmentType === 'Hourly' ? 'Hourly' : 'Salaried',
-          managerId: emp.managerId || null
-        };
+          managerId: emp.managerId || null,
+          // IMPORTANT: Preserve address and emergency contact data from backend
+          address: emp.address,
+          city: emp.city,
+          state: emp.state,
+          zipCode: emp.zipCode,
+          emergencyContact: emp.emergencyContact
+        } as any; // Cast to any since we're adding extra fields
       });
 
       // Fetch manager names for all employees with managers
