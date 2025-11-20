@@ -18,7 +18,11 @@ import {
   calculateChallengeExpiry, 
   formatPhoneE164, 
   isValidPhoneNumber, 
-  isValidEmail
+  isValidEmail,
+  generateTOTPSecret,
+  generateTOTPUri,
+  generateQRCodeDataURL,
+  verifyTOTPCode
 } from './lib/mfa.js';
 import { sendEmailOTP, sendSMSOTP } from './mfaService.js';
 import rateLimit from 'express-rate-limit';
@@ -143,17 +147,22 @@ export function registerMFARoutes(app: Express) {
       const { methodType, methodValue } = req.body;
 
       // Validate method type
-      if (!methodType || !['email', 'sms'].includes(methodType)) {
-        return res.status(400).json({ error: 'Invalid method type. Use "email" or "sms".' });
+      if (!methodType || !['email', 'sms', 'totp', 'passkey'].includes(methodType)) {
+        return res.status(400).json({ error: 'Invalid method type. Use "email", "sms", "totp", or "passkey".' });
       }
 
-      // Validate method value
-      if (methodType === 'sms' && !isValidPhoneNumber(methodValue)) {
-        return res.status(400).json({ error: 'Invalid phone number format' });
-      }
-
-      if (methodType === 'email' && !isValidEmail(methodValue)) {
-        return res.status(400).json({ error: 'Invalid email format' });
+      // Validate method value based on type
+      if (methodType === 'sms') {
+        if (!methodValue || !isValidPhoneNumber(methodValue)) {
+          return res.status(400).json({ error: 'Invalid phone number format' });
+        }
+      } else if (methodType === 'email') {
+        if (!methodValue || !isValidEmail(methodValue)) {
+          return res.status(400).json({ error: 'Invalid email format' });
+        }
+      } else if (methodType === 'totp' || methodType === 'passkey') {
+        // TOTP and Passkey don't require methodValue during enrollment
+        // Secret/key will be generated
       }
 
       // Check if method already exists
@@ -244,17 +253,22 @@ export function registerMFARoutes(app: Express) {
       const { methodType, methodValue } = req.body;
 
       // Validate method type
-      if (!methodType || !['email', 'sms'].includes(methodType)) {
-        return res.status(400).json({ error: 'Invalid method type. Use "email" or "sms".' });
+      if (!methodType || !['email', 'sms', 'totp', 'passkey'].includes(methodType)) {
+        return res.status(400).json({ error: 'Invalid method type. Use "email", "sms", "totp", or "passkey".' });
       }
 
-      // Validate method value
-      if (methodType === 'sms' && !isValidPhoneNumber(methodValue)) {
-        return res.status(400).json({ error: 'Invalid phone number format' });
-      }
-
-      if (methodType === 'email' && !isValidEmail(methodValue)) {
-        return res.status(400).json({ error: 'Invalid email format' });
+      // Validate method value based on type
+      if (methodType === 'sms') {
+        if (!methodValue || !isValidPhoneNumber(methodValue)) {
+          return res.status(400).json({ error: 'Invalid phone number format' });
+        }
+      } else if (methodType === 'email') {
+        if (!methodValue || !isValidEmail(methodValue)) {
+          return res.status(400).json({ error: 'Invalid email format' });
+        }
+      } else if (methodType === 'totp' || methodType === 'passkey') {
+        // TOTP and Passkey don't require methodValue during enrollment
+        // Secret/key will be generated
       }
 
       // Check if method already exists

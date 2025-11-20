@@ -1,11 +1,64 @@
 import crypto from 'crypto';
 import argon2 from 'argon2';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 
 /**
- * Generate a 6-digit OTP code
+ * Generate a 6-digit OTP code (for SMS/Email)
  */
 export function generateOTPCode(): string {
   return crypto.randomInt(100000, 999999).toString();
+}
+
+/**
+ * Generate a TOTP secret for authenticator apps
+ * Returns the secret in base32 format
+ */
+export function generateTOTPSecret(): { secret: string; base32: string } {
+  const secret = speakeasy.generateSecret({
+    name: 'HRStudio360',
+    length: 32
+  });
+  
+  return {
+    secret: secret.ascii,
+    base32: secret.base32
+  };
+}
+
+/**
+ * Generate otpauth:// URI for QR code generation
+ */
+export function generateTOTPUri(secret: string, userEmail: string): string {
+  return speakeasy.otpauthURL({
+    secret: secret,
+    label: userEmail,
+    issuer: 'HRStudio360',
+    encoding: 'base32'
+  });
+}
+
+/**
+ * Generate a QR code data URL from otpauth:// URI
+ */
+export async function generateQRCodeDataURL(otpauthUrl: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(otpauthUrl);
+  } catch (error) {
+    throw new Error('Failed to generate QR code');
+  }
+}
+
+/**
+ * Verify a TOTP code against a secret
+ */
+export function verifyTOTPCode(secret: string, token: string): boolean {
+  return speakeasy.totp.verify({
+    secret: secret,
+    encoding: 'base32',
+    token: token,
+    window: 2 // Allow 2 time steps before/after for clock skew
+  });
 }
 
 /**
