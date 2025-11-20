@@ -30,6 +30,8 @@ export default function MFASettings() {
   const [pendingMethodId, setPendingMethodId] = useState<string | null>(null);
   const [pendingSessionToken, setPendingSessionToken] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
+  const [totpSecret, setTotpSecret] = useState<string | null>(null);
   
   // Fetch existing MFA methods
   const { data: methods = [], isLoading } = useQuery<MFAMethod[]>({
@@ -55,6 +57,13 @@ export default function MFASettings() {
         setPendingMethodId(data.methodId);
         setPendingSessionToken(data.sessionToken);
         setVerificationCode('');
+        // For TOTP, capture QR code and secret
+        if (data.qrCode) {
+          setTotpQrCode(data.qrCode);
+        }
+        if (data.secret) {
+          setTotpSecret(data.secret);
+        }
       } else {
         queryClient.invalidateQueries({ queryKey: ['/api/mfa/methods'] });
         resetForm();
@@ -118,6 +127,8 @@ export default function MFASettings() {
     setVerificationCode('');
     setPendingMethodId(null);
     setPendingSessionToken(null);
+    setTotpQrCode(null);
+    setTotpSecret(null);
     setError('');
   };
   
@@ -147,6 +158,16 @@ export default function MFASettings() {
     verifyMethodMutation.mutate({
       sessionToken: pendingSessionToken,
       code: verificationCode.trim()
+    });
+  };
+  
+  const handleAddTOTP = () => {
+    setSelectedMethodType('totp');
+    setError('');
+    // For TOTP, no methodValue is needed, call API directly
+    addMethodMutation.mutate({
+      methodType: 'totp',
+      methodValue: '' // TOTP doesn't need a value; server generates secret
     });
   };
   
@@ -311,71 +332,173 @@ export default function MFASettings() {
           )}
           
           {!addingMethod && !pendingMethodId ? (
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                onClick={() => {
-                  setSelectedMethodType('sms');
-                  setAddingMethod(true);
-                  setError('');
-                }}
-                data-testid="button-add-sms"
-              >
-                <Smartphone className="h-6 w-6 text-gray-700 dark:text-gray-200" />
-                <span className="font-medium text-gray-900 dark:text-white">Text Message</span>
-                <span className="text-xs text-orange-600 dark:text-orange-400">(Less Secure)</span>
-              </button>
+            <div className="space-y-6">
+              {/* Recommended Methods */}
+              <div>
+                <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  Recommended
+                </h5>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border-2 border-green-300 dark:border-green-700 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                    onClick={handleAddTOTP}
+                    disabled={addMethodMutation.isPending}
+                    data-testid="button-add-totp"
+                  >
+                    <Key className="h-6 w-6 text-green-700 dark:text-green-400" />
+                    <span className="font-medium text-gray-900 dark:text-white">Authenticator App</span>
+                    <span className="text-xs text-green-700 dark:text-green-400">(Most Secure)</span>
+                  </button>
+                </div>
+              </div>
               
-              <button
-                className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                onClick={() => {
-                  setSelectedMethodType('email');
-                  setAddingMethod(true);
-                  setError('');
-                }}
-                data-testid="button-add-email"
-              >
-                <Mail className="h-6 w-6 text-gray-700 dark:text-gray-200" />
-                <span className="font-medium text-gray-900 dark:text-white">Email</span>
-                <span className="text-xs text-orange-600 dark:text-orange-400">(Less Secure)</span>
-              </button>
+              {/* Less Secure Options */}
+              <div>
+                <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  Less Secure Options
+                </h5>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    onClick={() => {
+                      setSelectedMethodType('sms');
+                      setAddingMethod(true);
+                      setError('');
+                    }}
+                    data-testid="button-add-sms"
+                  >
+                    <Smartphone className="h-6 w-6 text-gray-700 dark:text-gray-200" />
+                    <span className="font-medium text-gray-900 dark:text-white">Text Message</span>
+                    <span className="text-xs text-orange-600 dark:text-orange-400">(Less Secure)</span>
+                  </button>
+                  
+                  <button
+                    className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    onClick={() => {
+                      setSelectedMethodType('email');
+                      setAddingMethod(true);
+                      setError('');
+                    }}
+                    data-testid="button-add-email"
+                  >
+                    <Mail className="h-6 w-6 text-gray-700 dark:text-gray-200" />
+                    <span className="font-medium text-gray-900 dark:text-white">Email</span>
+                    <span className="text-xs text-orange-600 dark:text-orange-400">(Less Secure)</span>
+                  </button>
+                </div>
+              </div>
             </div>
           ) : pendingMethodId ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Enter the verification code sent to your {selectedMethodType === 'sms' ? 'phone' : 'email'}
-              </p>
-              <div>
-                <label htmlFor="verification-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Verification Code
-                </label>
-                <input
-                  id="verification-code"
-                  data-testid="input-verification-code"
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  value={verificationCode}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  maxLength={6}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleVerifyMethod}
-                  disabled={verifyMethodMutation.isPending || verificationCode.length !== 6}
-                  data-testid="button-verify-method"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {verifyMethodMutation.isPending ? 'Verifying...' : 'Verify'}
-                </button>
-                <button
-                  className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </button>
-              </div>
+              {selectedMethodType === 'totp' ? (
+                // TOTP Setup - Show QR Code
+                <div className="space-y-4">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <h5 className="font-semibold text-green-900 dark:text-green-100 mb-2">
+                      Set Up Authenticator App
+                    </h5>
+                    <ol className="text-sm text-green-800 dark:text-green-200 space-y-2 list-decimal list-inside">
+                      <li>Download an authenticator app (Google Authenticator, Microsoft Authenticator, Authy)</li>
+                      <li>Scan this QR code with the app, or enter the secret manually</li>
+                      <li>Enter the 6-digit code from your app below to verify</li>
+                    </ol>
+                  </div>
+                  
+                  {totpQrCode && (
+                    <div className="flex flex-col items-center space-y-3 bg-white dark:bg-gray-900 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <img 
+                        src={totpQrCode} 
+                        alt="TOTP QR Code" 
+                        className="w-64 h-64"
+                        data-testid="img-totp-qrcode"
+                      />
+                      {totpSecret && (
+                        <div className="text-center">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            Manual entry code:
+                          </p>
+                          <code className="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded border border-gray-300 dark:border-gray-600">
+                            {totpSecret}
+                          </code>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label htmlFor="verification-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Enter 6-digit code from your app
+                    </label>
+                    <input
+                      id="verification-code"
+                      data-testid="input-verification-code"
+                      type="text"
+                      placeholder="000000"
+                      value={verificationCode}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleVerifyMethod}
+                      disabled={verifyMethodMutation.isPending || verificationCode.length !== 6}
+                      data-testid="button-verify-method"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {verifyMethodMutation.isPending ? 'Verifying...' : 'Verify & Complete Setup'}
+                    </button>
+                    <button
+                      className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      onClick={resetForm}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // SMS/Email verification - Show code entry
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Enter the verification code sent to your {selectedMethodType === 'sms' ? 'phone' : 'email'}
+                  </p>
+                  <div>
+                    <label htmlFor="verification-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Verification Code
+                    </label>
+                    <input
+                      id="verification-code"
+                      data-testid="input-verification-code"
+                      type="text"
+                      placeholder="Enter 6-digit code"
+                      value={verificationCode}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleVerifyMethod}
+                      disabled={verifyMethodMutation.isPending || verificationCode.length !== 6}
+                      data-testid="button-verify-method"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {verifyMethodMutation.isPending ? 'Verifying...' : 'Verify'}
+                    </button>
+                    <button
+                      className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      onClick={resetForm}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
