@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Inbox, User, DollarSign, Star, CheckCircle, Clock, AlertTriangle, Eye, Filter, Search, ArrowLeft, X, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Inbox, User, DollarSign, Star, CheckCircle, Clock, AlertTriangle, Eye, Filter, Search, X, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'wouter';
+import { useDashboardEscape } from '../hooks/useDashboardEscape';
+import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface InboxTask {
   id: string;
@@ -33,29 +34,20 @@ interface InboxPageProps {
 
 const InboxPage: React.FC<InboxPageProps> = ({ initialFilter }) => {
   const { t } = useTranslation();
-  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState('pending');
   const [filterCategory, setFilterCategory] = useState('All');
   const [teamFilter, setTeamFilter] = useState<'my-team' | 'my-department' | 'my-location' | 'all'>(initialFilter?.type || 'all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTask, setSelectedTask] = useState<InboxTask | null>(null);
 
-  useEffect(() => {
-    const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (selectedTask) {
-          setSelectedTask(null);
-        } else {
-          setLocation('/dashboard');
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleEscKey);
-    return () => {
-      document.removeEventListener('keydown', handleEscKey);
-    };
-  }, [selectedTask, setLocation]);
+  // ESC key handler: close task detail if open, otherwise return to dashboard
+  useDashboardEscape(() => {
+    if (selectedTask) {
+      setSelectedTask(null);
+      return false; // Don't navigate to dashboard yet
+    }
+    return true; // Allow navigation to dashboard
+  });
 
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info';
@@ -226,14 +218,7 @@ const InboxPage: React.FC<InboxPageProps> = ({ initialFilter }) => {
       <div className="bg-white dark:bg-gray-800 rounded-lg w-full min-h-screen overflow-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setLocation('/dashboard')}
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2"
-              data-testid="button-exit-dashboard"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Exit to Dashboard</span>
-            </button>
+            <DashboardExitButton />
             
             <div className="h-6 w-px bg-gray-300 dark:border-gray-600"></div>
             

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Send, Bot, Sparkles, Loader2 } from 'lucide-react';
+import { Send, Bot, Sparkles, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '../lib/queryClient';
-import { useLocation } from 'wouter';
+import { useDashboardEscape } from '../hooks/useDashboardEscape';
+import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface StudioAIPageProps {
   context?: 'recruitment' | 'payroll';
@@ -16,7 +17,8 @@ interface ChatMessage {
 }
 
 const StudioAIPage: React.FC<StudioAIPageProps> = ({ context = 'recruitment' }) => {
-  const [, setLocation] = useLocation();
+  // ESC key handler to return to dashboard
+  useDashboardEscape();
 
   // Define context-specific welcome messages
   const getWelcomeMessage = () => {
@@ -58,20 +60,6 @@ const StudioAIPage: React.FC<StudioAIPageProps> = ({ context = 'recruitment' }) 
       }
     ]);
   }, [context]);
-
-  // ESC key handler to go back to dashboard
-  useEffect(() => {
-    const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setLocation('/dashboard');
-      }
-    };
-
-    document.addEventListener('keydown', handleEscKey);
-    return () => {
-      document.removeEventListener('keydown', handleEscKey);
-    };
-  }, [setLocation]);
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
