@@ -25,15 +25,18 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen, onNa
 
   const handleSignIn = async (email: string, password: string) => {
     try {
-      await signIn(email, password);
+      const mfaRequired = await signIn(email, password);
       setShowSignInModal(false);
       
-      // Navigate to dashboard after successful sign-in
-      setTimeout(() => {
-        if (onNavigate) {
-          onNavigate('dashboard');
-        }
-      }, 100);
+      // Only navigate to dashboard if MFA is not required
+      // If MFA is required, signIn() already redirected to /mfa-verify
+      if (!mfaRequired) {
+        setTimeout(() => {
+          if (onNavigate) {
+            onNavigate('dashboard');
+          }
+        }, 100);
+      }
     } catch (error) {
       // Error will be displayed in SignInModal
       throw error;
