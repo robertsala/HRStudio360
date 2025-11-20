@@ -5,7 +5,8 @@ import {
   mfaMethods, 
   mfaChallenges, 
   mfaAuditLog,
-  organizationSettings 
+  organizationSettings,
+  profiles
 } from '../shared/schema.js';
 import { 
   generateOTPCode, 
@@ -189,7 +190,61 @@ export function registerMFARoutes(app: Express) {
 
       const isPrimary = existingMethods.length === 0;
 
-      // Create the method (unverified)
+      // Handle TOTP enrollment differently
+      if (methodType === 'totp') {
+        // Get user's email for QR code label
+        const [userProfile] = await db
+          .select()
+          .from(profiles)
+          .where(eq(profiles.id, userId));
+
+        if (!userProfile) {
+          return res.status(404).json({ error: 'User profile not found' });
+        }
+
+        // Generate TOTP secret
+        const { base32 } = generateTOTPSecret();
+        const otpauthUri = generateTOTPUri(base32, userProfile.email);
+        const qrCodeDataUrl = await generateQRCodeDataURL(otpauthUri);
+
+        // Create the method with secret stored in methodValue
+        const [newMethod] = await db
+          .insert(mfaMethods)
+          .values({
+            profileId: userId,
+            methodType: 'totp',
+            methodValue: base32, // Store the secret
+            isPrimary,
+            isVerified: false
+          })
+          .returning();
+
+        // Create a session token for verification (no code hash needed for TOTP)
+        const sessionToken = generateSessionToken();
+
+        await db.insert(mfaChallenges).values({
+          profileId: userId,
+          methodId: newMethod.id,
+          methodType: 'totp',
+          code: '', // No pre-generated code for TOTP
+          sessionToken,
+          status: 'pending',
+          expiresAt: calculateChallengeExpiry()
+        });
+
+        await logMFAAudit(userId, 'enrollment_initiated', 'totp', true, req);
+
+        return res.json({
+          methodId: newMethod.id,
+          sessionToken,
+          requiresVerification: true,
+          qrCode: qrCodeDataUrl,
+          secret: base32, // Send the secret for manual entry
+          message: 'Scan the QR code with your authenticator app'
+        });
+      }
+
+      // Handle SMS/Email enrollment (original logic)
       const [newMethod] = await db
         .insert(mfaMethods)
         .values({
@@ -295,7 +350,61 @@ export function registerMFARoutes(app: Express) {
 
       const isPrimary = existingMethods.length === 0;
 
-      // Create the method (unverified)
+      // Handle TOTP enrollment differently
+      if (methodType === 'totp') {
+        // Get user's email for QR code label
+        const [userProfile] = await db
+          .select()
+          .from(profiles)
+          .where(eq(profiles.id, userId));
+
+        if (!userProfile) {
+          return res.status(404).json({ error: 'User profile not found' });
+        }
+
+        // Generate TOTP secret
+        const { base32 } = generateTOTPSecret();
+        const otpauthUri = generateTOTPUri(base32, userProfile.email);
+        const qrCodeDataUrl = await generateQRCodeDataURL(otpauthUri);
+
+        // Create the method with secret stored in methodValue
+        const [newMethod] = await db
+          .insert(mfaMethods)
+          .values({
+            profileId: userId,
+            methodType: 'totp',
+            methodValue: base32, // Store the secret
+            isPrimary,
+            isVerified: false
+          })
+          .returning();
+
+        // Create a session token for verification (no code hash needed for TOTP)
+        const sessionToken = generateSessionToken();
+
+        await db.insert(mfaChallenges).values({
+          profileId: userId,
+          methodId: newMethod.id,
+          methodType: 'totp',
+          code: '', // No pre-generated code for TOTP
+          sessionToken,
+          status: 'pending',
+          expiresAt: calculateChallengeExpiry()
+        });
+
+        await logMFAAudit(userId, 'enrollment_initiated', 'totp', true, req);
+
+        return res.json({
+          methodId: newMethod.id,
+          sessionToken,
+          requiresVerification: true,
+          qrCode: qrCodeDataUrl,
+          secret: base32, // Send the secret for manual entry
+          message: 'Scan the QR code with your authenticator app'
+        });
+      }
+
+      // Handle SMS/Email enrollment (original logic)
       const [newMethod] = await db
         .insert(mfaMethods)
         .values({
@@ -399,8 +508,26 @@ export function registerMFARoutes(app: Express) {
         return res.status(400).json({ error: 'Too many verification attempts' });
       }
 
-      // Verify the code
-      const isValid = await verifyCode(challenge.code, code);
+      // Verify the code - handle TOTP differently
+      let isValid = false;
+      
+      if (challenge.methodType === 'totp') {
+        // For TOTP, get the method to retrieve the secret
+        const [method] = await db
+          .select()
+          .from(mfaMethods)
+          .where(eq(mfaMethods.id, challenge.methodId));
+        
+        if (!method || !method.methodValue) {
+          return res.status(400).json({ error: 'TOTP method not found or invalid' });
+        }
+        
+        // Verify TOTP code against the secret
+        isValid = verifyTOTPCode(method.methodValue, code);
+      } else {
+        // For SMS/Email, verify against the hashed code
+        isValid = await verifyCode(challenge.code, code);
+      }
       
       if (!isValid) {
         // Increment attempts
