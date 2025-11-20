@@ -20,7 +20,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Frontend**: Built with React 18, TypeScript, and Vite. Uses React Context for state management, Wouter for routing, and TanStack Query v5 for data fetching. Internationalization is supported via i18next.
 -   **Backend**: Express.js server providing a RESTful API, using Drizzle ORM for type-safe database interactions.
 -   **Data Storage**: PostgreSQL database (Neon-backed) with schema defined by Drizzle ORM. Database performance is optimized with strategic indexing.
--   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Role-based access control (RBAC) is implemented with a granular permission system, including permission templates, role hierarchy, and time-based grants.
+-   **Authentication & Authorization**: Server-side sessions (`express-session`) with secure password-based authentication (Argon2id hashing, robust password requirements, progressive account lockout, rate limiting) and httpOnly cookies. Role-based access control (RBAC) is implemented with a granular permission system, including permission templates, role hierarchy, and time-based grants. **Multi-Factor Authentication (MFA)** system with TOTP (Authenticator Apps), SMS, and Email verification methods. TOTP support includes QR code generation for easy setup with Google Authenticator, Microsoft Authenticator, and Authy.
 -   **Real-time Features**: WebSocket-based chat system (`ws library`) with session-based authentication, real-time messaging, typing indicators, presence tracking, and robust message deduplication. Includes an enterprise-grade WebRTC-based calling system.
 -   **AI Integration**: Powered by OpenAI API (GPT-4o), the "Studio AI" agent provides a Global AI Assistant for contextual responses, Recruitment AI for candidate screening and hiring insights, and Payroll AI for validation and expense analysis. AI capabilities are role-restricted, auditable, and context-aware. AI also assists with permission suggestions and tax configuration.
 -   **Dashboard Customization**: A role-based customizable dashboard widget system allows personalized views.
@@ -63,7 +63,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 
 -   **Core**: `react`, `react-dom`, `typescript`, `vite`, `express`.
 -   **Database**: `drizzle-orm`, `drizzle-kit`, `drizzle-zod`, `@neondatabase/serverless`.
--   **Auth/Security**: `argon2`, `express-rate-limit`, `express-session`.
+-   **Auth/Security**: `argon2`, `express-rate-limit`, `express-session`, `speakeasy`, `qrcode`.
 -   **UI**: `lucide-react`, `tailwindcss`, `emoji-picker-react`, `react-animated-weather`.
 -   **Forms**: `react-hook-form`, `@hookform/resolvers`, `zod`.
 -   **Utilities**: `jspdf`, `html2canvas`, `i18next`, `react-i18next`, `wouter`, `ws`.
