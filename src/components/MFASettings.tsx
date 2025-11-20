@@ -2,12 +2,7 @@ import { useState } from 'react';
 import { Shield, Smartphone, Mail, Check, Trash2, AlertCircle, Key, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { apiRequest } from '../lib/queryClient';
 
 interface MFAMethod {
   id: string;
@@ -215,26 +210,26 @@ export default function MFASettings() {
       </div>
       
       {orgSettings?.mfaEnabled === false && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
+        <div className="flex gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
             Multi-factor authentication is currently disabled by your organization administrator.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       )}
       
       {/* Current Methods */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
             <Shield className="h-5 w-5 mr-2" />
             Active Verification Methods
-          </CardTitle>
-          <CardDescription>
+          </h4>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             These methods can be used to verify your identity during sign-in
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="p-6">
           {methods.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Shield className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
@@ -275,53 +270,50 @@ export default function MFASettings() {
                   </div>
                   <div className="flex items-center space-x-2">
                     {!method.isPrimary && method.isVerified && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                         onClick={() => setPrimaryMutation.mutate(method.id)}
                         data-testid={`button-set-primary-${method.id}`}
                       >
                         Set as Primary
-                      </Button>
+                      </button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                    <button
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => removeMethodMutation.mutate(method.id)}
                       disabled={methods.length === 1 && method.isVerified}
                       data-testid={`button-remove-${method.id}`}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    </Button>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       
       {/* Add New Method */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Add Verification Method</CardTitle>
-          <CardDescription>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Add Verification Method</h4>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Recommended: Use authenticator apps or passkeys for the highest security
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="p-6">
           {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="flex gap-3 p-4 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
           )}
           
           {!addingMethod && !pendingMethodId ? (
             <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                className="h-auto py-4 flex-col space-y-2"
+              <button
+                className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => {
                   setSelectedMethodType('sms');
                   setAddingMethod(true);
@@ -329,14 +321,13 @@ export default function MFASettings() {
                 }}
                 data-testid="button-add-sms"
               >
-                <Smartphone className="h-6 w-6" />
-                <span>Text Message</span>
+                <Smartphone className="h-6 w-6 text-gray-700 dark:text-gray-200" />
+                <span className="font-medium text-gray-900 dark:text-white">Text Message</span>
                 <span className="text-xs text-orange-600 dark:text-orange-400">(Less Secure)</span>
-              </Button>
+              </button>
               
-              <Button
-                variant="outline"
-                className="h-auto py-4 flex-col space-y-2"
+              <button
+                className="h-auto py-6 px-4 flex flex-col items-center space-y-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => {
                   setSelectedMethodType('email');
                   setAddingMethod(true);
@@ -344,10 +335,10 @@ export default function MFASettings() {
                 }}
                 data-testid="button-add-email"
               >
-                <Mail className="h-6 w-6" />
-                <span>Email</span>
+                <Mail className="h-6 w-6 text-gray-700 dark:text-gray-200" />
+                <span className="font-medium text-gray-900 dark:text-white">Email</span>
                 <span className="text-xs text-orange-600 dark:text-orange-400">(Less Secure)</span>
-              </Button>
+              </button>
             </div>
           ) : pendingMethodId ? (
             <div className="space-y-4">
@@ -355,8 +346,10 @@ export default function MFASettings() {
                 Enter the verification code sent to your {selectedMethodType === 'sms' ? 'phone' : 'email'}
               </p>
               <div>
-                <Label htmlFor="verification-code">Verification Code</Label>
-                <Input
+                <label htmlFor="verification-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Verification Code
+                </label>
+                <input
                   id="verification-code"
                   data-testid="input-verification-code"
                   type="text"
@@ -364,63 +357,71 @@ export default function MFASettings() {
                   value={verificationCode}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   maxLength={6}
-                  className="mt-1"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
               </div>
               <div className="flex space-x-2">
-                <Button
+                <button
                   onClick={handleVerifyMethod}
                   disabled={verifyMethodMutation.isPending || verificationCode.length !== 6}
                   data-testid="button-verify-method"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {verifyMethodMutation.isPending ? 'Verifying...' : 'Verify'}
-                </Button>
-                <Button variant="outline" onClick={resetForm}>
+                </button>
+                <button
+                  className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                  onClick={resetForm}
+                >
                   Cancel
-                </Button>
+                </button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="method-value">
+                <label htmlFor="method-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {selectedMethodType === 'sms' ? 'Phone Number' : 'Email Address'}
-                </Label>
-                <Input
+                </label>
+                <input
                   id="method-value"
                   data-testid="input-method-value"
                   type={selectedMethodType === 'sms' ? 'tel' : 'email'}
                   placeholder={selectedMethodType === 'sms' ? '+1 (555) 123-4567' : 'your@email.com'}
                   value={methodValue}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMethodValue(e.target.value)}
-                  className="mt-1"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
               </div>
               <div className="flex space-x-2">
-                <Button
+                <button
                   onClick={handleAddMethod}
                   disabled={addMethodMutation.isPending}
                   data-testid="button-submit-method"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {addMethodMutation.isPending ? 'Adding...' : 'Add Method'}
-                </Button>
-                <Button variant="outline" onClick={resetForm}>
+                </button>
+                <button
+                  className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                  onClick={resetForm}
+                >
                   Cancel
-                </Button>
+                </button>
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       
       {/* Information */}
-      <Alert>
-        <Shield className="h-4 w-4" />
-        <AlertDescription>
+      <div className="flex gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <Shield className="h-5 w-5 text-blue-600 dark:text-blue-500 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-blue-800 dark:text-blue-200">
           <strong>Security Tip:</strong> For maximum security, we recommend using authenticator apps or passkeys.
           SMS and email codes can be intercepted and are less secure.
-        </AlertDescription>
-      </Alert>
+        </p>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest } from '../lib/queryClient';
 import { Shield, Smartphone, Mail, RefreshCw, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface MFAMethod {
   methodType: 'sms' | 'email' | 'totp' | 'passkey';
@@ -16,7 +10,6 @@ interface MFAMethod {
 
 export default function MFAVerificationPage() {
   const [, navigate] = useLocation();
-  const { toast } = useToast();
   
   // Get MFA data from sessionStorage (set by login flow)
   const mfaData = sessionStorage.getItem('mfaData');
@@ -32,6 +25,7 @@ export default function MFAVerificationPage() {
   const [isResending, setIsResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
   // Redirect if no MFA data
   useEffect(() => {
@@ -69,14 +63,12 @@ export default function MFAVerificationPage() {
       if (response.success) {
         // Clear MFA data
         sessionStorage.removeItem('mfaData');
-        
-        toast({
-          title: 'Verification successful',
-          description: 'You have been logged in successfully'
-        });
+        setSuccess('Verification successful! Redirecting...');
         
         // Reload to establish session
-        window.location.href = '/';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
@@ -91,6 +83,7 @@ export default function MFAVerificationPage() {
     
     setIsResending(true);
     setError('');
+    setSuccess('');
     
     try {
       await apiRequest('/api/mfa/resend-code', {
@@ -101,11 +94,7 @@ export default function MFAVerificationPage() {
         })
       });
       
-      toast({
-        title: 'Code sent',
-        description: `A new verification code has been sent to ${selectedMethod.methodValue}`
-      });
-      
+      setSuccess(`A new verification code has been sent to ${selectedMethod.methodValue}`);
       setCountdown(60); // 60 second cooldown
       setCode('');
     } catch (err: any) {
@@ -121,6 +110,7 @@ export default function MFAVerificationPage() {
     setSelectedMethod(method);
     setCode('');
     setError('');
+    setSuccess('');
     
     // Request new code for this method
     try {
@@ -132,11 +122,7 @@ export default function MFAVerificationPage() {
         })
       });
       
-      toast({
-        title: 'Code sent',
-        description: `A verification code has been sent to ${method.methodValue}`
-      });
-      
+      setSuccess(`A verification code has been sent to ${method.methodValue}`);
       setCountdown(60);
     } catch (err: any) {
       setError(err.message || 'Failed to send code');
@@ -175,28 +161,37 @@ export default function MFAVerificationPage() {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg">
+        <div className="p-6 text-center border-b border-gray-200 dark:border-gray-700">
           <div className="mx-auto mb-4 w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
             <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-          <CardTitle>Two-Step Verification</CardTitle>
-          <CardDescription>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Two-Step Verification</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
             Enter the verification code sent to {selectedMethod?.methodValue}
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
         
-        <CardContent className="space-y-4">
+        <div className="p-6 space-y-4">
           {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="flex gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
+          
+          {success && (
+            <div className="flex gap-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <Shield className="h-5 w-5 text-green-600 dark:text-green-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-green-800 dark:text-green-200">{success}</p>
+            </div>
           )}
           
           <div className="space-y-2">
-            <Label htmlFor="code">Verification Code</Label>
-            <Input
+            <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Verification Code
+            </label>
+            <input
               id="code"
               data-testid="input-verification-code"
               type="text"
@@ -213,28 +208,26 @@ export default function MFAVerificationPage() {
                 }
               }}
               maxLength={6}
-              className="text-center text-2xl tracking-widest font-mono"
+              className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center text-2xl tracking-widest font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               autoFocus
             />
           </div>
           
-          <Button
+          <button
             data-testid="button-verify-code"
             onClick={handleVerifyCode}
             disabled={isVerifying || code.length !== 6}
-            className="w-full"
+            className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
           >
             {isVerifying ? 'Verifying...' : 'Verify Code'}
-          </Button>
+          </button>
           
-          <div className="flex items-center justify-between text-sm">
-            <Button
+          <div className="flex items-center justify-center text-sm">
+            <button
               data-testid="button-resend-code"
-              variant="ghost"
-              size="sm"
               onClick={handleResendCode}
               disabled={isResending || countdown > 0}
-              className="text-blue-600 dark:text-blue-400"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
             >
               {isResending ? (
                 <>
@@ -249,7 +242,7 @@ export default function MFAVerificationPage() {
                   Resend Code
                 </>
               )}
-            </Button>
+            </button>
           </div>
           
           {methods.length > 1 && (
@@ -259,38 +252,39 @@ export default function MFAVerificationPage() {
               </p>
               <div className="space-y-2">
                 {methods.map((method) => (
-                  <Button
+                  <button
                     key={method.methodType}
                     data-testid={`button-switch-${method.methodType}`}
-                    variant={method.methodType === selectedMethod?.methodType ? 'default' : 'outline'}
-                    size="sm"
                     onClick={() => handleMethodSwitch(method)}
-                    className="w-full justify-start"
+                    className={`w-full px-4 py-3 rounded-md border transition-colors flex items-center ${
+                      method.methodType === selectedMethod?.methodType
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
                   >
                     {getMethodIcon(method.methodType)}
                     <span className="ml-2">{getMethodLabel(method.methodType)}</span>
                     <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
                       {method.methodValue}
                     </span>
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
           )}
           
-          <Button
+          <button
             data-testid="button-cancel"
-            variant="ghost"
             onClick={() => {
               sessionStorage.removeItem('mfaData');
               navigate('/');
             }}
-            className="w-full"
+            className="w-full px-4 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
           >
             Cancel
-          </Button>
-        </CardContent>
-      </Card>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
