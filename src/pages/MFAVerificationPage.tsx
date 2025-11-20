@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { apiRequest } from '../lib/queryClient';
+import { useAuth } from '../contexts/AuthContext';
 import { Shield, Smartphone, Mail, RefreshCw, AlertCircle, Key } from 'lucide-react';
 
 interface MFAMethod {
@@ -66,10 +67,11 @@ export default function MFAVerificationPage() {
         sessionStorage.removeItem('mfaData');
         setSuccess('Verification successful! Redirecting...');
         
-        // Reload to establish session
+        // Navigate directly to dashboard
+        // The session cookie is now set, so AuthContext will detect it
         setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
+          window.location.href = '/dashboard';
+        }, 500);
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
