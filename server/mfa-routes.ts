@@ -461,10 +461,12 @@ export function registerMFARoutes(app: Express) {
     try {
       const userId = requireAuth(req);
       if (!userId) {
+        console.log('[MFA Enrollment] Not authenticated - user must be logged in to verify enrollment');
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
       const { sessionToken, code } = req.body;
+      console.log('[MFA Enrollment] Verification attempt - userId:', userId, 'sessionToken:', sessionToken?.substring(0, 10) + '...', 'code length:', code?.length);
 
       if (!sessionToken || !code) {
         return res.status(400).json({ error: 'Session token and code are required' });
@@ -483,8 +485,11 @@ export function registerMFARoutes(app: Express) {
         );
 
       if (!challenge) {
+        console.log('[MFA Enrollment] Challenge not found for user:', userId, 'token:', sessionToken?.substring(0, 10) + '...');
         return res.status(400).json({ error: 'Invalid or expired verification session' });
       }
+
+      console.log('[MFA Enrollment] Challenge found - methodType:', challenge.methodType, 'methodId:', challenge.methodId);
 
       // Check if expired
       if (isChallengeExpired(challenge.expiresAt)) {
@@ -494,6 +499,7 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaChallenges.id, challenge.id));
         
         await logMFAAudit(userId, 'enrollment_verification', challenge.methodType, false, req, 'Code expired');
+        console.log('[MFA Enrollment] Code expired');
         return res.status(400).json({ error: 'Verification code has expired' });
       }
 
@@ -505,6 +511,7 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaChallenges.id, challenge.id));
         
         await logMFAAudit(userId, 'enrollment_verification', challenge.methodType, false, req, 'Too many attempts');
+        console.log('[MFA Enrollment] Too many attempts');
         return res.status(400).json({ error: 'Too many verification attempts' });
       }
 
@@ -512,6 +519,7 @@ export function registerMFARoutes(app: Express) {
       let isValid = false;
       
       if (challenge.methodType === 'totp') {
+        console.log('[MFA Enrollment] Verifying TOTP code...');
         // For TOTP, get the method to retrieve the secret
         const [method] = await db
           .select()
@@ -519,14 +527,18 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaMethods.id, challenge.methodId));
         
         if (!method || !method.methodValue) {
+          console.log('[MFA Enrollment] TOTP method not found or invalid');
           return res.status(400).json({ error: 'TOTP method not found or invalid' });
         }
         
         // Verify TOTP code against the secret
         isValid = verifyTOTPCode(method.methodValue, code);
+        console.log('[MFA Enrollment] TOTP verification result:', isValid);
       } else {
+        console.log('[MFA Enrollment] Verifying SMS/Email code...');
         // For SMS/Email, verify against the hashed code
         isValid = await verifyCode(challenge.code, code);
+        console.log('[MFA Enrollment] SMS/Email verification result:', isValid);
       }
       
       if (!isValid) {
@@ -537,6 +549,7 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaChallenges.id, challenge.id));
         
         await logMFAAudit(userId, 'enrollment_verification', challenge.methodType, false, req, 'Invalid code');
+        console.log('[MFA Enrollment] Invalid verification code');
         return res.status(400).json({ error: 'Invalid verification code' });
       }
 
@@ -555,6 +568,7 @@ export function registerMFARoutes(app: Express) {
           .update(mfaMethods)
           .set({ isVerified: true })
           .where(eq(mfaMethods.id, challenge.methodId));
+        console.log('[MFA Enrollment] Marked method as verified - methodId:', challenge.methodId);
       } else {
         // Fallback for legacy challenges without methodId - mark by type (less precise)
         await db
@@ -566,13 +580,15 @@ export function registerMFARoutes(app: Express) {
               eq(mfaMethods.methodType, challenge.methodType)
             )
           );
+        console.log('[MFA Enrollment] Marked method as verified - methodType:', challenge.methodType);
       }
 
       await logMFAAudit(userId, 'enrollment_verified', challenge.methodType, true, req);
 
+      console.log('[MFA Enrollment] Enrollment verification successful - user remains logged in');
       res.json({ success: true, message: 'MFA method verified successfully' });
     } catch (error: any) {
-      console.error('Failed to verify enrollment:', error);
+      console.error('[MFA Enrollment] Failed to verify enrollment:', error);
       const userId = requireAuth(req);
       if (userId) {
         await logMFAAudit(userId, 'enrollment_verification', null, false, req, error.message);
@@ -769,6 +785,8 @@ export function registerMFARoutes(app: Express) {
     try {
       const { sessionToken, code } = req.body;
 
+      console.log('[MFA Login] Verification attempt - sessionToken:', sessionToken?.substring(0, 10) + '...', 'code length:', code?.length);
+
       if (!sessionToken || !code) {
         return res.status(400).json({ error: 'Session token and code are required' });
       }
@@ -785,8 +803,11 @@ export function registerMFARoutes(app: Express) {
         );
 
       if (!challenge) {
+        console.log('[MFA Login] Challenge not found for token:', sessionToken?.substring(0, 10) + '...');
         return res.status(400).json({ error: 'Invalid or expired verification session' });
       }
+
+      console.log('[MFA Login] Challenge found - methodType:', challenge.methodType, 'methodId:', challenge.methodId);
 
       // Check if expired
       if (isChallengeExpired(challenge.expiresAt)) {
@@ -796,6 +817,7 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaChallenges.id, challenge.id));
         
         await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Code expired');
+        console.log('[MFA Login] Code expired');
         return res.status(400).json({ error: 'Verification code has expired' });
       }
 
@@ -807,11 +829,35 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaChallenges.id, challenge.id));
         
         await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Too many attempts');
+        console.log('[MFA Login] Too many attempts');
         return res.status(400).json({ error: 'Too many verification attempts' });
       }
 
-      // Verify the code
-      const isValid = await verifyCode(challenge.code, code);
+      // Verify the code - handle TOTP differently
+      let isValid = false;
+      
+      if (challenge.methodType === 'totp') {
+        console.log('[MFA Login] Verifying TOTP code...');
+        // For TOTP, get the method to retrieve the secret
+        const [method] = await db
+          .select()
+          .from(mfaMethods)
+          .where(eq(mfaMethods.id, challenge.methodId));
+        
+        if (!method || !method.methodValue) {
+          console.log('[MFA Login] TOTP method not found or invalid');
+          return res.status(400).json({ error: 'TOTP method not found or invalid' });
+        }
+        
+        // Verify TOTP code against the secret
+        isValid = verifyTOTPCode(method.methodValue, code);
+        console.log('[MFA Login] TOTP verification result:', isValid);
+      } else {
+        console.log('[MFA Login] Verifying SMS/Email code...');
+        // For SMS/Email, verify against the hashed code
+        isValid = await verifyCode(challenge.code, code);
+        console.log('[MFA Login] SMS/Email verification result:', isValid);
+      }
       
       if (!isValid) {
         // Increment attempts
@@ -821,6 +867,7 @@ export function registerMFARoutes(app: Express) {
           .where(eq(mfaChallenges.id, challenge.id));
         
         await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Invalid code');
+        console.log('[MFA Login] Invalid verification code');
         return res.status(400).json({ error: 'Invalid verification code' });
       }
 
@@ -853,13 +900,15 @@ export function registerMFARoutes(app: Express) {
       }
 
       // Create actual session
+      console.log('[MFA Login] Creating session for user:', challenge.profileId);
       (req.session as any).userId = challenge.profileId;
 
       await logMFAAudit(challenge.profileId, 'login_verified', challenge.methodType, true, req);
 
+      console.log('[MFA Login] MFA verification successful');
       res.json({ success: true, profileId: challenge.profileId });
     } catch (error: any) {
-      console.error('Failed to verify MFA:', error);
+      console.error('[MFA Login] Failed to verify MFA:', error);
       res.status(500).json({ error: 'Failed to verify MFA code' });
     }
   });

@@ -2299,34 +2299,57 @@ export function registerRoutes(app: Express) {
       
       // If MFA is enrolled, don't create session yet - require MFA verification
       if (mfaEnrolled.length > 0) {
-        // Initiate MFA challenge
-        const code = generateOTPCode();
-        const codeHash = await hashCode(code);
-        const sessionToken = generateSessionToken();
+        console.log('[Login] MFA enrolled - initiating MFA challenge for user:', profile.id);
         
         // Find primary method or use first verified method
         const primaryMethod = mfaEnrolled.find(m => m.isPrimary) || mfaEnrolled[0];
+        console.log('[Login] Primary MFA method:', primaryMethod.methodType, 'methodId:', primaryMethod.id);
         
-        // Create MFA challenge
-        await db.insert(mfaChallenges).values({
-          profileId: profile.id,
-          methodType: primaryMethod.methodType,
-          code: codeHash,
-          sessionToken,
-          status: 'pending',
-          expiresAt: calculateChallengeExpiry()
-        });
+        // Initiate MFA challenge - handle TOTP differently (no code needed)
+        const sessionToken = generateSessionToken();
         
-        // Send verification code
-        try {
-          if (primaryMethod.methodType === 'sms' && primaryMethod.methodValue) {
-            await sendSMSOTP(formatPhoneE164(primaryMethod.methodValue), code);
-          } else if (primaryMethod.methodType === 'email' && primaryMethod.methodValue) {
-            await sendEmailOTP(primaryMethod.methodValue, code);
+        if (primaryMethod.methodType === 'totp') {
+          // For TOTP, no pre-generated code - user will provide code from their app
+          console.log('[Login] TOTP login - creating challenge without code');
+          await db.insert(mfaChallenges).values({
+            profileId: profile.id,
+            methodId: primaryMethod.id,
+            methodType: primaryMethod.methodType,
+            code: '', // No pre-generated code for TOTP
+            sessionToken,
+            status: 'pending',
+            expiresAt: calculateChallengeExpiry()
+          });
+        } else {
+          // For SMS/Email, generate and send a code
+          console.log('[Login] SMS/Email login - generating code');
+          const code = generateOTPCode();
+          const codeHash = await hashCode(code);
+          
+          // Create MFA challenge
+          await db.insert(mfaChallenges).values({
+            profileId: profile.id,
+            methodId: primaryMethod.id,
+            methodType: primaryMethod.methodType,
+            code: codeHash,
+            sessionToken,
+            status: 'pending',
+            expiresAt: calculateChallengeExpiry()
+          });
+          
+          // Send verification code
+          try {
+            if (primaryMethod.methodType === 'sms' && primaryMethod.methodValue) {
+              await sendSMSOTP(formatPhoneE164(primaryMethod.methodValue), code);
+              console.log('[Login] SMS code sent to', maskPhoneNumber(primaryMethod.methodValue));
+            } else if (primaryMethod.methodType === 'email' && primaryMethod.methodValue) {
+              await sendEmailOTP(primaryMethod.methodValue, code);
+              console.log('[Login] Email code sent to', maskEmail(primaryMethod.methodValue));
+            }
+          } catch (error: any) {
+            console.error('[Login] Failed to send MFA code:', error);
+            return res.status(500).json({ error: 'Failed to send verification code' });
           }
-        } catch (error: any) {
-          console.error('Failed to send MFA code:', error);
-          return res.status(500).json({ error: 'Failed to send verification code' });
         }
         
         // Return MFA required response with available methods
@@ -2334,9 +2357,12 @@ export function registerRoutes(app: Express) {
           methodType: m.methodType,
           methodValue: m.methodType === 'sms' 
             ? maskPhoneNumber(m.methodValue || '')
-            : maskEmail(m.methodValue || '')
+            : m.methodType === 'email'
+            ? maskEmail(m.methodValue || '')
+            : null // TOTP doesn't have a value to mask
         }));
         
+        console.log('[Login] Returning MFA required response');
         return res.json({
           mfaRequired: true,
           sessionToken,
@@ -2345,7 +2371,9 @@ export function registerRoutes(app: Express) {
             methodType: primaryMethod.methodType,
             methodValue: primaryMethod.methodType === 'sms'
               ? maskPhoneNumber(primaryMethod.methodValue || '')
-              : maskEmail(primaryMethod.methodValue || '')
+              : primaryMethod.methodType === 'email'
+              ? maskEmail(primaryMethod.methodValue || '')
+              : null // TOTP doesn't have a value to mask
           }
         });
       }
