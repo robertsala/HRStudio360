@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff, Upload } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff, Upload, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api';
 import { useTranslation } from 'react-i18next';
+import MFASettings from './MFASettings';
 
 interface UserProfileProps {
   onNavigate?: (view: 'landing' | 'dashboard' | 'profile') => void;
@@ -822,6 +823,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Two-Step Verification Section */}
+            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                  <Shield className="h-5 w-5 mr-2 text-gray-400" />
+                  Two-Step Verification
+                </h3>
+              </div>
+              
+              <MFASettings />
             </div>
 
             {/* Recent Activity */}
