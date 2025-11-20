@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 import Layout from './components/Layout';
 import Hero from './components/Hero';
@@ -17,6 +17,16 @@ import CareersPage from './pages/CareersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import StudioAIPage from './pages/StudioAIPage';
 import InboxPage from './pages/InboxPage';
+import ChatPage from './pages/ChatPage';
+import BenefitsPage from './pages/BenefitsPage';
+import LeavePage from './pages/LeavePage';
+import PerformancePage from './pages/PerformancePage';
+import EmployeesPage from './pages/EmployeesPage';
+import TimeTrackingPage from './pages/TimeTrackingPage';
+import AnnouncementsPage from './pages/AnnouncementsPage';
+import SettingsPage from './pages/SettingsPage';
+import HiringPage from './pages/HiringPage';
+import TrainingPage from './pages/TrainingPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -121,6 +131,87 @@ function App() {
           <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <ProtectedRoute>
               <InboxPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        {/* TIER 1 Full-Screen Pages - protected */}
+        <Route path="/chat">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/benefits">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <BenefitsPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/leave">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <LeavePage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/performance">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <PerformancePage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/employees">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <EmployeesPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/time-tracking">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <TimeTrackingPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/announcements">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <AnnouncementsPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/settings">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/hiring">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <HiringPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        <Route path="/training">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <TrainingPage />
             </ProtectedRoute>
           </Layout>
         </Route>

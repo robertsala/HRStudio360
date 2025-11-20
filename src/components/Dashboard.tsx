@@ -1,16 +1,13 @@
 import React from 'react';
 import { useLocation } from 'wouter';
-import { User, Settings, BarChart3, Users, Calendar as CalendarIcon, Bell, LogOut, Brain, TrendingUp, TrendingDown, FileText, Inbox, Clock, Plus, DollarSign, Star, Shield, Smartphone, GraduationCap, Award, Heart, Bot, UserX, Search, ChevronRight, MapPin, Building, Mail, Phone, Briefcase, Target, AlertTriangle, CheckCircle, Zap, Globe, Sparkles, GitBranch, CreditCard, History, MessageCircle } from 'lucide-react';
-import ChangeLogNotificationBadge from './ChangeLogNotificationBadge';
+import { User, BarChart3, Users, Calendar as CalendarIcon, Bell, Brain, TrendingUp, TrendingDown, FileText, Inbox, Clock, DollarSign, Star, Shield, GraduationCap, Bot, ChevronRight, MapPin, Briefcase, Target, AlertTriangle, CheckCircle, Zap, Globe, Sparkles, GitBranch, CreditCard, History, MessageCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../utils/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import type { DashboardStats } from '../../shared/schema';
 import { useDashboardWidgets } from '../hooks/useDashboardWidgets';
 import Calendar from './Calendar';
-import EmployeeDirectoryModal from './modals/EmployeeDirectoryModal';
 import ReviewsModal from './modals/ReviewsModal';
 import EventsModal from './modals/EventsModal';
 import NotificationsModal from './modals/NotificationsModal';
@@ -20,30 +17,22 @@ import ScheduleReviewModal from './modals/ScheduleReviewModal';
 import SystemSettingsModal from './modals/SystemSettingsModal';
 import TimeAttendanceModal from './modals/TimeAttendanceModal';
 import EmployeeProfileModal from './modals/EmployeeProfileModal';
-import TrainingModal from './modals/TrainingModal';
 import SecurityModal from './modals/SecurityModal';
 import MobileAppModal from './modals/MobileAppModal';
 import AIInsightsModal from './modals/AIInsightsModal';
 import AnalyticsModal from './modals/AnalyticsModal';
 import ReportsModal from './modals/ReportsModal';
-import LeaveManagementModal from './modals/LeaveManagementModal';
-import PerformanceReviewModal from './modals/ComprehensivePerformanceReviewModal';
-import InboxModal from './modals/InboxModal';
-import HiringModal from './modals/HiringModal';
 import HRDataReportingModal from './modals/HRDataReportingModal';
 import ComprehensiveEmployeeProfileModal from './modals/ComprehensiveEmployeeProfileModal';
-import BenefitsPayModal from './modals/BenefitsPayModal';
 import AIAssistantModal from './modals/AIAssistantModal';
 import OffboardingModal from './modals/OffboardingModal';
 import TerminationRequestModal from './modals/TerminationRequestModal';
-import AnnouncementsModal from './modals/AnnouncementsModal';
 import OfferManagementModal from './modals/OfferManagementModal';
 import HRKPIDashboardModal from './modals/HRKPIDashboardModal';
 import AddressChangeApprovalModal from './modals/AddressChangeApprovalModal';
 import WorkersCompensationModal from './modals/WorkersCompensationModal';
 import UserManagementModal from './modals/UserManagementModalEnhanced';
 import OrgChartModal from './modals/OrgChartModal';
-import NewHireOnboardingModal from './modals/NewHireOnboardingModal';
 import ComprehensiveExpenseModal from './modals/ComprehensiveExpenseModal';
 import ExpenseEnrollmentModal from './modals/ExpenseEnrollmentModal';
 import ReportingRelationshipsModal from './modals/ReportingRelationshipsModal';
@@ -51,7 +40,6 @@ import ImpersonationBanner from './ImpersonationBanner';
 import DirectDepositModal from './modals/DirectDepositModal';
 import WeatherWidget from './WeatherWidget';
 import LocationOverrideModal from './modals/LocationOverrideModal';
-import EnterpriseChatModal from './modals/EnterpriseChatModal';
 import ChatNotificationBubble from './ChatNotificationBubble';
 import DigitalClock from './DigitalClock';
 import KnowledgeBaseModal from './modals/KnowledgeBaseModal';
@@ -61,14 +49,14 @@ import StudioAIChatModal from './modals/StudioAIChatModal';
 import AgentActivityModal from './modals/AgentActivityModal';
 import { mapEmployeeFromBackend } from '../lib/employeeDataMapper';
 
-const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; openMyProfile: () => void }>((props, ref) => {
+const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; openMyProfile: () => void }>((_props, ref) => {
   const { t } = useTranslation();
-  const { user, signOut, isImpersonating } = useAuth();
+  const { user, isImpersonating } = useAuth();
   const [, setLocation] = useLocation();
   
   // Active content state for inline views
   const [activeContent, setActiveContent] = React.useState<string | null>(null);
-  const [selectedAnnouncementId, setSelectedAnnouncementId] = React.useState<string | null>(null);
+  const [_selectedAnnouncementId, _setSelectedAnnouncementId] = React.useState<string | null>(null);
   const [systemSettingsTab, setSystemSettingsTab] = React.useState<string | undefined>(undefined);
 
   // Employee state management
@@ -82,7 +70,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
   const [userProfile, setUserProfile] = React.useState<any>(null);
 
   // Modal filter context
-  const [modalFilter, setModalFilter] = React.useState<{
+  const [_modalFilter, _setModalFilter] = React.useState<{
     type: 'my-team' | 'my-department' | 'my-location' | 'all';
     value?: string;
   }>({ type: 'all' });
@@ -104,7 +92,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
   });
 
   // Chat-specific state
-  const [initialChatChannelId, setInitialChatChannelId] = React.useState<string | undefined>(undefined);
+  const [_initialChatChannelId, _setInitialChatChannelId] = React.useState<string | undefined>(undefined);
   
   // Studio AI context state
   const [studioAIContext, setStudioAIContext] = React.useState<'recruitment' | 'payroll'>('recruitment');
@@ -136,7 +124,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
   const userRole = getDatabaseRole();
 
   // Fetch dashboard stats from API
-  const { data: dashboardStats, isLoading: isStatsLoading, error: statsError} = useQuery<DashboardStats>({
+  const { data: dashboardStats, isLoading: isStatsLoading, error: _statsError} = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error('User ID is required');
@@ -152,7 +140,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
   });
 
   // Fetch dashboard widgets configuration and helpers
-  const { widgets, isLoading: isWidgetsLoading, isWidgetVisible, renderWidget } = useDashboardWidgets(user?.id, userRole);
+  const { widgets: _widgets, isLoading: _isWidgetsLoading, isWidgetVisible: _isWidgetVisible, renderWidget } = useDashboardWidgets(user?.id, userRole);
 
   // Fetch announcements from API
   const { data: apiAnnouncements, isLoading: isAnnouncementsLoading } = useQuery<any[]>({
@@ -257,12 +245,73 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       return;
     }
 
+    // TIER 1 Full-Screen Pages - navigate to routes instead of opening modals
+    if (modalName === 'enterpriseChat') {
+      console.log('Navigating to Chat page');
+      setLocation('/chat');
+      return;
+    }
+
+    if (modalName === 'benefitsPay') {
+      console.log('Navigating to Benefits page');
+      setLocation('/benefits');
+      return;
+    }
+
+    if (modalName === 'leaveManagement') {
+      console.log('Navigating to Leave page');
+      setLocation('/leave');
+      return;
+    }
+
+    if (modalName === 'performanceReview') {
+      console.log('Navigating to Performance page');
+      setLocation('/performance');
+      return;
+    }
+
+    if (modalName === 'employees' || modalName === 'employeeDirectory') {
+      console.log('Navigating to Employees page');
+      setLocation('/employees');
+      return;
+    }
+
+    if (modalName === 'timeTracking') {
+      console.log('Navigating to Time Tracking page');
+      setLocation('/time-tracking');
+      return;
+    }
+
+    if (modalName === 'announcements') {
+      console.log('Navigating to Announcements page');
+      setLocation('/announcements');
+      return;
+    }
+
+    if (modalName === 'systemSettings') {
+      console.log('Navigating to Settings page');
+      setLocation('/settings');
+      return;
+    }
+
+    if (modalName === 'hiring') {
+      console.log('Navigating to Hiring page');
+      setLocation('/hiring');
+      return;
+    }
+
+    if (modalName === 'training') {
+      console.log('Navigating to Training page');
+      setLocation('/training');
+      return;
+    }
+
     // Special handling for systemSettings with tab parameter (e.g., "systemSettings:changelog")
     if (modalName.startsWith('systemSettings:')) {
       const tab = modalName.split(':')[1];
-      console.log(`Opening systemSettings with tab: ${tab}`);
-      setSystemSettingsTab(tab);
-      setActiveContent('systemSettings');
+      console.log(`Opening Settings page with tab: ${tab}`);
+      // Navigate to settings page with tab as query parameter
+      setLocation(`/settings?tab=${tab}`);
       return;
     }
 
@@ -342,8 +391,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
   // Handle successful employee addition
   const handleEmployeeAdded = (newEmployee: any) => {
     console.log('New employee added:', newEmployee);
-    // Add the new employee to the list
-    setEmployees(prev => [...prev, newEmployee]);
+    // Employee list is managed in EmployeesPage now
     closeModal('addEmployee');
   };
 
@@ -600,13 +648,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
   const renderInlineContent = () => {
     console.log('renderInlineContent called with activeContent:', activeContent);
     switch (activeContent) {
-      case 'employees':
-        return (
-          <EmployeeDirectoryModal
-            isOpen={true}
-            onClose={closeInlineContent}
-          />
-        );
+      // TIER 1 modals: employees, benefits, leave, performance, chat, etc. now navigate to routes
       case 'reviews':
         return (
           <ReviewsModal
@@ -628,8 +670,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         return <TimeAttendanceModal onClose={closeInlineContent} />;
       case 'employeeProfile':
         return <EmployeeProfileModal isOpen={true} onClose={closeInlineContent} />;
-      case 'training':
-        return <TrainingModal onClose={closeInlineContent} onOpenKnowledgeBase={() => setModals({ ...modals, knowledgeBase: true })} />;
       case 'security':
         return <SecurityModal isOpen={true} onClose={closeInlineContent} />;
       case 'analytics':
@@ -638,60 +678,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         return <MobileAppModal isOpen={true} onClose={closeInlineContent} />;
       case 'reports':
         return <ReportsModal onClose={closeInlineContent} />;
-      case 'leaveManagement':
-        return <LeaveManagementModal
-          onClose={closeInlineContent}
-          initialFilter={
-            modalFilter.type !== 'all'
-              ? {
-                  type: modalFilter.type,
-                  managerId: user?.name,
-                  department: userProfile?.department,
-                  location: employees.find(e => e.email === user?.email)?.location,
-                }
-              : undefined
-          }
-        />;
-      case 'performanceReview':
-        return <PerformanceReviewModal
-          onClose={closeInlineContent}
-          initialFilter={
-            modalFilter.type !== 'all'
-              ? {
-                  type: modalFilter.type,
-                  managerId: user?.name,
-                  department: userProfile?.department,
-                  location: employees.find(e => e.email === user?.email)?.location,
-                }
-              : undefined
-          }
-        />;
-      case 'inbox':
-        console.log('Rendering InboxModal with filter:', modalFilter);
-        return <InboxModal
-          onClose={closeInlineContent}
-          initialFilter={
-            modalFilter.type !== 'all'
-              ? {
-                  type: modalFilter.type,
-                  managerId: user?.name,
-                  department: userProfile?.department,
-                  location: employees.find(e => e.email === user?.email)?.location,
-                }
-              : undefined
-          }
-        />;
-      case 'hiring':
-        return <HiringModal onNavigateToOnboarding={() => openModal('onboarding')} onClose={closeInlineContent} onOpenStudioAI={() => {
-          setStudioAIContext('recruitment');
-          openModal('studioAIChat');
-        }} />;
+      // TIER 1 modals now navigate to routes - no inline rendering needed
       case 'hrDataReporting':
         return <HRDataReportingModal isOpen={true} onClose={closeInlineContent} />;
       case 'comprehensiveProfile':
         return <ComprehensiveEmployeeProfileModal isOpen={true} onClose={closeInlineContent} employee={activeEmployee || undefined} />;
-      case 'benefitsPay':
-        return <BenefitsPayModal isOpen={true} onClose={closeInlineContent} />;
       case 'aiInsights':
         return <AIInsightsModal isOpen={true} onClose={closeInlineContent} />;
       case 'aiAssistant':
@@ -700,8 +691,6 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         return <OffboardingModal isOpen={true} onClose={closeInlineContent} />;
       case 'systemSettings':
         return <SystemSettingsModal onClose={closeInlineContent} initialTab={systemSettingsTab} />;
-      case 'announcements':
-        return <AnnouncementsModal selectedAnnouncementId={selectedAnnouncementId} onClose={closeInlineContent} />;
       case 'offerManagement':
         return <OfferManagementModal onClose={closeInlineContent} />;
       case 'hrKPIDashboard':
@@ -835,7 +824,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <button
                     onClick={() => {
-                      setModalFilter({ type: 'all' });
+                      _setModalFilter({ type: 'all' });
                       openModal('employees');
                     }}
                     className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 text-left"
@@ -850,7 +839,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                   </button>
                   <button
                     onClick={() => {
-                      setModalFilter({ type: 'all' });
+                      _setModalFilter({ type: 'all' });
                       openModal('leaveManagement');
                     }}
                     className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl p-4 text-white hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 text-left"
@@ -865,7 +854,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                   </button>
                   <button
                     onClick={() => {
-                      setModalFilter({ type: 'all' });
+                      _setModalFilter({ type: 'all' });
                       openModal('inbox');
                     }}
                     className="bg-gradient-to-r from-red-500 to-pink-500 rounded-xl p-4 text-white hover:from-red-600 hover:to-pink-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 text-left"
@@ -880,7 +869,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                   </button>
                   <button
                     onClick={() => {
-                      setModalFilter({ type: 'all' });
+                      _setModalFilter({ type: 'all' });
                       openModal('performanceReview');
                     }}
                     className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-4 text-white hover:from-green-600 hover:to-emerald-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 text-left"
@@ -1092,7 +1081,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                               </div>
                               <button
                                 onClick={() => {
-                                  setSelectedAnnouncementId(announcement.id);
+                                  _setSelectedAnnouncementId(announcement.id);
                                   openModal('announcements');
                                 }}
                                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm font-medium ml-4 hover:underline"
@@ -1433,13 +1422,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
             }}
           />
         )}
-        {modals.enterpriseChat && (
-          <EnterpriseChatModal
-            isOpen={modals.enterpriseChat}
-            onClose={() => closeModal('enterpriseChat')}
-            initialChannelId={initialChatChannelId}
-          />
-        )}
+        {/* enterpriseChat now navigates to /chat route */}
         {modals.knowledgeBase && (
           <KnowledgeBaseModal
             isOpen={modals.knowledgeBase}
@@ -1484,7 +1467,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         {/* Chat Notification Bubbles */}
         <ChatNotificationBubble
           onOpenChat={(channelId) => {
-            setInitialChatChannelId(channelId || undefined);
+            _setInitialChatChannelId(channelId || undefined);
             setModals(prev => ({ ...prev, enterpriseChat: true }));
           }}
         />
