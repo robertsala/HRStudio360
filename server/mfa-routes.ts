@@ -622,8 +622,183 @@ export function registerMFARoutes(app: Express) {
     }
   });
 
+  // Alias: POST /api/mfa/verify-login (same as /api/mfa/verify for frontend compatibility)
+  app.post('/api/mfa/verify-login', mfaRateLimiter, async (req, res) => {
+    // This is a direct alias - delegate to the main verify handler
+    try {
+      const { sessionToken, code } = req.body;
+
+      if (!sessionToken || !code) {
+        return res.status(400).json({ error: 'Session token and code are required' });
+      }
+
+      // Find the challenge
+      const [challenge] = await db
+        .select()
+        .from(mfaChallenges)
+        .where(
+          and(
+            eq(mfaChallenges.sessionToken, sessionToken),
+            eq(mfaChallenges.status, 'pending')
+          )
+        );
+
+      if (!challenge) {
+        return res.status(400).json({ error: 'Invalid or expired verification session' });
+      }
+
+      // Check if expired
+      if (isChallengeExpired(challenge.expiresAt)) {
+        await db
+          .update(mfaChallenges)
+          .set({ status: 'expired' })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Code expired');
+        return res.status(400).json({ error: 'Verification code has expired' });
+      }
+
+      // Check if too many attempts
+      if (challenge.attempts >= challenge.maxAttempts) {
+        await db
+          .update(mfaChallenges)
+          .set({ status: 'failed' })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Too many attempts');
+        return res.status(400).json({ error: 'Too many verification attempts' });
+      }
+
+      // Verify the code
+      const isValid = await verifyCode(challenge.code, code);
+      
+      if (!isValid) {
+        // Increment attempts
+        await db
+          .update(mfaChallenges)
+          .set({ attempts: challenge.attempts + 1 })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Invalid code');
+        return res.status(400).json({ error: 'Invalid verification code' });
+      }
+
+      // Mark challenge as verified
+      await db
+        .update(mfaChallenges)
+        .set({ 
+          status: 'verified',
+          verifiedAt: new Date()
+        })
+        .where(eq(mfaChallenges.id, challenge.id));
+
+      // Update last used timestamp on the specific method
+      if (challenge.methodId) {
+        await db
+          .update(mfaMethods)
+          .set({ lastUsedAt: new Date() })
+          .where(eq(mfaMethods.id, challenge.methodId));
+      } else {
+        // Fallback for legacy challenges without methodId
+        await db
+          .update(mfaMethods)
+          .set({ lastUsedAt: new Date() })
+          .where(
+            and(
+              eq(mfaMethods.profileId, challenge.profileId),
+              eq(mfaMethods.methodType, challenge.methodType)
+            )
+          );
+      }
+
+      // Create actual session
+      (req.session as any).userId = challenge.profileId;
+
+      await logMFAAudit(challenge.profileId, 'login_verified', challenge.methodType, true, req);
+
+      res.json({ success: true, profileId: challenge.profileId });
+    } catch (error: any) {
+      console.error('Failed to verify MFA:', error);
+      res.status(500).json({ error: 'Failed to verify MFA code' });
+    }
+  });
+
   // Resend verification code
   app.post('/api/mfa/resend', mfaRateLimiter, async (req, res) => {
+    try {
+      const { sessionToken } = req.body;
+
+      if (!sessionToken) {
+        return res.status(400).json({ error: 'Session token is required' });
+      }
+
+      // Find the existing challenge
+      const [challenge] = await db
+        .select()
+        .from(mfaChallenges)
+        .where(eq(mfaChallenges.sessionToken, sessionToken));
+
+      if (!challenge) {
+        return res.status(400).json({ error: 'Invalid session' });
+      }
+
+      // Get the method to send to (prefer methodId if available)
+      let method;
+      if (challenge.methodId) {
+        [method] = await db
+          .select()
+          .from(mfaMethods)
+          .where(eq(mfaMethods.id, challenge.methodId));
+      } else {
+        // Fallback for legacy challenges without methodId
+        [method] = await db
+          .select()
+          .from(mfaMethods)
+          .where(
+            and(
+              eq(mfaMethods.profileId, challenge.profileId),
+              eq(mfaMethods.methodType, challenge.methodType)
+            )
+          );
+      }
+
+      if (!method || !method.methodValue) {
+        return res.status(400).json({ error: 'MFA method not found' });
+      }
+
+      // Generate new code
+      const code = generateOTPCode();
+      const codeHash = await hashCode(code);
+
+      // Update the challenge with new code and reset attempts
+      await db
+        .update(mfaChallenges)
+        .set({
+          code: codeHash,
+          status: 'pending',
+          attempts: 0,
+          expiresAt: calculateChallengeExpiry()
+        })
+        .where(eq(mfaChallenges.id, challenge.id));
+
+      // Send the new code
+      if (method.methodType === 'sms') {
+        await sendSMSOTP(formatPhoneE164(method.methodValue), code);
+      } else if (method.methodType === 'email') {
+        await sendEmailOTP(method.methodValue, code);
+      }
+
+      await logMFAAudit(challenge.profileId, 'code_resent', challenge.methodType, true, req);
+
+      res.json({ success: true, message: 'Verification code resent' });
+    } catch (error: any) {
+      console.error('Failed to resend code:', error);
+      res.status(500).json({ error: error.message || 'Failed to resend code' });
+    }
+  });
+
+  // Alias: POST /api/mfa/resend-code (same as /api/mfa/resend for frontend compatibility)
+  app.post('/api/mfa/resend-code', mfaRateLimiter, async (req, res) => {
     try {
       const { sessionToken } = req.body;
 
