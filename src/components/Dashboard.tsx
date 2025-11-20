@@ -250,6 +250,13 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       return;
     }
 
+    // Special handling for Inbox - navigate to full-view page
+    if (modalName === 'inbox') {
+      console.log('Navigating to Inbox page');
+      setLocation('/inbox');
+      return;
+    }
+
     // Special handling for systemSettings with tab parameter (e.g., "systemSettings:changelog")
     if (modalName.startsWith('systemSettings:')) {
       const tab = modalName.split(':')[1];

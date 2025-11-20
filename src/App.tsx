@@ -16,6 +16,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import CareersPage from './pages/CareersPage';
 import OnboardingPage from './pages/OnboardingPage';
 import StudioAIPage from './pages/StudioAIPage';
+import InboxPage from './pages/InboxPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -111,6 +112,15 @@ function App() {
           <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <ProtectedRoute>
               <StudioAIPage context="recruitment" />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        {/* Inbox route - protected */}
+        <Route path="/inbox">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <InboxPage />
             </ProtectedRoute>
           </Layout>
         </Route>
