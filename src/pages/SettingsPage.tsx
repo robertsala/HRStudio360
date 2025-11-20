@@ -3,6 +3,7 @@ import { Building, Users, Briefcase, Settings, Bell, Trash2, Plus, Save, FileTex
 import ChangeLogTab from '../components/modals/ChangeLogTab';
 import PermissionManagementModal from '../components/modals/PermissionManagementModal';
 import CorrectionRequestModal from '../components/modals/CorrectionRequestModal';
+import MFASettings from '../components/MFASettings';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
@@ -436,10 +437,7 @@ const SettingsPage: React.FC = () => {
               )}
 
               {activeTab === 'accessControl' && (
-                <div className="text-center py-12">
-                  <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">Access Control coming soon</p>
-                </div>
+                <MFASettings />
               )}
 
               {activeTab === 'notifications' && (
