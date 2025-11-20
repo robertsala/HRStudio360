@@ -22,6 +22,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   updateProfilePicture: (pictureUrl: string) => Promise<void>;
   impersonatedUser: User | null;
   actualUser: User | null;
@@ -303,6 +304,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshSession = async () => {
+    try {
+      console.log('[AuthContext] Refreshing session...');
+      
+      // Check session with backend
+      const session = await apiClient.getSession();
+      
+      if (session?.user) {
+        console.log('[AuthContext] Session found, loading profile...');
+        await loadUserProfile(session.user.id, session.user.email || '');
+      } else {
+        console.log('[AuthContext] No session found, clearing auth state');
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('[AuthContext] Error refreshing session:', error);
+      // Clear auth state on error
+      setUser(null);
+      setIsAuthenticated(false);
+      throw error;
+    }
+  };
+
   const updateProfilePicture = async (pictureUrl: string) => {
     if (user) {
       try {
@@ -387,6 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOut,
+    refreshSession,
     updateProfilePicture,
     impersonatedUser,
     actualUser,
