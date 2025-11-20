@@ -27,6 +27,7 @@ import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
 import HiringPage from './pages/HiringPage';
 import TrainingPage from './pages/TrainingPage';
+import MFAVerificationPage from './pages/MFAVerificationPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -92,6 +93,11 @@ function App() {
         {/* Password reset route - accessible without authentication */}
         <Route path="/reset-password">
           <ResetPasswordPage />
+        </Route>
+
+        {/* MFA verification route - accessible without full authentication */}
+        <Route path="/mfa-verify">
+          <MFAVerificationPage />
         </Route>
 
         {/* Public Careers page - accessible without authentication */}

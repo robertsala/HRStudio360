@@ -197,6 +197,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await apiClient.login(email, password);
 
+      // Check if MFA is required
+      if (response.mfaRequired && response.sessionToken) {
+        // Store MFA data in sessionStorage for MFA verification page
+        sessionStorage.setItem('mfaData', JSON.stringify({
+          sessionToken: response.sessionToken,
+          methods: response.methods,
+          selectedMethod: response.selectedMethod
+        }));
+        
+        // Redirect to MFA verification page
+        setLocation('/mfa-verify');
+        return;
+      }
+
+      // Normal login flow - no MFA
       if (response.user) {
         await loadUserProfile(response.user.id, response.user.email || '');
       }

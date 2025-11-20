@@ -90,7 +90,7 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string, password: string): Promise<{ user: User }> {
+  async login(email: string, password: string): Promise<{ user?: User; mfaRequired?: boolean; sessionToken?: string; methods?: any[]; selectedMethod?: any }> {
     return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
