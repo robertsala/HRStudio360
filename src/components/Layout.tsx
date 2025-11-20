@@ -203,12 +203,17 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
 
   const handleSignIn = async (email: string, password: string) => {
     try {
-      await signIn(email, password);
+      const mfaRequired = await signIn(email, password);
       setShowSignInModal(false);
       
-      // Navigate to dashboard after successful sign-in using direct routing
-      console.log('[Layout] Navigating to dashboard after successful sign-in');
-      setLocation('/dashboard');
+      // Only navigate to dashboard if MFA is not required
+      // If MFA is required, signIn() already redirected to /mfa-verify
+      if (!mfaRequired) {
+        console.log('[Layout] Navigating to dashboard after successful sign-in');
+        setLocation('/dashboard');
+      } else {
+        console.log('[Layout] MFA required - user redirected to verification page');
+      }
     } catch (error) {
       // Error will be displayed in SignInModal
       throw error;

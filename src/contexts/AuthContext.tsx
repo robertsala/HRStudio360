@@ -19,7 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   celebration: CelebrationData | null;
   dismissCelebration: () => void;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfilePicture: (pictureUrl: string) => Promise<void>;
@@ -193,7 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Session refresh is now handled by backend via cookies automatically
   // No manual activity tracking needed
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await apiClient.login(email, password);
 
@@ -208,13 +208,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Redirect to MFA verification page
         setLocation('/mfa-verify');
-        return;
+        return true; // MFA required
       }
 
       // Normal login flow - no MFA
       if (response.user) {
         await loadUserProfile(response.user.id, response.user.email || '');
       }
+      
+      return false; // MFA not required
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
