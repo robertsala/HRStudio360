@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, Phone, MapPin, Calendar, CreditCard as Edit3, Save, Camera, FileText, Award, Clock, UserX, Star, DollarSign, CheckCircle, CreditCard, TrendingUp as TrendingUpIcon, History, Upload } from 'lucide-react';
+import { X, Mail, Phone, MapPin, Calendar, CreditCard as Edit3, Save, Camera, FileText, Award, Clock, UserX, Star, DollarSign, CheckCircle, CreditCard, TrendingUp as TrendingUpIcon, History, Upload, Shield, Lock, Unlock, Key, Copy, Download, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TerminationRequestModal from './TerminationRequestModal';
 import DirectDepositModal from './DirectDepositModal';
@@ -65,6 +65,17 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   const [managerName, setManagerName] = useState<string>('Not assigned');
   const [availableManagers, setAvailableManagers] = useState<Array<{ id: string; name: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // MFA Admin state
+  const [mfaStatus, setMfaStatus] = useState<any>(null);
+  const [loadingMfaStatus, setLoadingMfaStatus] = useState(false);
+  const [showDisableMfaDialog, setShowDisableMfaDialog] = useState(false);
+  const [disableReason, setDisableReason] = useState('');
+  const [disablingMfa, setDisablingMfa] = useState(false);
+  const [showBackupCodesDialog, setShowBackupCodesDialog] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [generatingBackupCodes, setGeneratingBackupCodes] = useState(false);
+  const [backupCodesReason, setBackupCodesReason] = useState('');
 
   // Determine if current user has HR or admin privileges (authoritative check)
   // Based on backend canManageAnnouncements logic: department === 'HR' OR role === 'Product Owner'
@@ -479,6 +490,98 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     setShowImageUpload(false);
   };
 
+  // MFA Admin Functions
+  const fetchMfaStatus = async () => {
+    if (!isHRUser || !formData.userId) return;
+    
+    setLoadingMfaStatus(true);
+    try {
+      const response = await fetch(`/api/admin/mfa/${formData.userId}/status`);
+      if (response.ok) {
+        const data = await response.json();
+        setMfaStatus(data);
+      } else if (response.status === 403) {
+        console.warn('Insufficient permissions to view MFA status');
+        setMfaStatus(null);
+      } else {
+        console.error('Failed to fetch MFA status');
+        setMfaStatus(null);
+      }
+    } catch (error) {
+      console.error('Error fetching MFA status:', error);
+      setMfaStatus(null);
+    } finally {
+      setLoadingMfaStatus(false);
+    }
+  };
+
+  const handleDisableMfa = async () => {
+    if (!disableReason.trim()) {
+      alert('Please provide a reason for disabling MFA');
+      return;
+    }
+
+    setDisablingMfa(true);
+    try {
+      const response = await apiRequest('POST', `/api/admin/mfa/${formData.userId}/disable`, {
+        reason: disableReason.trim()
+      });
+
+      if (response) {
+        alert('✅ MFA has been disabled successfully');
+        setShowDisableMfaDialog(false);
+        setDisableReason('');
+        await fetchMfaStatus(); // Refresh status
+      }
+    } catch (error: any) {
+      console.error('Error disabling MFA:', error);
+      alert(`Failed to disable MFA: ${error.message || 'Please try again'}`);
+    } finally {
+      setDisablingMfa(false);
+    }
+  };
+
+  const handleGenerateBackupCodes = async () => {
+    setGeneratingBackupCodes(true);
+    try {
+      const response = await apiRequest('POST', `/api/admin/mfa/${formData.userId}/reset-backup-codes`, {
+        reason: backupCodesReason.trim() || 'Admin generated new backup codes'
+      });
+
+      if (response && response.backupCodes) {
+        setBackupCodes(response.backupCodes);
+        setBackupCodesReason('');
+        await fetchMfaStatus(); // Refresh status
+      }
+    } catch (error: any) {
+      console.error('Error generating backup codes:', error);
+      alert(`Failed to generate backup codes: ${error.message || 'Please try again'}`);
+      setShowBackupCodesDialog(false);
+    } finally {
+      setGeneratingBackupCodes(false);
+    }
+  };
+
+  const copyBackupCodes = () => {
+    const codesText = backupCodes.join('\n');
+    navigator.clipboard.writeText(codesText).then(() => {
+      alert('Backup codes copied to clipboard');
+    });
+  };
+
+  const downloadBackupCodes = () => {
+    const codesText = backupCodes.join('\n');
+    const blob = new Blob([`Backup Codes for ${formData.name}\n\n${codesText}\n\nKeep these codes secure. Each code can only be used once.`], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${formData.name.replace(/\s+/g, '_')}_MFA_Backup_Codes.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const mockProfilePictures = [
     'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
     'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
@@ -495,7 +598,8 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
     { id: 'schedule', label: 'Schedule & Hours' },
     { id: 'timeTracking', label: 'Time Tracking' },
     { id: 'performance', label: 'Performance & Development' },
-    { id: 'documents', label: 'Documents' }
+    { id: 'documents', label: 'Documents' },
+    ...(isHRUser ? [{ id: 'security', label: 'Security & Access' }] : [])
   ];
 
   const getStatusColor = (status: string) => {
@@ -514,6 +618,9 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
   useEffect(() => {
     if ((activeTab === 'payBenefits' || activeTab === 'performance')) {
       loadEmployeeData();
+    }
+    if (activeTab === 'security' && isHRUser) {
+      fetchMfaStatus();
     }
   }, [activeTab, user?.id]);
 
@@ -1661,6 +1768,167 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                   </div>
                 </div>
               )}
+
+              {/* Security & Access Tab (HR/Product Owner only) */}
+              {activeTab === 'security' && isHRUser && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                        <Shield className="h-6 w-6 text-blue-600 mr-2" />
+                        Security & Access
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Manage multi-factor authentication for {formData.name}
+                      </p>
+                    </div>
+                  </div>
+
+                  {loadingMfaStatus ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* MFA Status Overview */}
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center">
+                            {mfaStatus?.mfaEnabled ? (
+                              <>
+                                <Lock className="h-8 w-8 text-green-600 mr-3" />
+                                <div>
+                                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">MFA Enabled</h4>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    This employee has multi-factor authentication enabled
+                                  </p>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <Unlock className="h-8 w-8 text-gray-400 mr-3" />
+                                <div>
+                                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">MFA Disabled</h4>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    This employee does not have MFA enabled
+                                  </p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            mfaStatus?.mfaEnabled 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-400'
+                          }`}>
+                            {mfaStatus?.mfaEnabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+
+                        {mfaStatus?.mfaEnabled && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Enrolled Methods</p>
+                              <p className="text-2xl font-bold text-blue-600">
+                                {mfaStatus?.methods?.length || 0}
+                              </p>
+                            </div>
+                            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Backup Codes</p>
+                              <p className="text-2xl font-bold text-green-600">
+                                {mfaStatus?.backupCodesRemaining || 0}
+                              </p>
+                            </div>
+                            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Last Used</p>
+                              <p className="text-sm font-medium text-purple-600">
+                                {mfaStatus?.lastUsed 
+                                  ? new Date(mfaStatus.lastUsed).toLocaleDateString()
+                                  : 'Never'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Enrolled Methods */}
+                      {mfaStatus?.mfaEnabled && mfaStatus?.methods?.length > 0 && (
+                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                          <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Enrolled MFA Methods</h4>
+                          <div className="space-y-3">
+                            {mfaStatus.methods.map((method: any) => (
+                              <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                                <div className="flex items-center">
+                                  <Key className="h-5 w-5 text-blue-600 mr-3" />
+                                  <div>
+                                    <p className="font-medium text-gray-900 dark:text-white capitalize">
+                                      {method.methodType === 'totp' ? 'Authenticator App' : method.methodType}
+                                      {method.isPrimary && (
+                                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400 text-xs rounded">
+                                          Primary
+                                        </span>
+                                      )}
+                                    </p>
+                                    {method.methodValue && (
+                                      <p className="text-sm text-gray-500 dark:text-gray-400">{method.methodValue}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {method.isVerified ? (
+                                    <CheckCircle className="h-5 w-5 text-green-600" />
+                                  ) : (
+                                    <span className="text-xs text-yellow-600 dark:text-yellow-400">Pending</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Admin Actions */}
+                      {mfaStatus?.mfaEnabled && (
+                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                          <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Admin Actions</h4>
+                          <div className="space-y-3">
+                            <button
+                              onClick={() => setShowBackupCodesDialog(true)}
+                              className="w-full flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
+                              data-testid="button-generate-backup-codes"
+                            >
+                              <div className="flex items-center">
+                                <Key className="h-5 w-5 text-blue-600 mr-3" />
+                                <div className="text-left">
+                                  <p className="font-medium text-gray-900 dark:text-white">Generate New Backup Codes</p>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">Create new backup codes for employee</p>
+                                </div>
+                              </div>
+                              <span className="text-blue-600">→</span>
+                            </button>
+
+                            <button
+                              onClick={() => setShowDisableMfaDialog(true)}
+                              className="w-full flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors border border-red-200 dark:border-red-800"
+                              data-testid="button-disable-mfa"
+                            >
+                              <div className="flex items-center">
+                                <AlertTriangle className="h-5 w-5 text-red-600 mr-3" />
+                                <div className="text-left">
+                                  <p className="font-medium text-gray-900 dark:text-white">Disable MFA</p>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">Remove all MFA methods for this employee</p>
+                                </div>
+                              </div>
+                              <span className="text-red-600">→</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1803,6 +2071,219 @@ const ComprehensiveEmployeeProfileModal: React.FC<ComprehensiveEmployeeProfileMo
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disable MFA Confirmation Dialog */}
+      {showDisableMfaDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <AlertTriangle className="h-6 w-6 text-red-600 mr-2" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Disable MFA</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDisableMfaDialog(false);
+                  setDisableReason('');
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                data-testid="button-close-disable-mfa-dialog"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  <strong>Warning:</strong> This will remove all MFA methods for {formData.name}. 
+                  The employee can re-enroll in MFA at any time.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Reason for disabling MFA <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={disableReason}
+                  onChange={(e) => setDisableReason(e.target.value)}
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  rows={3}
+                  placeholder="e.g., Employee lost device and needs immediate access"
+                  data-testid="textarea-disable-reason"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  This reason will be logged for security audit purposes
+                </p>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowDisableMfaDialog(false);
+                    setDisableReason('');
+                  }}
+                  disabled={disablingMfa}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  data-testid="button-cancel-disable-mfa"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDisableMfa}
+                  disabled={disablingMfa || !disableReason.trim()}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  data-testid="button-confirm-disable-mfa"
+                >
+                  {disablingMfa ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                      Disabling...
+                    </>
+                  ) : (
+                    'Disable MFA'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Backup Codes Dialog */}
+      {showBackupCodesDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <Key className="h-6 w-6 text-blue-600 mr-2" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Generate Backup Codes</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBackupCodesDialog(false);
+                  setBackupCodes([]);
+                  setBackupCodesReason('');
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                data-testid="button-close-backup-codes-dialog"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {backupCodes.length === 0 ? (
+              <div className="space-y-4">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Note:</strong> Generating new backup codes will invalidate all previous unused codes.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Reason (optional)
+                  </label>
+                  <textarea
+                    value={backupCodesReason}
+                    onChange={(e) => setBackupCodesReason(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    rows={2}
+                    placeholder="e.g., Employee requested new codes"
+                    data-testid="textarea-backup-codes-reason"
+                  />
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowBackupCodesDialog(false);
+                      setBackupCodesReason('');
+                    }}
+                    disabled={generatingBackupCodes}
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    data-testid="button-cancel-generate-codes"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleGenerateBackupCodes}
+                    disabled={generatingBackupCodes}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    data-testid="button-confirm-generate-codes"
+                  >
+                    {generatingBackupCodes ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate Codes'
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <p className="text-sm text-green-800 dark:text-green-200 font-medium">
+                    ✓ New backup codes generated successfully
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Important:</strong> These codes will only be shown once. Save them securely and share with {formData.name}.
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Backup Codes:</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {backupCodes.map((code, index) => (
+                      <div key={index} className="font-mono text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 text-center">
+                        {code}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={copyBackupCodes}
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
+                    data-testid="button-copy-backup-codes"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </button>
+                  <button
+                    onClick={downloadBackupCodes}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                    data-testid="button-download-backup-codes"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowBackupCodesDialog(false);
+                    setBackupCodes([]);
+                    setBackupCodesReason('');
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  data-testid="button-close-codes-display"
+                >
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

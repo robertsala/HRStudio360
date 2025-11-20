@@ -52,6 +52,25 @@ export function registerMFARoutes(app: Express) {
     return userId;
   }
 
+  // Helper to check if user has HR or Product Owner role
+  async function isHROrProductOwner(profileId: string): Promise<boolean> {
+    try {
+      const [profile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, profileId));
+      
+      if (!profile) {
+        return false;
+      }
+      
+      return profile.department === 'HR' || profile.role === 'Product Owner';
+    } catch (error) {
+      console.error('Failed to check HR/Product Owner status:', error);
+      return false;
+    }
+  }
+
   // Helper to log MFA audit events
   async function logMFAAudit(
     profileId: string,
@@ -1295,6 +1314,285 @@ export function registerMFARoutes(app: Express) {
     } catch (error) {
       console.error('Failed to cleanup challenges:', error);
       res.status(500).json({ error: 'Failed to cleanup challenges' });
+    }
+  });
+
+  // ===== ADMIN ENDPOINTS =====
+  // These endpoints allow HR staff and Product Owners to manage MFA for employees
+
+  // Get MFA status for a specific employee (Admin only)
+  app.get('/api/admin/mfa/:profileId/status', async (req, res) => {
+    try {
+      const adminId = requireAuth(req);
+      if (!adminId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has HR or Product Owner permissions
+      const hasPermission = await isHROrProductOwner(adminId);
+      if (!hasPermission) {
+        await logMFAAudit(adminId, 'admin_view_status', null, false, req, 'Insufficient permissions');
+        return res.status(403).json({ error: 'Forbidden: Only HR and Product Owners can view employee MFA status' });
+      }
+
+      const { profileId } = req.params;
+
+      // Verify the target profile exists
+      const [targetProfile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, profileId));
+
+      if (!targetProfile) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+
+      // Get all MFA methods for this employee
+      const methods = await db
+        .select()
+        .from(mfaMethods)
+        .where(eq(mfaMethods.profileId, profileId));
+
+      // Get backup codes stats
+      const backupCodes = await db
+        .select()
+        .from(mfaBackupCodes)
+        .where(eq(mfaBackupCodes.profileId, profileId));
+
+      const backupCodesRemaining = backupCodes.filter(c => !c.used).length;
+
+      // Get last MFA usage from audit log
+      const [lastUsageLog] = await db
+        .select()
+        .from(mfaAuditLog)
+        .where(
+          and(
+            eq(mfaAuditLog.profileId, profileId),
+            eq(mfaAuditLog.success, true),
+            eq(mfaAuditLog.action, 'verify_code')
+          )
+        )
+        .orderBy(sql`${mfaAuditLog.createdAt} DESC`)
+        .limit(1);
+
+      // Mask sensitive method values for security
+      const maskedMethods = methods.map(method => ({
+        id: method.id,
+        methodType: method.methodType,
+        methodValue: method.methodType === 'sms' 
+          ? maskPhoneNumber(method.methodValue || '')
+          : method.methodType === 'email'
+          ? maskEmail(method.methodValue || '')
+          : null,
+        isPrimary: method.isPrimary,
+        isVerified: method.isVerified,
+        lastUsedAt: method.lastUsedAt,
+        createdAt: method.createdAt
+      }));
+
+      // Log admin access
+      await logMFAAudit(profileId, 'admin_view_status', null, true, req);
+
+      res.json({
+        mfaEnabled: methods.length > 0,
+        methods: maskedMethods,
+        backupCodesRemaining,
+        lastUsed: lastUsageLog?.createdAt || null,
+        employeeName: `${targetProfile.firstName || ''} ${targetProfile.lastName || ''}`.trim() || targetProfile.email,
+        employeeEmail: targetProfile.email
+      });
+    } catch (error: any) {
+      console.error('Failed to get employee MFA status:', error);
+      res.status(500).json({ error: 'Failed to get employee MFA status' });
+    }
+  });
+
+  // Disable MFA for a specific employee (Admin only)
+  app.post('/api/admin/mfa/:profileId/disable', async (req, res) => {
+    try {
+      const adminId = requireAuth(req);
+      if (!adminId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has HR or Product Owner permissions
+      const hasPermission = await isHROrProductOwner(adminId);
+      if (!hasPermission) {
+        await logMFAAudit(adminId, 'admin_disable_mfa', null, false, req, 'Insufficient permissions');
+        return res.status(403).json({ error: 'Forbidden: Only HR and Product Owners can disable employee MFA' });
+      }
+
+      const { profileId } = req.params;
+      const { reason } = req.body;
+
+      if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+        return res.status(400).json({ error: 'Reason is required for disabling MFA' });
+      }
+
+      // Verify the target profile exists
+      const [targetProfile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, profileId));
+
+      if (!targetProfile) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+
+      // Get admin profile for logging
+      const [adminProfile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, adminId));
+
+      // Delete all MFA methods for this profile
+      await db
+        .delete(mfaMethods)
+        .where(eq(mfaMethods.profileId, profileId));
+
+      // Delete all unused backup codes
+      await db
+        .delete(mfaBackupCodes)
+        .where(eq(mfaBackupCodes.profileId, profileId));
+
+      // Delete any pending challenges
+      await db
+        .delete(mfaChallenges)
+        .where(eq(mfaChallenges.profileId, profileId));
+
+      // Log the admin action with additional metadata
+      await db.insert(mfaAuditLog).values({
+        profileId: profileId,
+        action: 'admin_disable_mfa',
+        methodType: null,
+        success: true,
+        ipAddress: req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        errorMessage: JSON.stringify({
+          adminId,
+          adminEmail: adminProfile?.email,
+          reason: reason.trim(),
+          targetEmail: targetProfile.email
+        })
+      });
+
+      res.json({
+        success: true,
+        message: `MFA has been disabled for ${targetProfile.email}`,
+        adminAction: {
+          performedBy: adminProfile?.email,
+          reason: reason.trim(),
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error: any) {
+      console.error('Failed to disable employee MFA:', error);
+      const adminId = requireAuth(req);
+      if (adminId) {
+        await logMFAAudit(adminId, 'admin_disable_mfa', null, false, req, error.message);
+      }
+      res.status(500).json({ error: 'Failed to disable employee MFA' });
+    }
+  });
+
+  // Generate new backup codes for a specific employee (Admin only)
+  app.post('/api/admin/mfa/:profileId/reset-backup-codes', async (req, res) => {
+    try {
+      const adminId = requireAuth(req);
+      if (!adminId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has HR or Product Owner permissions
+      const hasPermission = await isHROrProductOwner(adminId);
+      if (!hasPermission) {
+        await logMFAAudit(adminId, 'admin_reset_backup_codes', null, false, req, 'Insufficient permissions');
+        return res.status(403).json({ error: 'Forbidden: Only HR and Product Owners can reset backup codes' });
+      }
+
+      const { profileId } = req.params;
+      const { reason } = req.body;
+
+      // Verify the target profile exists
+      const [targetProfile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, profileId));
+
+      if (!targetProfile) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+
+      // Check if employee has MFA enabled
+      const existingMethods = await db
+        .select()
+        .from(mfaMethods)
+        .where(eq(mfaMethods.profileId, profileId));
+
+      if (existingMethods.length === 0) {
+        return res.status(400).json({ error: 'Employee does not have MFA enabled' });
+      }
+
+      // Get admin profile for logging
+      const [adminProfile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, adminId));
+
+      // Invalidate all old unused backup codes
+      await db
+        .delete(mfaBackupCodes)
+        .where(eq(mfaBackupCodes.profileId, profileId));
+
+      // Generate new backup codes
+      const newCodes = generateBackupCodes(10);
+
+      // Store hashed backup codes
+      const backupCodePromises = newCodes.map(async (code) => {
+        const hashedCode = await hashBackupCode(code);
+        return db.insert(mfaBackupCodes).values({
+          profileId,
+          code: hashedCode,
+          used: false
+        });
+      });
+
+      await Promise.all(backupCodePromises);
+
+      // Log the admin action
+      await db.insert(mfaAuditLog).values({
+        profileId: profileId,
+        action: 'admin_reset_backup_codes',
+        methodType: 'backup_code',
+        success: true,
+        ipAddress: req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        errorMessage: JSON.stringify({
+          adminId,
+          adminEmail: adminProfile?.email,
+          reason: reason || 'Backup codes reset by admin',
+          targetEmail: targetProfile.email
+        })
+      });
+
+      res.json({
+        success: true,
+        backupCodes: newCodes,
+        message: `New backup codes generated for ${targetProfile.email}`,
+        warning: 'These codes will only be shown once. Please securely share them with the employee.',
+        adminAction: {
+          performedBy: adminProfile?.email,
+          reason: reason || 'Backup codes reset by admin',
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error: any) {
+      console.error('Failed to reset backup codes:', error);
+      const adminId = requireAuth(req);
+      if (adminId) {
+        await logMFAAudit(adminId, 'admin_reset_backup_codes', null, false, req, error.message);
+      }
+      res.status(500).json({ error: 'Failed to reset backup codes' });
     }
   });
 }
