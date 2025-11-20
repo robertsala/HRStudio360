@@ -199,6 +199,7 @@ export function registerMFARoutes(app: Express) {
 
       await db.insert(mfaChallenges).values({
         profileId: userId,
+        methodId: newMethod.id,
         methodType,
         code: codeHash,
         sessionToken,
@@ -299,6 +300,7 @@ export function registerMFARoutes(app: Express) {
 
       await db.insert(mfaChallenges).values({
         profileId: userId,
+        methodId: newMethod.id,
         methodType,
         code: codeHash,
         sessionToken,
@@ -406,16 +408,24 @@ export function registerMFARoutes(app: Express) {
         })
         .where(eq(mfaChallenges.id, challenge.id));
 
-      // Mark the MFA method as verified
-      await db
-        .update(mfaMethods)
-        .set({ isVerified: true })
-        .where(
-          and(
-            eq(mfaMethods.profileId, userId),
-            eq(mfaMethods.methodType, challenge.methodType)
-          )
-        );
+      // Mark the specific MFA method as verified (use methodId to ensure only this specific method is verified)
+      if (challenge.methodId) {
+        await db
+          .update(mfaMethods)
+          .set({ isVerified: true })
+          .where(eq(mfaMethods.id, challenge.methodId));
+      } else {
+        // Fallback for legacy challenges without methodId - mark by type (less precise)
+        await db
+          .update(mfaMethods)
+          .set({ isVerified: true })
+          .where(
+            and(
+              eq(mfaMethods.profileId, userId),
+              eq(mfaMethods.methodType, challenge.methodType)
+            )
+          );
+      }
 
       await logMFAAudit(userId, 'enrollment_verified', challenge.methodType, true, req);
 
@@ -471,6 +481,7 @@ export function registerMFARoutes(app: Express) {
       // Create challenge
       await db.insert(mfaChallenges).values({
         profileId,
+        methodId: selectedMethod.id,
         methodType: selectedMethod.methodType,
         code: codeHash,
         sessionToken,
@@ -580,16 +591,24 @@ export function registerMFARoutes(app: Express) {
         })
         .where(eq(mfaChallenges.id, challenge.id));
 
-      // Update last used timestamp on the method
-      await db
-        .update(mfaMethods)
-        .set({ lastUsedAt: new Date() })
-        .where(
-          and(
-            eq(mfaMethods.profileId, challenge.profileId),
-            eq(mfaMethods.methodType, challenge.methodType)
-          )
-        );
+      // Update last used timestamp on the specific method
+      if (challenge.methodId) {
+        await db
+          .update(mfaMethods)
+          .set({ lastUsedAt: new Date() })
+          .where(eq(mfaMethods.id, challenge.methodId));
+      } else {
+        // Fallback for legacy challenges without methodId
+        await db
+          .update(mfaMethods)
+          .set({ lastUsedAt: new Date() })
+          .where(
+            and(
+              eq(mfaMethods.profileId, challenge.profileId),
+              eq(mfaMethods.methodType, challenge.methodType)
+            )
+          );
+      }
 
       // Create actual session
       (req.session as any).userId = challenge.profileId;
@@ -622,16 +641,25 @@ export function registerMFARoutes(app: Express) {
         return res.status(400).json({ error: 'Invalid session' });
       }
 
-      // Get the method to send to
-      const [method] = await db
-        .select()
-        .from(mfaMethods)
-        .where(
-          and(
-            eq(mfaMethods.profileId, challenge.profileId),
-            eq(mfaMethods.methodType, challenge.methodType)
-          )
-        );
+      // Get the method to send to (prefer methodId if available)
+      let method;
+      if (challenge.methodId) {
+        [method] = await db
+          .select()
+          .from(mfaMethods)
+          .where(eq(mfaMethods.id, challenge.methodId));
+      } else {
+        // Fallback for legacy challenges without methodId
+        [method] = await db
+          .select()
+          .from(mfaMethods)
+          .where(
+            and(
+              eq(mfaMethods.profileId, challenge.profileId),
+              eq(mfaMethods.methodType, challenge.methodType)
+            )
+          );
+      }
 
       if (!method || !method.methodValue) {
         return res.status(400).json({ error: 'MFA method not found' });

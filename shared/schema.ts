@@ -2267,6 +2267,7 @@ export const mfaMethods = pgTable('mfa_methods', {
 export const mfaChallenges = pgTable('mfa_challenges', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  methodId: uuid('method_id').references(() => mfaMethods.id, { onDelete: 'cascade' }), // Links to specific MFA method being verified
   methodType: mfaMethodTypeEnum('method_type').notNull(),
   code: text('code').notNull(), // 6-digit code (hashed for security)
   sessionToken: text('session_token').notNull().unique(), // Temporary session token before MFA verification
