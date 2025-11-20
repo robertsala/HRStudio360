@@ -40,8 +40,11 @@ export default function MFAVerificationPage() {
   
   // Navigate to dashboard only after auth state is fully updated
   useEffect(() => {
+    console.log('[MFA] Redirect effect triggered:', { shouldRedirect, isAuthenticated });
     if (shouldRedirect && isAuthenticated) {
+      console.log('[MFA] Navigating to /dashboard with replace:true');
       navigate('/dashboard', { replace: true });
+      console.log('[MFA] Navigate() call completed');
     }
   }, [shouldRedirect, isAuthenticated, navigate]);
   
@@ -76,11 +79,14 @@ export default function MFAVerificationPage() {
         sessionStorage.removeItem('mfaData');
         setSuccess('Verification successful! Redirecting...');
         
+        console.log('[MFA] Before refreshSession(), isAuthenticated:', isAuthenticated);
         // Refresh session to load user data
         await refreshSession();
+        console.log('[MFA] After refreshSession(), isAuthenticated:', isAuthenticated);
         
         // Set flag to trigger redirect via useEffect
         // This ensures navigation happens AFTER auth state updates propagate
+        console.log('[MFA] Setting shouldRedirect=true');
         setShouldRedirect(true);
       }
     } catch (err: any) {
