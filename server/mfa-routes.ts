@@ -73,17 +73,24 @@ export function registerMFARoutes(app: Express) {
       const [orgSettings] = await db.select().from(organizationSettings).limit(1);
       
       if (!orgSettings) {
-        // Return default settings if none exist
+        // Return default settings if none exist (use frontend-compatible field names)
         return res.json({
           mfaEnabled: true,
+          mfaEnforced: false,
           mfaRequired: false,
           mfaRequiredForRoles: ['HR', 'Product Owner'],
+          allowedMethods: ['email', 'sms'],
           allowedMfaMethods: ['email', 'sms'],
           externalMfaProvider: null
         });
       }
 
-      res.json(orgSettings);
+      // Return both field name formats for compatibility
+      res.json({
+        ...orgSettings,
+        mfaEnforced: orgSettings.mfaRequired,
+        allowedMethods: orgSettings.allowedMfaMethods
+      });
     } catch (error) {
       console.error('Failed to get MFA settings:', error);
       res.status(500).json({ error: 'Failed to get MFA settings' });
@@ -211,6 +218,107 @@ export function registerMFARoutes(app: Express) {
       res.json({
         methodId: newMethod.id,
         sessionToken,
+        requiresVerification: true,
+        message: `Verification code sent to ${methodType === 'sms' ? maskPhoneNumber(methodValue) : maskEmail(methodValue)}`
+      });
+    } catch (error: any) {
+      console.error('Failed to enroll MFA method:', error);
+      const userId = requireAuth(req);
+      if (userId) {
+        await logMFAAudit(userId, 'enrollment_initiated', req.body.methodType, false, req, error.message);
+      }
+      res.status(500).json({ error: error.message || 'Failed to enroll MFA method' });
+    }
+  });
+
+  // Alias: POST /api/mfa/methods (same as /api/mfa/enroll for frontend compatibility)
+  app.post('/api/mfa/methods', mfaRateLimiter, async (req, res) => {
+    // This is a direct alias - just handle the same way as enroll
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { methodType, methodValue } = req.body;
+
+      // Validate method type
+      if (!methodType || !['email', 'sms'].includes(methodType)) {
+        return res.status(400).json({ error: 'Invalid method type. Use "email" or "sms".' });
+      }
+
+      // Validate method value
+      if (methodType === 'sms' && !isValidPhoneNumber(methodValue)) {
+        return res.status(400).json({ error: 'Invalid phone number format' });
+      }
+
+      if (methodType === 'email' && !isValidEmail(methodValue)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+
+      // Check if method already exists
+      const existing = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.profileId, userId),
+            eq(mfaMethods.methodType, methodType),
+            eq(mfaMethods.methodValue, methodValue)
+          )
+        );
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'This method is already enrolled' });
+      }
+
+      // Check if this is the first method (make it primary)
+      const existingMethods = await db
+        .select()
+        .from(mfaMethods)
+        .where(eq(mfaMethods.profileId, userId));
+
+      const isPrimary = existingMethods.length === 0;
+
+      // Create the method (unverified)
+      const [newMethod] = await db
+        .insert(mfaMethods)
+        .values({
+          profileId: userId,
+          methodType,
+          methodValue,
+          isPrimary,
+          isVerified: false
+        })
+        .returning();
+
+      // Send verification code
+      const code = generateOTPCode();
+      const codeHash = await hashCode(code);
+      const sessionToken = generateSessionToken();
+
+      await db.insert(mfaChallenges).values({
+        profileId: userId,
+        methodType,
+        code: codeHash,
+        sessionToken,
+        status: 'pending',
+        expiresAt: calculateChallengeExpiry()
+      });
+
+      // Send the code
+      if (methodType === 'sms') {
+        await sendSMSOTP(formatPhoneE164(methodValue), code);
+      } else if (methodType === 'email') {
+        await sendEmailOTP(methodValue, code);
+      }
+
+      await logMFAAudit(userId, 'enrollment_initiated', methodType, true, req);
+
+      res.json({
+        methodId: newMethod.id,
+        sessionToken,
+        requiresVerification: true,
         message: `Verification code sent to ${methodType === 'sms' ? maskPhoneNumber(methodValue) : maskEmail(methodValue)}`
       });
     } catch (error: any) {

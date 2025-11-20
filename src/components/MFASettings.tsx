@@ -33,6 +33,7 @@ export default function MFASettings() {
   const [methodValue, setMethodValue] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [pendingMethodId, setPendingMethodId] = useState<string | null>(null);
+  const [pendingSessionToken, setPendingSessionToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   
   // Fetch existing MFA methods
@@ -57,6 +58,7 @@ export default function MFASettings() {
     onSuccess: (data) => {
       if (data.requiresVerification) {
         setPendingMethodId(data.methodId);
+        setPendingSessionToken(data.sessionToken);
         setVerificationCode('');
       } else {
         queryClient.invalidateQueries({ queryKey: ['/api/mfa/methods'] });
@@ -71,8 +73,8 @@ export default function MFASettings() {
   
   // Verify MFA method
   const verifyMethodMutation = useMutation({
-    mutationFn: async (data: { methodId: string; code: string }) => {
-      return apiRequest('/api/mfa/verify-method', {
+    mutationFn: async (data: { sessionToken: string; code: string }) => {
+      return apiRequest('/api/mfa/verify-enrollment', {
         method: 'POST',
         body: JSON.stringify(data)
       });
@@ -120,6 +122,7 @@ export default function MFASettings() {
     setMethodValue('');
     setVerificationCode('');
     setPendingMethodId(null);
+    setPendingSessionToken(null);
     setError('');
   };
   
@@ -141,13 +144,13 @@ export default function MFASettings() {
   };
   
   const handleVerifyMethod = () => {
-    if (!pendingMethodId || !verificationCode.trim()) {
+    if (!pendingSessionToken || !verificationCode.trim()) {
       setError('Please enter the verification code');
       return;
     }
     
     verifyMethodMutation.mutate({
-      methodId: pendingMethodId,
+      sessionToken: pendingSessionToken,
       code: verificationCode.trim()
     });
   };
