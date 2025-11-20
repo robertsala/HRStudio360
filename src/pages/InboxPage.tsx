@@ -318,226 +318,220 @@ const InboxPage: React.FC<InboxPageProps> = ({ initialFilter }) => {
           </div>
         </div>
 
-        {/* Tasks List */}
+        {/* Tasks List or Task Detail View */}
         <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
-          <div className="p-6">
-            {filteredTasks.length === 0 ? (
-              <div className="text-center py-8">
-                <Inbox className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No tasks found matching your criteria</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
-                    onClick={() => setSelectedTask(task)}
-                    data-testid={`card-task-${task.id}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
-                        <div className="bg-white dark:bg-gray-800 rounded-full p-2">
-                          {getCategoryIcon(task.category)}
+          {!selectedTask ? (
+            <div className="p-6">
+              {filteredTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <Inbox className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No tasks found matching your criteria</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
+                      onClick={() => setSelectedTask(task)}
+                      data-testid={`card-task-${task.id}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-4">
+                          <div className="bg-white dark:bg-gray-800 rounded-full p-2">
+                            {getCategoryIcon(task.category)}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h3 className="font-semibold text-gray-900 dark:text-white">{task.title}</h3>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
+                                {task.priority}
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
+                                {task.status}
+                              </span>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{task.description}</p>
+                            <div className="flex items-center space-x-4 text-xs text-gray-500">
+                              <span>Created: {new Date(task.createdDate).toLocaleDateString()}</span>
+                              <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                              <span>Assigned to: {task.assignedTo}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">{task.title}</h3>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                              {task.priority}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
-                              {task.status}
-                            </span>
-                          </div>
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{task.description}</p>
-                          <div className="flex items-center space-x-4 text-xs text-gray-500">
-                            <span>Created: {new Date(task.createdDate).toLocaleDateString()}</span>
-                            <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                            <span>Assigned to: {task.assignedTo}</span>
-                          </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTask(task);
+                            }}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 transition-colors"
+                            title="View Details"
+                            data-testid={`button-view-${task.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedTask(task);
-                          }}
-                          className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 transition-colors"
-                          title="View Details"
-                          data-testid={`button-view-${task.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-4xl mx-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <button
+                    onClick={() => setSelectedTask(null)}
+                    className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    data-testid="button-back-to-list"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                    <span className="font-medium">Back to Tasks</span>
+                  </button>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Task Details</h3>
+                  <div className="w-24"></div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    {getCategoryIcon(selectedTask.category)}
+                    <div>
+                      <h4 className="font-semibold text-lg text-gray-900 dark:text-white">{selectedTask.title}</h4>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedTask.priority)}`}>
+                          {selectedTask.priority} Priority
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedTask.status)}`}>
+                          {selectedTask.status}
+                        </span>
                       </div>
                     </div>
                   </div>
-                ))}
+                  
+                  <div>
+                    <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Description</h5>
+                    <p className="text-gray-600 dark:text-gray-400">{selectedTask.description}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Category</h5>
+                      <p className="text-gray-600 dark:text-gray-400">{selectedTask.category}</p>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned To</h5>
+                      <p className="text-gray-600 dark:text-gray-400">{selectedTask.assignedTo}</p>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Created Date</h5>
+                      <p className="text-gray-600 dark:text-gray-400">{new Date(selectedTask.createdDate).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Due Date</h5>
+                      <p className="text-gray-600 dark:text-gray-400">{new Date(selectedTask.dueDate).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  {/* Salary Review Details */}
+                  {selectedTask.category === 'Salary Review' && (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                      <h5 className="font-medium text-green-900 mb-3">Salary Review Details</h5>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-green-700">Employee:</span>
+                          <p className="text-green-900">{selectedTask.employeeName}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Performance Score:</span>
+                          <p className="text-green-900">{selectedTask.performanceScore}/5.0</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Current Salary:</span>
+                          <p className="text-green-900">${selectedTask.currentSalary?.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Recommended Increase:</span>
+                          <p className="text-green-900">{selectedTask.recommendedIncrease}%</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">New Salary:</span>
+                          <p className="text-green-900 font-bold">
+                            ${selectedTask.currentSalary && selectedTask.recommendedIncrease 
+                              ? Math.round(selectedTask.currentSalary * (1 + selectedTask.recommendedIncrease / 100)).toLocaleString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-green-700">Increase Amount:</span>
+                          <p className="text-green-900 font-bold">
+                            +${selectedTask.currentSalary && selectedTask.recommendedIncrease 
+                              ? Math.round(selectedTask.currentSalary * (selectedTask.recommendedIncrease / 100)).toLocaleString()
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Performance Review Details */}
+                  {selectedTask.category === 'Performance Review' && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                      <h5 className="font-medium text-purple-900 mb-3">Performance Review Details</h5>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-purple-700">Employee:</span>
+                          <p className="text-purple-900">{selectedTask.employeeName}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-purple-700">Reviewer:</span>
+                          <p className="text-purple-900">{selectedTask.requester}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-purple-700">Performance Score:</span>
+                          <p className="text-purple-900">{selectedTask.performanceScore}/5.0</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-purple-700">Recommended Increase:</span>
+                          <p className="text-purple-900">{selectedTask.recommendedIncrease}%</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6">
+                  {selectedTask.status === 'Pending' && (
+                    <>
+                      <button
+                        onClick={() => handleDenyTask(selectedTask.id)}
+                        className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                        data-testid="button-deny"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Deny
+                      </button>
+                      <button
+                        onClick={() => handleApproveTask(selectedTask.id)}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                        data-testid="button-approve"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {selectedTask.category === 'Salary Review' 
+                          ? 'Approve Increase' 
+                          : selectedTask.category === 'Performance Review' 
+                          ? 'Approve Review' 
+                          : 'Mark Complete'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Task Details Modal */}
-      {selectedTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Task Details</h3>
-              <button
-                onClick={() => setSelectedTask(null)}
-                className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors"
-                data-testid="button-close-details"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                {getCategoryIcon(selectedTask.category)}
-                <div>
-                  <h4 className="font-semibold text-lg text-gray-900 dark:text-white">{selectedTask.title}</h4>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedTask.priority)}`}>
-                      {selectedTask.priority} Priority
-                    </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedTask.status)}`}>
-                      {selectedTask.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Description</h5>
-                <p className="text-gray-600 dark:text-gray-400">{selectedTask.description}</p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Category</h5>
-                  <p className="text-gray-600 dark:text-gray-400">{selectedTask.category}</p>
-                </div>
-                <div>
-                  <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned To</h5>
-                  <p className="text-gray-600 dark:text-gray-400">{selectedTask.assignedTo}</p>
-                </div>
-                <div>
-                  <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Created Date</h5>
-                  <p className="text-gray-600 dark:text-gray-400">{new Date(selectedTask.createdDate).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <h5 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Due Date</h5>
-                  <p className="text-gray-600 dark:text-gray-400">{new Date(selectedTask.dueDate).toLocaleDateString()}</p>
-                </div>
-              </div>
-
-              {/* Salary Review Details */}
-              {selectedTask.category === 'Salary Review' && (
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                  <h5 className="font-medium text-green-900 mb-3">Salary Review Details</h5>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-green-700">Employee:</span>
-                      <p className="text-green-900">{selectedTask.employeeName}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">Performance Score:</span>
-                      <p className="text-green-900">{selectedTask.performanceScore}/5.0</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">Current Salary:</span>
-                      <p className="text-green-900">${selectedTask.currentSalary?.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">Recommended Increase:</span>
-                      <p className="text-green-900">{selectedTask.recommendedIncrease}%</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">New Salary:</span>
-                      <p className="text-green-900 font-bold">
-                        ${selectedTask.currentSalary && selectedTask.recommendedIncrease 
-                          ? Math.round(selectedTask.currentSalary * (1 + selectedTask.recommendedIncrease / 100)).toLocaleString()
-                          : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-green-700">Increase Amount:</span>
-                      <p className="text-green-900 font-bold">
-                        +${selectedTask.currentSalary && selectedTask.recommendedIncrease 
-                          ? Math.round(selectedTask.currentSalary * (selectedTask.recommendedIncrease / 100)).toLocaleString()
-                          : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Performance Review Details */}
-              {selectedTask.category === 'Performance Review' && (
-                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-                  <h5 className="font-medium text-purple-900 mb-3">Performance Review Details</h5>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-purple-700">Employee:</span>
-                      <p className="text-purple-900">{selectedTask.employeeName}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-purple-700">Reviewer:</span>
-                      <p className="text-purple-900">{selectedTask.requester}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-purple-700">Performance Score:</span>
-                      <p className="text-purple-900">{selectedTask.performanceScore}/5.0</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-purple-700">Recommended Increase:</span>
-                      <p className="text-purple-900">{selectedTask.recommendedIncrease}%</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setSelectedTask(null)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 transition-colors"
-                data-testid="button-close"
-              >
-                Close
-              </button>
-              {selectedTask.status === 'Pending' && (
-                <>
-                  <button
-                    onClick={() => handleDenyTask(selectedTask.id)}
-                    className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
-                    data-testid="button-deny"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Deny
-                  </button>
-                  <button
-                    onClick={() => handleApproveTask(selectedTask.id)}
-                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
-                    data-testid="button-approve"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    {selectedTask.category === 'Salary Review' 
-                      ? 'Approve Increase' 
-                      : selectedTask.category === 'Performance Review' 
-                      ? 'Approve Review' 
-                      : 'Mark Complete'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Notification Toast */}
       {notification && (
