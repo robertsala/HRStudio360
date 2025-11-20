@@ -11,7 +11,7 @@ interface MFAMethod {
 
 export default function MFAVerificationPage() {
   const [, navigate] = useLocation();
-  const { refreshSession } = useAuth();
+  const { refreshSession, isAuthenticated } = useAuth();
   
   // Get MFA data from sessionStorage (set by login flow)
   const mfaData = sessionStorage.getItem('mfaData');
@@ -29,6 +29,7 @@ export default function MFAVerificationPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [usingBackupCode, setUsingBackupCode] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
   
   // Redirect if no MFA data
   useEffect(() => {
@@ -36,6 +37,13 @@ export default function MFAVerificationPage() {
       navigate('/');
     }
   }, [parsedData, sessionToken, navigate]);
+  
+  // Navigate to dashboard only after auth state is fully updated
+  useEffect(() => {
+    if (shouldRedirect && isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [shouldRedirect, isAuthenticated, navigate]);
   
   // Countdown timer for resend
   useEffect(() => {
@@ -68,10 +76,12 @@ export default function MFAVerificationPage() {
         sessionStorage.removeItem('mfaData');
         setSuccess('Verification successful! Redirecting...');
         
-        // Refresh session to load user data, then navigate
-        // This ensures a smooth client-side transition without page reload
+        // Refresh session to load user data
         await refreshSession();
-        navigate('/dashboard');
+        
+        // Set flag to trigger redirect via useEffect
+        // This ensures navigation happens AFTER auth state updates propagate
+        setShouldRedirect(true);
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
