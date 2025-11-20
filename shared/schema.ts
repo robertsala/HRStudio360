@@ -2229,3 +2229,112 @@ export const insertCallSignalingSchema = createInsertSchema(callSignaling).omit(
 });
 export type InsertCallSignaling = z.infer<typeof insertCallSignalingSchema>;
 export type CallSignaling = typeof callSignaling.$inferSelect;
+
+// MFA (Multi-Factor Authentication) Tables
+export const mfaMethodTypeEnum = pgEnum('mfa_method_type', ['email', 'sms', 'totp', 'webauthn']);
+export const mfaChallengeStatusEnum = pgEnum('mfa_challenge_status', ['pending', 'verified', 'expired', 'failed']);
+
+// Organization settings table - for tenant-level MFA configuration
+export const organizationSettings = pgTable('organization_settings', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  organizationName: text('organization_name').notNull().default('HRStudio360'),
+  mfaEnabled: boolean('mfa_enabled').default(true).notNull(), // Can disable built-in MFA for external providers
+  mfaRequired: boolean('mfa_required').default(false).notNull(), // Force all users to enroll
+  mfaRequiredForRoles: text('mfa_required_for_roles').array().default(sql`ARRAY['HR', 'Product Owner']::text[]`), // Roles that must use MFA
+  allowedMfaMethods: text('allowed_mfa_methods').array().default(sql`ARRAY['email', 'sms']::text[]`), // Which methods are allowed
+  externalMfaProvider: text('external_mfa_provider'), // 'okta', 'microsoft', 'duo', etc.
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// MFA methods table - stores enrolled 2FA methods per user
+export const mfaMethods = pgTable('mfa_methods', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  methodType: mfaMethodTypeEnum('method_type').notNull(),
+  methodValue: text('method_value'), // Phone number for SMS, email for email, null for TOTP/WebAuthn
+  totpSecret: text('totp_secret'), // TOTP secret key (encrypted)
+  webauthnCredentialId: text('webauthn_credential_id'), // WebAuthn credential ID
+  webauthnPublicKey: text('webauthn_public_key'), // WebAuthn public key
+  isPrimary: boolean('is_primary').default(false).notNull(),
+  isVerified: boolean('is_verified').default(false).notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// MFA challenges table - stores temporary verification codes
+export const mfaChallenges = pgTable('mfa_challenges', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  methodType: mfaMethodTypeEnum('method_type').notNull(),
+  code: text('code').notNull(), // 6-digit code (hashed for security)
+  sessionToken: text('session_token').notNull().unique(), // Temporary session token before MFA verification
+  status: mfaChallengeStatusEnum('status').default('pending').notNull(),
+  expiresAt: timestamp('expires_at').notNull(), // Codes expire after 10 minutes
+  attempts: smallint('attempts').default(0).notNull(), // Track failed attempts
+  maxAttempts: smallint('max_attempts').default(3).notNull(),
+  verifiedAt: timestamp('verified_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// MFA backup codes table - one-time use recovery codes
+export const mfaBackupCodes = pgTable('mfa_backup_codes', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  codeHash: text('code_hash').notNull(), // Hashed backup code
+  used: boolean('used').default(false).notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// MFA audit log table - track all MFA events for security
+export const mfaAuditLog = pgTable('mfa_audit_log', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  action: text('action').notNull(), // 'enrollment', 'verification', 'failure', 'disable', etc.
+  methodType: text('method_type'), // Which MFA method was used
+  success: boolean('success').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Insert schemas for MFA tables
+export const insertOrganizationSettingsSchema = createInsertSchema(organizationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertOrganizationSettings = z.infer<typeof insertOrganizationSettingsSchema>;
+export type OrganizationSettings = typeof organizationSettings.$inferSelect;
+
+export const insertMfaMethodSchema = createInsertSchema(mfaMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertMfaMethod = z.infer<typeof insertMfaMethodSchema>;
+export type MfaMethod = typeof mfaMethods.$inferSelect;
+
+export const insertMfaChallengeSchema = createInsertSchema(mfaChallenges).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertMfaChallenge = z.infer<typeof insertMfaChallengeSchema>;
+export type MfaChallenge = typeof mfaChallenges.$inferSelect;
+
+export const insertMfaBackupCodeSchema = createInsertSchema(mfaBackupCodes).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertMfaBackupCode = z.infer<typeof insertMfaBackupCodeSchema>;
+export type MfaBackupCode = typeof mfaBackupCodes.$inferSelect;
+
+export const insertMfaAuditLogSchema = createInsertSchema(mfaAuditLog).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertMfaAuditLog = z.infer<typeof insertMfaAuditLogSchema>;
+export type MfaAuditLog = typeof mfaAuditLog.$inferSelect;

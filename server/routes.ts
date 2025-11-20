@@ -16,6 +16,7 @@ import {
   insertCallSessionSchema, insertCallParticipantSchema, insertCallSignalingSchema,
   insertOnboardingChecklistSchema, insertOnboardingTaskSchema,
   insertI9FormSchema, insertStateTaxFormSchema, insertOnboardingDocumentSchema,
+  insertMfaMethodSchema, insertMfaChallengeSchema, insertMfaAuditLogSchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -28,15 +29,23 @@ import {
   tutorialBadges,
   userTutorialBadges,
   callSessions,
-  callParticipants
+  callParticipants,
+  organizationSettings,
+  mfaMethods,
+  mfaChallenges,
+  mfaBackupCodes,
+  mfaAuditLog
 } from '../shared/schema.js';
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { sendAutoFixNotificationEmail, notificationService } from './notification-service.js';
 import { seedProductionDatabase } from './seed-production.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
+import { generateOTPCode, generateSessionToken, hashCode, verifyCode, maskPhoneNumber, maskEmail, isChallengeExpired, calculateChallengeExpiry, formatPhoneE164, isValidPhoneNumber, isValidEmail, generateBackupCodes } from './lib/mfa.js';
+import { sendEmailOTP, sendSMSOTP } from './mfaService.js';
+import { registerMFARoutes } from './mfa-routes.js';
 import rateLimit from 'express-rate-limit';
 import { db } from './db.js';
-import { eq, and, asc, inArray } from 'drizzle-orm';
+import { eq, and, asc, inArray, desc, lt } from 'drizzle-orm';
 import { ObjectStorageService, ObjectNotFoundError } from './objectStorage.js';
 import { ObjectPermission } from './objectAcl.js';
 import {
@@ -62,6 +71,9 @@ const openai = new OpenAI({
 });
 
 export function registerRoutes(app: Express) {
+  // Register MFA routes first
+  registerMFARoutes(app);
+
   // Rate limiting for authentication endpoints to prevent brute-force attacks
   const authRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -2274,6 +2286,71 @@ export function registerRoutes(app: Express) {
       // Successful login - reset failed attempts
       await storage.resetFailedLoginAttempts(profile.id);
       
+      // Check if user has MFA enrolled
+      const mfaEnrolled = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.profileId, profile.id),
+            eq(mfaMethods.isVerified, true)
+          )
+        );
+      
+      // If MFA is enrolled, don't create session yet - require MFA verification
+      if (mfaEnrolled.length > 0) {
+        // Initiate MFA challenge
+        const code = generateOTPCode();
+        const codeHash = await hashCode(code);
+        const sessionToken = generateSessionToken();
+        
+        // Find primary method or use first verified method
+        const primaryMethod = mfaEnrolled.find(m => m.isPrimary) || mfaEnrolled[0];
+        
+        // Create MFA challenge
+        await db.insert(mfaChallenges).values({
+          profileId: profile.id,
+          methodType: primaryMethod.methodType,
+          code: codeHash,
+          sessionToken,
+          status: 'pending',
+          expiresAt: calculateChallengeExpiry()
+        });
+        
+        // Send verification code
+        try {
+          if (primaryMethod.methodType === 'sms' && primaryMethod.methodValue) {
+            await sendSMSOTP(formatPhoneE164(primaryMethod.methodValue), code);
+          } else if (primaryMethod.methodType === 'email' && primaryMethod.methodValue) {
+            await sendEmailOTP(primaryMethod.methodValue, code);
+          }
+        } catch (error: any) {
+          console.error('Failed to send MFA code:', error);
+          return res.status(500).json({ error: 'Failed to send verification code' });
+        }
+        
+        // Return MFA required response with available methods
+        const maskedMethods = mfaEnrolled.map(m => ({
+          methodType: m.methodType,
+          methodValue: m.methodType === 'sms' 
+            ? maskPhoneNumber(m.methodValue || '')
+            : maskEmail(m.methodValue || '')
+        }));
+        
+        return res.json({
+          mfaRequired: true,
+          sessionToken,
+          methods: maskedMethods,
+          selectedMethod: {
+            methodType: primaryMethod.methodType,
+            methodValue: primaryMethod.methodType === 'sms'
+              ? maskPhoneNumber(primaryMethod.methodValue || '')
+              : maskEmail(primaryMethod.methodValue || '')
+          }
+        });
+      }
+      
+      // No MFA enrolled - proceed with normal login
       // Regenerate session to prevent fixation attacks
       req.session.regenerate((err) => {
         if (err) {

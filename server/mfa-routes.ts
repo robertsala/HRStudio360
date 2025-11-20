@@ -1,0 +1,697 @@
+import type { Express } from 'express';
+import { db } from './db.js';
+import { eq, and, lt } from 'drizzle-orm';
+import { 
+  mfaMethods, 
+  mfaChallenges, 
+  mfaAuditLog,
+  organizationSettings 
+} from '../shared/schema.js';
+import { 
+  generateOTPCode, 
+  generateSessionToken, 
+  hashCode, 
+  verifyCode, 
+  maskPhoneNumber, 
+  maskEmail, 
+  isChallengeExpired, 
+  calculateChallengeExpiry, 
+  formatPhoneE164, 
+  isValidPhoneNumber, 
+  isValidEmail
+} from './lib/mfa.js';
+import { sendEmailOTP, sendSMSOTP } from './mfaService.js';
+import rateLimit from 'express-rate-limit';
+
+// Rate limiting for MFA endpoints to prevent code guessing attacks
+const mfaRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 requests per window
+  message: { error: 'Too many verification attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+export function registerMFARoutes(app: Express) {
+  
+  // Helper to check if user is authenticated
+  function requireAuth(req: any): string | null {
+    const userId = req.session?.userId;
+    if (typeof userId !== 'string') {
+      return null;
+    }
+    return userId;
+  }
+
+  // Helper to log MFA audit events
+  async function logMFAAudit(
+    profileId: string,
+    action: string,
+    methodType: string | null,
+    success: boolean,
+    req: any,
+    errorMessage?: string
+  ) {
+    try {
+      await db.insert(mfaAuditLog).values({
+        profileId,
+        action,
+        methodType,
+        success,
+        ipAddress: req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        errorMessage
+      });
+    } catch (error) {
+      console.error('Failed to log MFA audit:', error);
+    }
+  }
+
+  // Get organization MFA settings
+  app.get('/api/mfa/settings', async (_req, res) => {
+    try {
+      const [orgSettings] = await db.select().from(organizationSettings).limit(1);
+      
+      if (!orgSettings) {
+        // Return default settings if none exist
+        return res.json({
+          mfaEnabled: true,
+          mfaRequired: false,
+          mfaRequiredForRoles: ['HR', 'Product Owner'],
+          allowedMfaMethods: ['email', 'sms'],
+          externalMfaProvider: null
+        });
+      }
+
+      res.json(orgSettings);
+    } catch (error) {
+      console.error('Failed to get MFA settings:', error);
+      res.status(500).json({ error: 'Failed to get MFA settings' });
+    }
+  });
+
+  // Get user's enrolled MFA methods
+  app.get('/api/mfa/methods', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const methods = await db
+        .select()
+        .from(mfaMethods)
+        .where(eq(mfaMethods.profileId, userId));
+
+      // Mask sensitive information
+      const maskedMethods = methods.map(method => ({
+        id: method.id,
+        methodType: method.methodType,
+        methodValue: method.methodType === 'sms' 
+          ? maskPhoneNumber(method.methodValue || '')
+          : method.methodType === 'email'
+          ? maskEmail(method.methodValue || '')
+          : null,
+        isPrimary: method.isPrimary,
+        isVerified: method.isVerified,
+        lastUsedAt: method.lastUsedAt,
+        createdAt: method.createdAt
+      }));
+
+      res.json(maskedMethods);
+    } catch (error) {
+      console.error('Failed to get MFA methods:', error);
+      res.status(500).json({ error: 'Failed to get MFA methods' });
+    }
+  });
+
+  // Enroll a new MFA method (SMS or Email)
+  app.post('/api/mfa/enroll', mfaRateLimiter, async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { methodType, methodValue } = req.body;
+
+      // Validate method type
+      if (!methodType || !['email', 'sms'].includes(methodType)) {
+        return res.status(400).json({ error: 'Invalid method type. Use "email" or "sms".' });
+      }
+
+      // Validate method value
+      if (methodType === 'sms' && !isValidPhoneNumber(methodValue)) {
+        return res.status(400).json({ error: 'Invalid phone number format' });
+      }
+
+      if (methodType === 'email' && !isValidEmail(methodValue)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+
+      // Check if method already exists
+      const existing = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.profileId, userId),
+            eq(mfaMethods.methodType, methodType),
+            eq(mfaMethods.methodValue, methodValue)
+          )
+        );
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'This method is already enrolled' });
+      }
+
+      // Check if this is the first method (make it primary)
+      const existingMethods = await db
+        .select()
+        .from(mfaMethods)
+        .where(eq(mfaMethods.profileId, userId));
+
+      const isPrimary = existingMethods.length === 0;
+
+      // Create the method (unverified)
+      const [newMethod] = await db
+        .insert(mfaMethods)
+        .values({
+          profileId: userId,
+          methodType,
+          methodValue,
+          isPrimary,
+          isVerified: false
+        })
+        .returning();
+
+      // Send verification code
+      const code = generateOTPCode();
+      const codeHash = await hashCode(code);
+      const sessionToken = generateSessionToken();
+
+      await db.insert(mfaChallenges).values({
+        profileId: userId,
+        methodType,
+        code: codeHash,
+        sessionToken,
+        status: 'pending',
+        expiresAt: calculateChallengeExpiry()
+      });
+
+      // Send the code
+      if (methodType === 'sms') {
+        await sendSMSOTP(formatPhoneE164(methodValue), code);
+      } else if (methodType === 'email') {
+        await sendEmailOTP(methodValue, code);
+      }
+
+      await logMFAAudit(userId, 'enrollment_initiated', methodType, true, req);
+
+      res.json({
+        methodId: newMethod.id,
+        sessionToken,
+        message: `Verification code sent to ${methodType === 'sms' ? maskPhoneNumber(methodValue) : maskEmail(methodValue)}`
+      });
+    } catch (error: any) {
+      console.error('Failed to enroll MFA method:', error);
+      const userId = requireAuth(req);
+      if (userId) {
+        await logMFAAudit(userId, 'enrollment_initiated', req.body.methodType, false, req, error.message);
+      }
+      res.status(500).json({ error: error.message || 'Failed to enroll MFA method' });
+    }
+  });
+
+  // Verify enrollment with code
+  app.post('/api/mfa/verify-enrollment', mfaRateLimiter, async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { sessionToken, code } = req.body;
+
+      if (!sessionToken || !code) {
+        return res.status(400).json({ error: 'Session token and code are required' });
+      }
+
+      // Find the challenge
+      const [challenge] = await db
+        .select()
+        .from(mfaChallenges)
+        .where(
+          and(
+            eq(mfaChallenges.sessionToken, sessionToken),
+            eq(mfaChallenges.profileId, userId),
+            eq(mfaChallenges.status, 'pending')
+          )
+        );
+
+      if (!challenge) {
+        return res.status(400).json({ error: 'Invalid or expired verification session' });
+      }
+
+      // Check if expired
+      if (isChallengeExpired(challenge.expiresAt)) {
+        await db
+          .update(mfaChallenges)
+          .set({ status: 'expired' })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(userId, 'enrollment_verification', challenge.methodType, false, req, 'Code expired');
+        return res.status(400).json({ error: 'Verification code has expired' });
+      }
+
+      // Check if too many attempts
+      if (challenge.attempts >= challenge.maxAttempts) {
+        await db
+          .update(mfaChallenges)
+          .set({ status: 'failed' })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(userId, 'enrollment_verification', challenge.methodType, false, req, 'Too many attempts');
+        return res.status(400).json({ error: 'Too many verification attempts' });
+      }
+
+      // Verify the code
+      const isValid = await verifyCode(challenge.code, code);
+      
+      if (!isValid) {
+        // Increment attempts
+        await db
+          .update(mfaChallenges)
+          .set({ attempts: challenge.attempts + 1 })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(userId, 'enrollment_verification', challenge.methodType, false, req, 'Invalid code');
+        return res.status(400).json({ error: 'Invalid verification code' });
+      }
+
+      // Mark challenge as verified
+      await db
+        .update(mfaChallenges)
+        .set({ 
+          status: 'verified',
+          verifiedAt: new Date()
+        })
+        .where(eq(mfaChallenges.id, challenge.id));
+
+      // Mark the MFA method as verified
+      await db
+        .update(mfaMethods)
+        .set({ isVerified: true })
+        .where(
+          and(
+            eq(mfaMethods.profileId, userId),
+            eq(mfaMethods.methodType, challenge.methodType)
+          )
+        );
+
+      await logMFAAudit(userId, 'enrollment_verified', challenge.methodType, true, req);
+
+      res.json({ success: true, message: 'MFA method verified successfully' });
+    } catch (error: any) {
+      console.error('Failed to verify enrollment:', error);
+      const userId = requireAuth(req);
+      if (userId) {
+        await logMFAAudit(userId, 'enrollment_verification', null, false, req, error.message);
+      }
+      res.status(500).json({ error: 'Failed to verify enrollment' });
+    }
+  });
+
+  // Initiate MFA challenge during login (called by login route)
+  app.post('/api/mfa/initiate', mfaRateLimiter, async (req, res) => {
+    try {
+      const { profileId, methodType } = req.body;
+
+      if (!profileId) {
+        return res.status(400).json({ error: 'Profile ID is required' });
+      }
+
+      // Get user's MFA methods
+      const methods = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.profileId, profileId),
+            eq(mfaMethods.isVerified, true)
+          )
+        );
+
+      if (methods.length === 0) {
+        return res.status(400).json({ error: 'No MFA methods enrolled' });
+      }
+
+      // If methodType specified, use it. Otherwise use primary method
+      let selectedMethod = methodType
+        ? methods.find(m => m.methodType === methodType)
+        : methods.find(m => m.isPrimary) || methods[0];
+
+      if (!selectedMethod) {
+        return res.status(400).json({ error: 'Invalid MFA method' });
+      }
+
+      // Generate code
+      const code = generateOTPCode();
+      const codeHash = await hashCode(code);
+      const sessionToken = generateSessionToken();
+
+      // Create challenge
+      await db.insert(mfaChallenges).values({
+        profileId,
+        methodType: selectedMethod.methodType,
+        code: codeHash,
+        sessionToken,
+        status: 'pending',
+        expiresAt: calculateChallengeExpiry()
+      });
+
+      // Send the code
+      if (selectedMethod.methodType === 'sms' && selectedMethod.methodValue) {
+        await sendSMSOTP(formatPhoneE164(selectedMethod.methodValue), code);
+      } else if (selectedMethod.methodType === 'email' && selectedMethod.methodValue) {
+        await sendEmailOTP(selectedMethod.methodValue, code);
+      }
+
+      // Return masked methods for UI display
+      const maskedMethods = methods.map(m => ({
+        methodType: m.methodType,
+        methodValue: m.methodType === 'sms' 
+          ? maskPhoneNumber(m.methodValue || '')
+          : maskEmail(m.methodValue || '')
+      }));
+
+      await logMFAAudit(profileId, 'login_challenge_initiated', selectedMethod.methodType, true, req);
+
+      res.json({
+        sessionToken,
+        methods: maskedMethods,
+        selectedMethod: {
+          methodType: selectedMethod.methodType,
+          methodValue: selectedMethod.methodType === 'sms'
+            ? maskPhoneNumber(selectedMethod.methodValue || '')
+            : maskEmail(selectedMethod.methodValue || '')
+        }
+      });
+    } catch (error: any) {
+      console.error('Failed to initiate MFA:', error);
+      res.status(500).json({ error: error.message || 'Failed to initiate MFA' });
+    }
+  });
+
+  // Verify MFA code during login
+  app.post('/api/mfa/verify', mfaRateLimiter, async (req, res) => {
+    try {
+      const { sessionToken, code } = req.body;
+
+      if (!sessionToken || !code) {
+        return res.status(400).json({ error: 'Session token and code are required' });
+      }
+
+      // Find the challenge
+      const [challenge] = await db
+        .select()
+        .from(mfaChallenges)
+        .where(
+          and(
+            eq(mfaChallenges.sessionToken, sessionToken),
+            eq(mfaChallenges.status, 'pending')
+          )
+        );
+
+      if (!challenge) {
+        return res.status(400).json({ error: 'Invalid or expired verification session' });
+      }
+
+      // Check if expired
+      if (isChallengeExpired(challenge.expiresAt)) {
+        await db
+          .update(mfaChallenges)
+          .set({ status: 'expired' })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Code expired');
+        return res.status(400).json({ error: 'Verification code has expired' });
+      }
+
+      // Check if too many attempts
+      if (challenge.attempts >= challenge.maxAttempts) {
+        await db
+          .update(mfaChallenges)
+          .set({ status: 'failed' })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Too many attempts');
+        return res.status(400).json({ error: 'Too many verification attempts' });
+      }
+
+      // Verify the code
+      const isValid = await verifyCode(challenge.code, code);
+      
+      if (!isValid) {
+        // Increment attempts
+        await db
+          .update(mfaChallenges)
+          .set({ attempts: challenge.attempts + 1 })
+          .where(eq(mfaChallenges.id, challenge.id));
+        
+        await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Invalid code');
+        return res.status(400).json({ error: 'Invalid verification code' });
+      }
+
+      // Mark challenge as verified
+      await db
+        .update(mfaChallenges)
+        .set({ 
+          status: 'verified',
+          verifiedAt: new Date()
+        })
+        .where(eq(mfaChallenges.id, challenge.id));
+
+      // Update last used timestamp on the method
+      await db
+        .update(mfaMethods)
+        .set({ lastUsedAt: new Date() })
+        .where(
+          and(
+            eq(mfaMethods.profileId, challenge.profileId),
+            eq(mfaMethods.methodType, challenge.methodType)
+          )
+        );
+
+      // Create actual session
+      (req.session as any).userId = challenge.profileId;
+
+      await logMFAAudit(challenge.profileId, 'login_verified', challenge.methodType, true, req);
+
+      res.json({ success: true, profileId: challenge.profileId });
+    } catch (error: any) {
+      console.error('Failed to verify MFA:', error);
+      res.status(500).json({ error: 'Failed to verify MFA code' });
+    }
+  });
+
+  // Resend verification code
+  app.post('/api/mfa/resend', mfaRateLimiter, async (req, res) => {
+    try {
+      const { sessionToken } = req.body;
+
+      if (!sessionToken) {
+        return res.status(400).json({ error: 'Session token is required' });
+      }
+
+      // Find the existing challenge
+      const [challenge] = await db
+        .select()
+        .from(mfaChallenges)
+        .where(eq(mfaChallenges.sessionToken, sessionToken));
+
+      if (!challenge) {
+        return res.status(400).json({ error: 'Invalid session' });
+      }
+
+      // Get the method to send to
+      const [method] = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.profileId, challenge.profileId),
+            eq(mfaMethods.methodType, challenge.methodType)
+          )
+        );
+
+      if (!method || !method.methodValue) {
+        return res.status(400).json({ error: 'MFA method not found' });
+      }
+
+      // Generate new code
+      const code = generateOTPCode();
+      const codeHash = await hashCode(code);
+
+      // Update the challenge with new code and reset attempts
+      await db
+        .update(mfaChallenges)
+        .set({
+          code: codeHash,
+          status: 'pending',
+          attempts: 0,
+          expiresAt: calculateChallengeExpiry()
+        })
+        .where(eq(mfaChallenges.id, challenge.id));
+
+      // Send the new code
+      if (method.methodType === 'sms') {
+        await sendSMSOTP(formatPhoneE164(method.methodValue), code);
+      } else if (method.methodType === 'email') {
+        await sendEmailOTP(method.methodValue, code);
+      }
+
+      await logMFAAudit(challenge.profileId, 'code_resent', challenge.methodType, true, req);
+
+      res.json({ success: true, message: 'Verification code resent' });
+    } catch (error: any) {
+      console.error('Failed to resend code:', error);
+      res.status(500).json({ error: error.message || 'Failed to resend code' });
+    }
+  });
+
+  // Delete an MFA method
+  app.delete('/api/mfa/methods/:methodId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { methodId } = req.params;
+
+      // Check if method exists and belongs to user
+      const [method] = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.id, methodId),
+            eq(mfaMethods.profileId, userId)
+          )
+        );
+
+      if (!method) {
+        return res.status(404).json({ error: 'MFA method not found' });
+      }
+
+      // Check if this is the only method
+      const allMethods = await db
+        .select()
+        .from(mfaMethods)
+        .where(eq(mfaMethods.profileId, userId));
+
+      if (allMethods.length === 1) {
+        return res.status(400).json({ error: 'Cannot remove the only MFA method. Add another method first.' });
+      }
+
+      // Delete the method
+      await db
+        .delete(mfaMethods)
+        .where(eq(mfaMethods.id, methodId));
+
+      // If this was the primary method, make another method primary
+      if (method.isPrimary) {
+        const [nextMethod] = await db
+          .select()
+          .from(mfaMethods)
+          .where(eq(mfaMethods.profileId, userId))
+          .limit(1);
+
+        if (nextMethod) {
+          await db
+            .update(mfaMethods)
+            .set({ isPrimary: true })
+            .where(eq(mfaMethods.id, nextMethod.id));
+        }
+      }
+
+      await logMFAAudit(userId, 'method_removed', method.methodType, true, req);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete MFA method:', error);
+      res.status(500).json({ error: 'Failed to delete MFA method' });
+    }
+  });
+
+  // Set primary MFA method
+  app.post('/api/mfa/methods/:methodId/set-primary', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const { methodId } = req.params;
+
+      // Verify method belongs to user
+      const [method] = await db
+        .select()
+        .from(mfaMethods)
+        .where(
+          and(
+            eq(mfaMethods.id, methodId),
+            eq(mfaMethods.profileId, userId)
+          )
+        );
+
+      if (!method) {
+        return res.status(404).json({ error: 'MFA method not found' });
+      }
+
+      if (!method.isVerified) {
+        return res.status(400).json({ error: 'Cannot set unverified method as primary' });
+      }
+
+      // Remove primary from all other methods
+      await db
+        .update(mfaMethods)
+        .set({ isPrimary: false })
+        .where(eq(mfaMethods.profileId, userId));
+
+      // Set this method as primary
+      await db
+        .update(mfaMethods)
+        .set({ isPrimary: true })
+        .where(eq(mfaMethods.id, methodId));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to set primary method:', error);
+      res.status(500).json({ error: 'Failed to set primary method' });
+    }
+  });
+
+  // Clean up expired challenges (can be called periodically)
+  app.post('/api/mfa/cleanup', async (_req, res) => {
+    try {
+      const now = new Date();
+      
+      await db
+        .update(mfaChallenges)
+        .set({ status: 'expired' })
+        .where(
+          and(
+            eq(mfaChallenges.status, 'pending'),
+            lt(mfaChallenges.expiresAt, now)
+          )
+        );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to cleanup challenges:', error);
+      res.status(500).json({ error: 'Failed to cleanup challenges' });
+    }
+  });
+}
