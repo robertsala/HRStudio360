@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Smartphone, Mail, Check, Trash2, AlertCircle, Key, Lock } from 'lucide-react';
+import { Shield, Smartphone, Mail, Check, Trash2, AlertCircle, Key, Lock, Download, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/queryClient';
@@ -19,6 +19,12 @@ interface OrgSettings {
   allowedMethods: string[];
 }
 
+interface BackupCodeStats {
+  total: number;
+  used: number;
+  remaining: number;
+}
+
 export default function MFASettings() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -32,6 +38,8 @@ export default function MFASettings() {
   const [error, setError] = useState('');
   const [totpQrCode, setTotpQrCode] = useState<string | null>(null);
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [showBackupCodesModal, setShowBackupCodesModal] = useState(false);
   
   // Fetch existing MFA methods
   const { data: methods = [], isLoading } = useQuery<MFAMethod[]>({
@@ -42,6 +50,12 @@ export default function MFASettings() {
   // Fetch organization settings
   const { data: orgSettings } = useQuery<OrgSettings>({
     queryKey: ['/api/mfa/settings']
+  });
+  
+  // Fetch backup codes stats
+  const { data: backupCodeStats } = useQuery<BackupCodeStats>({
+    queryKey: ['/api/mfa/backup-codes/stats'],
+    enabled: !!user && methods.some(m => m.methodType === 'totp' && m.isVerified)
   });
   
   // Add new MFA method
@@ -83,8 +97,16 @@ export default function MFASettings() {
         body: JSON.stringify(data)
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/mfa/methods'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/mfa/backup-codes/stats'] });
+      
+      // If backup codes are returned, show the modal
+      if (data.backupCodes && data.backupCodes.length > 0) {
+        setBackupCodes(data.backupCodes);
+        setShowBackupCodesModal(true);
+      }
+      
       resetForm();
       setError('');
     },
@@ -169,6 +191,34 @@ export default function MFASettings() {
       methodType: 'totp',
       methodValue: '' // TOTP doesn't need a value; server generates secret
     });
+  };
+  
+  const downloadBackupCodes = () => {
+    const content = `HRStudio360 MFA Backup Codes
+Generated: ${new Date().toLocaleString()}
+
+IMPORTANT: Save these codes in a secure location.
+Each code can only be used once.
+
+${backupCodes.map((code, i) => `${i + 1}. ${code}`).join('\n')}
+
+If you lose access to your authenticator app, you can use these codes to sign in.
+`;
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hrstudio360-backup-codes-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  
+  const handleCloseBackupCodesModal = () => {
+    setShowBackupCodesModal(false);
+    setBackupCodes([]);
   };
   
   const getMethodIcon = (type: string) => {
@@ -536,6 +586,93 @@ export default function MFASettings() {
           )}
         </div>
       </div>
+      
+      {/* Backup Codes Section - Only show if user has TOTP enabled */}
+      {methods.some(m => m.methodType === 'totp' && m.isVerified) && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="p-6">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center mb-4">
+              <FileText className="h-5 w-5 mr-2" />
+              Backup Codes
+            </h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Backup codes can be used to sign in if you lose access to your authenticator app.
+            </p>
+            {backupCodeStats && (
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {backupCodeStats.remaining} of {backupCodeStats.total} codes remaining
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {backupCodeStats.used} codes have been used
+                    </p>
+                  </div>
+                  {backupCodeStats.remaining < 3 && (
+                    <AlertCircle className="h-5 w-5 text-orange-500" />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Backup Codes Modal */}
+      {showBackupCodesModal && backupCodes.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Save Your Backup Codes</h3>
+                <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="flex gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-orange-800 dark:text-orange-200">
+                  <p className="font-semibold">Important: Save these codes now!</p>
+                  <p className="mt-1">Each code can only be used once. You won't be able to view them again after closing this window.</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {backupCodes.map((code, index) => (
+                  <div
+                    key={index}
+                    className="p-3 bg-gray-50 dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600 font-mono text-center"
+                    data-testid={`backup-code-${index}`}
+                  >
+                    <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{index + 1}.</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">{code}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <button
+                  onClick={downloadBackupCodes}
+                  data-testid="button-download-codes"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="h-5 w-5" />
+                  Download as Text File
+                </button>
+                <button
+                  onClick={handleCloseBackupCodesModal}
+                  data-testid="button-close-codes-modal"
+                  className="flex-1 px-4 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  I've Saved My Codes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Information */}
       <div className="flex gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">

@@ -196,3 +196,17 @@ export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
+
+/**
+ * Hash a backup code using Argon2id for secure storage
+ */
+export async function hashBackupCode(code: string): Promise<string> {
+  return hashCode(code);
+}
+
+/**
+ * Verify a backup code against its hash
+ */
+export async function verifyBackupCode(hash: string, code: string): Promise<boolean> {
+  return verifyCode(hash, code);
+}

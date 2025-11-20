@@ -5,6 +5,7 @@ import {
   mfaMethods, 
   mfaChallenges, 
   mfaAuditLog,
+  mfaBackupCodes,
   organizationSettings,
   profiles
 } from '../shared/schema.js';
@@ -23,7 +24,10 @@ import {
   generateTOTPSecret,
   generateTOTPUri,
   generateQRCodeDataURL,
-  verifyTOTPCode
+  verifyTOTPCode,
+  generateBackupCodes,
+  hashBackupCode,
+  verifyBackupCode
 } from './lib/mfa.js';
 import { sendEmailOTP, sendSMSOTP } from './mfaService.js';
 import rateLimit from 'express-rate-limit';
@@ -134,6 +138,35 @@ export function registerMFARoutes(app: Express) {
     } catch (error) {
       console.error('Failed to get MFA methods:', error);
       res.status(500).json({ error: 'Failed to get MFA methods' });
+    }
+  });
+
+  // Get backup codes statistics
+  app.get('/api/mfa/backup-codes/stats', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Get all backup codes for this user
+      const codes = await db
+        .select()
+        .from(mfaBackupCodes)
+        .where(eq(mfaBackupCodes.profileId, userId));
+
+      const total = codes.length;
+      const used = codes.filter(c => c.used).length;
+      const remaining = total - used;
+
+      res.json({
+        total,
+        used,
+        remaining
+      });
+    } catch (error) {
+      console.error('Failed to get backup codes stats:', error);
+      res.status(500).json({ error: 'Failed to get backup codes stats' });
     }
   });
 
@@ -585,8 +618,31 @@ export function registerMFARoutes(app: Express) {
 
       await logMFAAudit(userId, 'enrollment_verified', challenge.methodType, true, req);
 
+      // Generate backup codes for TOTP enrollment
+      let backupCodes: string[] = [];
+      if (challenge.methodType === 'totp') {
+        console.log('[MFA Enrollment] Generating backup codes for TOTP enrollment...');
+        backupCodes = generateBackupCodes(10);
+        
+        // Hash and store backup codes
+        for (const code of backupCodes) {
+          const codeHash = await hashBackupCode(code);
+          await db.insert(mfaBackupCodes).values({
+            profileId: userId,
+            codeHash,
+            used: false
+          });
+        }
+        
+        console.log('[MFA Enrollment] Generated and stored 10 backup codes');
+      }
+
       console.log('[MFA Enrollment] Enrollment verification successful - user remains logged in');
-      res.json({ success: true, message: 'MFA method verified successfully' });
+      res.json({ 
+        success: true, 
+        message: 'MFA method verified successfully',
+        backupCodes: backupCodes.length > 0 ? backupCodes : undefined
+      });
     } catch (error: any) {
       console.error('[MFA Enrollment] Failed to verify enrollment:', error);
       const userId = requireAuth(req);
@@ -835,6 +891,11 @@ export function registerMFARoutes(app: Express) {
 
       // Verify the code - handle TOTP differently
       let isValid = false;
+      let usedBackupCodeId: string | null = null;
+      
+      // Detect if this looks like a backup code (8 alphanumeric chars with optional dash)
+      const normalizedCode = code.replace(/-/g, '').toUpperCase();
+      const looksLikeBackupCode = /^[A-Z0-9]{8}$/.test(normalizedCode);
       
       if (challenge.methodType === 'totp') {
         console.log('[MFA Login] Verifying TOTP code...');
@@ -849,9 +910,36 @@ export function registerMFARoutes(app: Express) {
           return res.status(400).json({ error: 'TOTP method not found or invalid' });
         }
         
-        // Verify TOTP code against the secret
+        // First try TOTP code verification
         isValid = verifyTOTPCode(method.methodValue, code);
         console.log('[MFA Login] TOTP verification result:', isValid);
+        
+        // If TOTP fails and code looks like backup code, try backup code verification
+        if (!isValid && looksLikeBackupCode) {
+          console.log('[MFA Login] TOTP failed, trying backup code verification...');
+          
+          // Get all unused backup codes for this user
+          const backupCodes = await db
+            .select()
+            .from(mfaBackupCodes)
+            .where(
+              and(
+                eq(mfaBackupCodes.profileId, challenge.profileId),
+                eq(mfaBackupCodes.used, false)
+              )
+            );
+          
+          // Try to verify against each unused backup code
+          for (const backupCode of backupCodes) {
+            const backupIsValid = await verifyBackupCode(backupCode.codeHash, normalizedCode);
+            if (backupIsValid) {
+              isValid = true;
+              usedBackupCodeId = backupCode.id;
+              console.log('[MFA Login] Backup code verified successfully');
+              break;
+            }
+          }
+        }
       } else {
         console.log('[MFA Login] Verifying SMS/Email code...');
         // For SMS/Email, verify against the hashed code
@@ -869,6 +957,20 @@ export function registerMFARoutes(app: Express) {
         await logMFAAudit(challenge.profileId, 'login_verification', challenge.methodType, false, req, 'Invalid code');
         console.log('[MFA Login] Invalid verification code');
         return res.status(400).json({ error: 'Invalid verification code' });
+      }
+      
+      // If a backup code was used, mark it as used
+      if (usedBackupCodeId) {
+        await db
+          .update(mfaBackupCodes)
+          .set({ 
+            used: true,
+            usedAt: new Date()
+          })
+          .where(eq(mfaBackupCodes.id, usedBackupCodeId));
+        
+        await logMFAAudit(challenge.profileId, 'backup_code_used', 'totp', true, req, 'Backup code login successful');
+        console.log('[MFA Login] Backup code marked as used:', usedBackupCodeId);
       }
 
       // Mark challenge as verified

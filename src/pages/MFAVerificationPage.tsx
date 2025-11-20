@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { apiRequest } from '../lib/queryClient';
-import { Shield, Smartphone, Mail, RefreshCw, AlertCircle } from 'lucide-react';
+import { Shield, Smartphone, Mail, RefreshCw, AlertCircle, Key } from 'lucide-react';
 
 interface MFAMethod {
   methodType: 'sms' | 'email' | 'totp' | 'passkey';
@@ -26,6 +26,7 @@ export default function MFAVerificationPage() {
   const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [usingBackupCode, setUsingBackupCode] = useState(false);
   
   // Redirect if no MFA data
   useEffect(() => {
@@ -189,17 +190,24 @@ export default function MFAVerificationPage() {
           
           <div className="space-y-2">
             <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Verification Code
+              {usingBackupCode ? 'Backup Code' : 'Verification Code'}
             </label>
             <input
               id="code"
               data-testid="input-verification-code"
               type="text"
-              placeholder="Enter 6-digit code"
+              placeholder={usingBackupCode ? 'XXXX-XXXX' : 'Enter 6-digit code'}
               value={code}
               onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                setCode(value);
+                if (usingBackupCode) {
+                  // For backup codes: allow alphanumeric and dash, uppercase, max 9 chars
+                  const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 9);
+                  setCode(value);
+                } else {
+                  // For TOTP: only digits, max 6 chars
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setCode(value);
+                }
                 setError('');
               }}
               onKeyDown={(e) => {
@@ -207,10 +215,37 @@ export default function MFAVerificationPage() {
                   handleVerifyCode();
                 }
               }}
-              maxLength={6}
+              maxLength={usingBackupCode ? 9 : 6}
               className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center text-2xl tracking-widest font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               autoFocus
             />
+            {selectedMethod?.methodType === 'totp' && !usingBackupCode && (
+              <button
+                onClick={() => {
+                  setUsingBackupCode(true);
+                  setCode('');
+                  setError('');
+                }}
+                data-testid="button-use-backup-code"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              >
+                <Key className="h-4 w-4" />
+                Use a backup code instead
+              </button>
+            )}
+            {usingBackupCode && (
+              <button
+                onClick={() => {
+                  setUsingBackupCode(false);
+                  setCode('');
+                  setError('');
+                }}
+                data-testid="button-use-totp-code"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Use authenticator app code instead
+              </button>
+            )}
           </div>
           
           <button
