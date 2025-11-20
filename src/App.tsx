@@ -15,6 +15,7 @@ import AnniversaryCelebrationModal from './components/modals/AnniversaryCelebrat
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CareersPage from './pages/CareersPage';
 import OnboardingPage from './pages/OnboardingPage';
+import StudioAIPage from './pages/StudioAIPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -101,6 +102,15 @@ function App() {
           <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
             <ProtectedRoute>
               <OnboardingPage />
+            </ProtectedRoute>
+          </Layout>
+        </Route>
+
+        {/* Studio AI Chat route - protected */}
+        <Route path="/ai-assistant">
+          <Layout currentView="dashboard" onNavigate={handleNavigation} onOpenModal={handleOpenModal} onOpenMyProfile={handleOpenMyProfile}>
+            <ProtectedRoute>
+              <StudioAIPage context="recruitment" />
             </ProtectedRoute>
           </Layout>
         </Route>

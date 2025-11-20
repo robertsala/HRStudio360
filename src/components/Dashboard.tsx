@@ -243,6 +243,13 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       return;
     }
 
+    // Special handling for Studio AI Chat - navigate to full-view page
+    if (modalName === 'studioAIChat') {
+      console.log('Navigating to Studio AI page');
+      setLocation('/ai-assistant');
+      return;
+    }
+
     // Special handling for systemSettings with tab parameter (e.g., "systemSettings:changelog")
     if (modalName.startsWith('systemSettings:')) {
       const tab = modalName.split(':')[1];
