@@ -6,6 +6,7 @@ import {
   mfaChallenges, 
   mfaAuditLog,
   mfaBackupCodes,
+  mfaRecoveryTokens,
   organizationSettings,
   profiles
 } from '../shared/schema.js';
@@ -27,9 +28,12 @@ import {
   verifyTOTPCode,
   generateBackupCodes,
   hashBackupCode,
-  verifyBackupCode
+  verifyBackupCode,
+  generateRecoveryToken,
+  calculateRecoveryExpiry
 } from './lib/mfa.js';
 import { sendEmailOTP, sendSMSOTP } from './mfaService.js';
+import { sendMFARecoveryEmail } from './emailService.js';
 import rateLimit from 'express-rate-limit';
 
 // Rate limiting for MFA endpoints to prevent code guessing attacks
@@ -1593,6 +1597,266 @@ export function registerMFARoutes(app: Express) {
         await logMFAAudit(adminId, 'admin_reset_backup_codes', null, false, req, error.message);
       }
       res.status(500).json({ error: 'Failed to reset backup codes' });
+    }
+  });
+
+  // Recovery rate limiter - more strict (max 3 requests per hour)
+  const recoveryRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // Limit each IP to 3 requests per hour
+    message: { error: 'Too many recovery requests. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+
+  // POST /api/mfa/request-recovery - Request MFA recovery via email
+  app.post('/api/mfa/request-recovery', recoveryRateLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json({ error: 'Valid email address is required' });
+      }
+
+      // Find profile by email
+      const [profile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.email, email.toLowerCase()));
+
+      if (!profile) {
+        // Don't reveal if email exists - security best practice
+        return res.json({ 
+          success: true, 
+          message: 'If an account exists with this email, a recovery link has been sent.' 
+        });
+      }
+
+      // Check if user has MFA enabled
+      const methods = await db
+        .select()
+        .from(mfaMethods)
+        .where(and(
+          eq(mfaMethods.profileId, profile.id),
+          eq(mfaMethods.isVerified, true)
+        ));
+
+      if (methods.length === 0) {
+        // User doesn't have MFA enabled - don't reveal this
+        return res.json({ 
+          success: true, 
+          message: 'If an account exists with this email, a recovery link has been sent.' 
+        });
+      }
+
+      // Generate recovery token
+      const token = generateRecoveryToken();
+      const expiresAt = calculateRecoveryExpiry();
+
+      // Store recovery token
+      await db.insert(mfaRecoveryTokens).values({
+        profileId: profile.id,
+        token,
+        expiresAt,
+        isUsed: false
+      });
+
+      // Send recovery email
+      try {
+        await sendMFARecoveryEmail({
+          recipientEmail: profile.email,
+          recipientName: profile.firstName || 'User',
+          recoveryToken: token
+        });
+      } catch (emailError) {
+        console.error('Failed to send recovery email:', emailError);
+        // Clean up token if email failed
+        await db.delete(mfaRecoveryTokens).where(eq(mfaRecoveryTokens.token, token));
+        
+        await logMFAAudit(
+          profile.id,
+          'mfa_recovery_request',
+          null,
+          false,
+          req,
+          'Failed to send recovery email'
+        );
+        
+        return res.status(500).json({ error: 'Failed to send recovery email. Please try again.' });
+      }
+
+      // Log the recovery request
+      await logMFAAudit(
+        profile.id,
+        'mfa_recovery_request',
+        null,
+        true,
+        req,
+        `Recovery email sent to ${email}`
+      );
+
+      res.json({ 
+        success: true, 
+        message: 'If an account exists with this email, a recovery link has been sent.' 
+      });
+    } catch (error: any) {
+      console.error('Failed to process recovery request:', error);
+      res.status(500).json({ error: 'Failed to process recovery request' });
+    }
+  });
+
+  // POST /api/mfa/verify-recovery - Verify recovery token and create recovery session
+  app.post('/api/mfa/verify-recovery', async (req, res) => {
+    try {
+      const { token } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: 'Recovery token is required' });
+      }
+
+      // Find recovery token
+      const [recoveryToken] = await db
+        .select()
+        .from(mfaRecoveryTokens)
+        .where(eq(mfaRecoveryTokens.token, token));
+
+      if (!recoveryToken) {
+        return res.status(400).json({ error: 'Invalid or expired recovery token' });
+      }
+
+      // Check if token is already used
+      if (recoveryToken.isUsed) {
+        await logMFAAudit(
+          recoveryToken.profileId,
+          'mfa_recovery_verify',
+          null,
+          false,
+          req,
+          'Token already used'
+        );
+        return res.status(400).json({ error: 'This recovery link has already been used' });
+      }
+
+      // Check if token is expired
+      if (new Date() > new Date(recoveryToken.expiresAt)) {
+        await logMFAAudit(
+          recoveryToken.profileId,
+          'mfa_recovery_verify',
+          null,
+          false,
+          req,
+          'Token expired'
+        );
+        return res.status(400).json({ error: 'Recovery link has expired. Please request a new one.' });
+      }
+
+      // Mark token as used
+      await db
+        .update(mfaRecoveryTokens)
+        .set({ 
+          isUsed: true, 
+          usedAt: new Date() 
+        })
+        .where(eq(mfaRecoveryTokens.id, recoveryToken.id));
+
+      // Create recovery session
+      req.session.userId = recoveryToken.profileId;
+      req.session.mfaRecoveryMode = true;
+      req.session.recoverySessionExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Log successful recovery
+      await logMFAAudit(
+        recoveryToken.profileId,
+        'mfa_recovery_verify',
+        null,
+        true,
+        req,
+        'Recovery successful - user must re-enroll MFA'
+      );
+
+      res.json({ 
+        success: true, 
+        requiresReenrollment: true,
+        message: 'Recovery successful. Please set up two-step verification again.'
+      });
+    } catch (error: any) {
+      console.error('Failed to verify recovery token:', error);
+      res.status(500).json({ error: 'Failed to verify recovery token' });
+    }
+  });
+
+  // GET /api/mfa/recovery-status - Check if user is in recovery mode
+  app.get('/api/mfa/recovery-status', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const isInRecoveryMode = req.session?.mfaRecoveryMode === true;
+      const recoveryExpiry = req.session?.recoverySessionExpiry;
+
+      // Check if recovery session has expired
+      if (isInRecoveryMode && recoveryExpiry && new Date() > new Date(recoveryExpiry)) {
+        req.session.mfaRecoveryMode = false;
+        req.session.userId = undefined;
+        return res.json({ 
+          inRecoveryMode: false,
+          sessionExpired: true
+        });
+      }
+
+      res.json({ 
+        inRecoveryMode: isInRecoveryMode,
+        expiresAt: recoveryExpiry
+      });
+    } catch (error: any) {
+      console.error('Failed to check recovery status:', error);
+      res.status(500).json({ error: 'Failed to check recovery status' });
+    }
+  });
+
+  // POST /api/mfa/clear-recovery-mode - Clear recovery mode after successful re-enrollment
+  app.post('/api/mfa/clear-recovery-mode', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Check if user has re-enrolled MFA
+      const methods = await db
+        .select()
+        .from(mfaMethods)
+        .where(and(
+          eq(mfaMethods.profileId, userId),
+          eq(mfaMethods.isVerified, true)
+        ));
+
+      if (methods.length === 0) {
+        return res.status(400).json({ error: 'You must set up two-step verification first' });
+      }
+
+      // Clear recovery mode
+      req.session.mfaRecoveryMode = false;
+      delete req.session.recoverySessionExpiry;
+
+      await logMFAAudit(
+        userId,
+        'mfa_recovery_complete',
+        null,
+        true,
+        req,
+        'User re-enrolled MFA and exited recovery mode'
+      );
+
+      res.json({ 
+        success: true,
+        message: 'Recovery mode cleared. Your account is now fully secured.'
+      });
+    } catch (error: any) {
+      console.error('Failed to clear recovery mode:', error);
+      res.status(500).json({ error: 'Failed to clear recovery mode' });
     }
   });
 }

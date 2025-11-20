@@ -97,14 +97,25 @@ export default function MFASettings() {
         body: JSON.stringify(data)
       });
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/mfa/methods'] });
       queryClient.invalidateQueries({ queryKey: ['/api/mfa/backup-codes/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/mfa/recovery-status'] });
       
       // If backup codes are returned, show the modal
       if (data.backupCodes && data.backupCodes.length > 0) {
         setBackupCodes(data.backupCodes);
         setShowBackupCodesModal(true);
+      }
+      
+      // Clear recovery mode if user just re-enrolled after recovery
+      try {
+        await apiRequest('/api/mfa/clear-recovery-mode', {
+          method: 'POST'
+        });
+      } catch (err) {
+        // Silently fail - user may not be in recovery mode
+        console.log('Not in recovery mode or already cleared');
       }
       
       resetForm();

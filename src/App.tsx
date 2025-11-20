@@ -28,6 +28,8 @@ import SettingsPage from './pages/SettingsPage';
 import HiringPage from './pages/HiringPage';
 import TrainingPage from './pages/TrainingPage';
 import MFAVerificationPage from './pages/MFAVerificationPage';
+import MFARecoveryRequestPage from './pages/MFARecoveryRequestPage';
+import MFARecoveryVerifyPage from './pages/MFARecoveryVerifyPage';
 import { useAuth } from './contexts/AuthContext';
 
 function App() {
@@ -98,6 +100,15 @@ function App() {
         {/* MFA verification route - accessible without full authentication */}
         <Route path="/mfa-verify">
           <MFAVerificationPage />
+        </Route>
+
+        {/* MFA recovery routes - accessible without authentication */}
+        <Route path="/mfa-recovery-request">
+          <MFARecoveryRequestPage />
+        </Route>
+
+        <Route path="/mfa-recover">
+          <MFARecoveryVerifyPage />
         </Route>
 
         {/* Public Careers page - accessible without authentication */}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Building, Users, Briefcase, Settings, Bell, Trash2, Plus, Save, FileText, Shield } from 'lucide-react';
+import { Building, Users, Briefcase, Settings, Bell, Trash2, Plus, Save, FileText, Shield, AlertTriangle } from 'lucide-react';
 import ChangeLogTab from '../components/modals/ChangeLogTab';
 import PermissionManagementModal from '../components/modals/PermissionManagementModal';
 import CorrectionRequestModal from '../components/modals/CorrectionRequestModal';
@@ -7,6 +7,7 @@ import MFASettings from '../components/MFASettings';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 
 const SettingsPage: React.FC = () => {
   const [location] = useLocation();
@@ -17,12 +18,22 @@ const SettingsPage: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState('company');
   
-  // React to URL changes for active tab
+  // Check if user is in MFA recovery mode
+  const { data: recoveryStatus } = useQuery<{ inRecoveryMode: boolean; expiresAt?: string }>({
+    queryKey: ['/api/mfa/recovery-status'],
+    refetchInterval: 30000 // Check every 30 seconds
+  });
+  
+  // React to URL changes for active tab and recovery mode
   useEffect(() => {
     if (tabFromURL) {
       setActiveTab(tabFromURL);
+    } else if (recoveryStatus?.inRecoveryMode) {
+      // Auto-open Access Control tab if in recovery mode
+      setActiveTab('accessControl');
     }
-  }, [tabFromURL]);
+  }, [tabFromURL, recoveryStatus?.inRecoveryMode]);
+  
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info';
     message: string;
@@ -228,6 +239,27 @@ const SettingsPage: React.FC = () => {
           </div>
           <DashboardExitButton className="text-blue-100 hover:text-white" />
         </div>
+
+        {recoveryStatus?.inRecoveryMode && (
+          <div className="mx-6 mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-600 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                  ⚠️ Security Alert: MFA Re-enrollment Required
+                </h3>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                  For your security, please set up two-step verification again. You must complete this before accessing other parts of the application.
+                </p>
+                {recoveryStatus.expiresAt && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                    Recovery session expires: {new Date(recoveryStatus.expiresAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {notification && (
           <div className={`mx-6 mt-4 p-4 rounded-lg ${

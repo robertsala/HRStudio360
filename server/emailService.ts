@@ -133,3 +133,75 @@ export async function sendCollaboratorAcceptedEmail(params: CollaboratorAccepted
     console.error('⚠️  Failed to send collaborator accepted email:', error);
   }
 }
+
+export interface MFARecoveryEmailParams {
+  recipientEmail: string;
+  recipientName: string;
+  recoveryToken: string;
+}
+
+export async function sendMFARecoveryEmail(params: MFARecoveryEmailParams): Promise<void> {
+  if (!resend) {
+    console.log(`📧 [Email Skipped] Would send MFA recovery email to ${params.recipientEmail}`);
+    return;
+  }
+
+  const frontendUrl = process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000';
+  const recoveryLink = `${frontendUrl}/mfa-recover?token=${params.recoveryToken}`;
+
+  try {
+    await resend.emails.send({
+      from: 'HRStudio360 Security <noreply@hrstudio360.com>',
+      to: params.recipientEmail,
+      subject: 'Reset Your Two-Step Verification - HR Studio 360',
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+              .button { display: inline-block; background: #ef4444; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+              .warning-icon { font-size: 48px; margin: 10px 0; }
+              .warning-box { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; }
+              .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="warning-icon">🔐</div>
+                <h1>Reset Two-Step Verification</h1>
+              </div>
+              <div class="content">
+                <p>Hi ${params.recipientName},</p>
+                <p>You requested to reset your two-step verification for HR Studio 360.</p>
+                <p>Click the button below to verify your identity and regain access:</p>
+                <center>
+                  <a href="${recoveryLink}" class="button">
+                    Verify Identity & Recover Account
+                  </a>
+                </center>
+                <div class="warning-box">
+                  <strong>⏱️ This link expires in 30 minutes.</strong><br>
+                  For security reasons, you'll need to set up two-step verification again after recovery.
+                </div>
+                <p>If you didn't request this, you can safely ignore this email. Your account security has not been compromised.</p>
+                <div class="footer">
+                  <p>This is an automated security email from HR Studio 360. Please do not reply to this email.</p>
+                  <p>If you need assistance, please contact your system administrator.</p>
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `
+    });
+    console.log(`✅ MFA recovery email sent to ${params.recipientEmail}`);
+  } catch (error) {
+    console.error('⚠️  Failed to send MFA recovery email:', error);
+    throw new Error('Failed to send recovery email');
+  }
+}

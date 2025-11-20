@@ -318,6 +318,16 @@ export default function MFAVerificationPage() {
           >
             Cancel
           </button>
+          
+          <div className="pt-4 text-center border-t border-gray-200 dark:border-gray-700">
+            <a
+              href="/mfa-recovery-request"
+              data-testid="link-recovery-request"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:underline"
+            >
+              Lost access to your device?
+            </a>
+          </div>
         </div>
       </div>
     </div>

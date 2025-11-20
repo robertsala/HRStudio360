@@ -210,3 +210,20 @@ export async function hashBackupCode(code: string): Promise<string> {
 export async function verifyBackupCode(hash: string, code: string): Promise<boolean> {
   return verifyCode(hash, code);
 }
+
+/**
+ * Generate a recovery token for MFA account recovery
+ * Returns a random 32-character hex token
+ */
+export function generateRecoveryToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Calculate recovery token expiry time (30 minutes from now)
+ */
+export function calculateRecoveryExpiry(): Date {
+  const expiry = new Date();
+  expiry.setMinutes(expiry.getMinutes() + 30);
+  return expiry;
+}

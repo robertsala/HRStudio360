@@ -2302,6 +2302,17 @@ export const mfaAuditLog = pgTable('mfa_audit_log', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// MFA recovery tokens table - for account recovery when MFA is lost
+export const mfaRecoveryTokens = pgTable('mfa_recovery_tokens', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  token: text('token').notNull().unique(), // Random 32-char hex token
+  expiresAt: timestamp('expires_at').notNull(), // 30 minutes from creation
+  isUsed: boolean('is_used').default(false).notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 // Insert schemas for MFA tables
 export const insertOrganizationSettingsSchema = createInsertSchema(organizationSettings).omit({
   id: true,
@@ -2339,3 +2350,10 @@ export const insertMfaAuditLogSchema = createInsertSchema(mfaAuditLog).omit({
 });
 export type InsertMfaAuditLog = z.infer<typeof insertMfaAuditLogSchema>;
 export type MfaAuditLog = typeof mfaAuditLog.$inferSelect;
+
+export const insertMfaRecoveryTokenSchema = createInsertSchema(mfaRecoveryTokens).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertMfaRecoveryToken = z.infer<typeof insertMfaRecoveryTokenSchema>;
+export type MfaRecoveryToken = typeof mfaRecoveryTokens.$inferSelect;
