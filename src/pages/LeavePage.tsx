@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, User, Clock, CheckCircle, AlertCircle, Plus, Filter, Download, Mail, Bell, MapPin, Users, Eye } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient, type EmployeeDirectoryEntry } from '../lib/api';
@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { LeaveRequest as DBLeaveRequest, LeaveBalance } from '../../shared/schema';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
+import { useLocation } from 'wouter';
 
 interface LeaveRequestWithEmployee {
   id: string;
@@ -65,21 +66,22 @@ interface LeavePageProps {
 const LeavePage: React.FC<LeavePageProps> = ({ initialFilter, navigationParams }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [location] = useLocation();
   
-  // Parse URL query parameters for filters
-  const params = new URLSearchParams(window.location.search);
-  const filterFromURL = params.get('filter') as 'my-team' | 'my-department' | 'my-location' | 'all' | null;
-  const managerIdFromURL = params.get('managerId');
-  const departmentFromURL = params.get('department');
-  const locationFromURL = params.get('location');
+  // Reactive URL query parameter parsing for filters
+  const query = useMemo(() => new URLSearchParams(location.split('?')[1] ?? ''), [location]);
+  const filterFromURL = query.get('filter') as 'my-team' | 'my-department' | 'my-location' | 'all' | null;
+  const managerIdFromURL = query.get('managerId');
+  const departmentFromURL = query.get('department');
+  const locationFromURL = query.get('location');
   
   // Use URL params as fallback if initialFilter prop is not provided
-  const effectiveFilter = initialFilter || (filterFromURL ? {
+  const effectiveFilter = useMemo(() => initialFilter || (filterFromURL ? {
     type: filterFromURL,
     managerId: managerIdFromURL || undefined,
     department: departmentFromURL || undefined,
     location: locationFromURL || undefined
-  } : undefined);
+  } : undefined), [initialFilter, filterFromURL, managerIdFromURL, departmentFromURL, locationFromURL]);
   
   const [activeTab, setActiveTab] = useState('requests');
   const [filterStatus, setFilterStatus] = useState('All');

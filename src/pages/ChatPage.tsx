@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MessageCircle, Users, Search, Plus, Hash, Send, Paperclip, Smile, Phone, Video, Settings, Bot, CheckCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { chatService, Channel, Message, ChannelMember } from '../utils/chatService';
@@ -9,6 +9,7 @@ import CallModal from '../components/modals/CallModal';
 import { callingService, CallSession } from '../utils/callingService';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
+import { useLocation } from 'wouter';
 
 interface ChatPageProps {
   initialChannelId?: string;
@@ -16,10 +17,11 @@ interface ChatPageProps {
 
 const ChatPage: React.FC<ChatPageProps> = ({ initialChannelId }) => {
   const { user } = useAuth();
+  const [location] = useLocation();
   
-  // Parse URL query parameters for channelId
-  const params = new URLSearchParams(window.location.search);
-  const channelIdFromURL = params.get('channelId');
+  // Reactive URL query parameter parsing for channelId
+  const query = useMemo(() => new URLSearchParams(location.split('?')[1] ?? ''), [location]);
+  const channelIdFromURL = query.get('channelId');
   const effectiveChannelId = initialChannelId || channelIdFromURL;
   
   const [channels, setChannels] = useState<Channel[]>([]);

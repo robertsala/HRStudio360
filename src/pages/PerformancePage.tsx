@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Star, User, Calendar, TrendingUp, DollarSign, Send, CheckCircle, AlertCircle, Award, Target, Users, Brain, Clock, FileText } from 'lucide-react';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
+import { useLocation } from 'wouter';
 
 interface PerformanceQuestion {
   id: string;
@@ -35,14 +36,23 @@ interface PerformanceReview {
 }
 
 const PerformancePage: React.FC = () => {
-  // Parse URL query parameters for filters
-  const params = new URLSearchParams(window.location.search);
-  const filterFromURL = params.get('filter');
-  const departmentFromURL = params.get('department');
+  const [location] = useLocation();
+  
+  // Reactive URL query parameter parsing for filters
+  const query = useMemo(() => new URLSearchParams(location.split('?')[1] ?? ''), [location]);
+  const filterFromURL = query.get('filter');
+  const departmentFromURL = query.get('department');
   
   const [activeTab, setActiveTab] = useState('reviews');
   const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [filterDepartment, setFilterDepartment] = useState(departmentFromURL || 'all');
+  const [filterDepartment, setFilterDepartment] = useState('all');
+  
+  // React to URL changes for department filter
+  useEffect(() => {
+    if (departmentFromURL) {
+      setFilterDepartment(departmentFromURL);
+    }
+  }, [departmentFromURL]);
   const [currentReview, setCurrentReview] = useState<PerformanceReview | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, Bell, Filter, Search, Plus, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
+import { useLocation } from 'wouter';
 
 interface Announcement {
   id: string;
@@ -25,10 +26,11 @@ interface Announcement {
 
 const AnnouncementsPage: React.FC = () => {
   const { user } = useAuth();
+  const [location] = useLocation();
   
-  // Parse URL query parameters for announcementId
-  const params = new URLSearchParams(window.location.search);
-  const announcementIdFromURL = params.get('announcementId');
+  // Reactive URL query parameter parsing for announcementId
+  const query = useMemo(() => new URLSearchParams(location.split('?')[1] ?? ''), [location]);
+  const announcementIdFromURL = query.get('announcementId');
   
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -84,16 +86,19 @@ const AnnouncementsPage: React.FC = () => {
     }
   }, [user]);
   
-  // Auto-select announcement from URL when announcements are loaded
+  // Auto-select announcement from URL when announcements are loaded - react to URL changes
   useEffect(() => {
-    if (announcementIdFromURL && announcements.length > 0 && !selectedAnnouncement) {
-      const announcement = announcements.find(a => a.id === announcementIdFromURL);
-      if (announcement) {
-        setSelectedAnnouncement(announcement);
-        markAsRead(announcement.id);
+    if (announcementIdFromURL && announcements.length > 0) {
+      // Update selection if URL announcement is different from currently selected one
+      if (!selectedAnnouncement || selectedAnnouncement.id !== announcementIdFromURL) {
+        const announcement = announcements.find(a => a.id === announcementIdFromURL);
+        if (announcement) {
+          setSelectedAnnouncement(announcement);
+          markAsRead(announcement.id);
+        }
       }
     }
-  }, [announcementIdFromURL, announcements]);
+  }, [announcementIdFromURL, announcements, selectedAnnouncement]);
 
   const loadUserProfile = async () => {
     if (!user) return;

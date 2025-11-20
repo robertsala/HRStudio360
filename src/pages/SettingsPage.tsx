@@ -1,17 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Building, Users, Briefcase, Settings, Bell, Trash2, Plus, Save, FileText, Shield } from 'lucide-react';
 import ChangeLogTab from '../components/modals/ChangeLogTab';
 import PermissionManagementModal from '../components/modals/PermissionManagementModal';
 import CorrectionRequestModal from '../components/modals/CorrectionRequestModal';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
 import { DashboardExitButton } from '../components/DashboardExitButton';
+import { useLocation } from 'wouter';
 
 const SettingsPage: React.FC = () => {
-  // Parse URL query parameters for tab
-  const params = new URLSearchParams(window.location.search);
-  const tabFromURL = params.get('tab');
+  const [location] = useLocation();
   
-  const [activeTab, setActiveTab] = useState(tabFromURL || 'company');
+  // Reactive URL query parameter parsing for tab
+  const query = useMemo(() => new URLSearchParams(location.split('?')[1] ?? ''), [location]);
+  const tabFromURL = query.get('tab');
+  
+  const [activeTab, setActiveTab] = useState('company');
+  
+  // React to URL changes for active tab
+  useEffect(() => {
+    if (tabFromURL) {
+      setActiveTab(tabFromURL);
+    }
+  }, [tabFromURL]);
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info';
     message: string;

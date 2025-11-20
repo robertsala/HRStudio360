@@ -219,7 +219,22 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
     return 'Inbox';
   };
 
-  const openModal = (modalName: string) => {
+  // TIER 1 Route Map for full-screen pages with query param support
+  const TIER1_ROUTE_MAP: Record<string, { path: string; queryKey?: string }> = {
+    enterpriseChat: { path: '/chat', queryKey: 'channelId' },
+    benefitsPay: { path: '/benefits' },
+    leaveManagement: { path: '/leave' },
+    performanceReview: { path: '/performance' },
+    employees: { path: '/employees' },
+    employeeDirectory: { path: '/employees' },
+    timeTracking: { path: '/time-tracking' },
+    announcements: { path: '/announcements' },
+    systemSettings: { path: '/settings', queryKey: 'tab' },
+    hiring: { path: '/hiring' },
+    training: { path: '/training' }
+  };
+
+  const openModal = (modalName: string, options?: { query?: Record<string, string> }) => {
     console.log(`Opening modal: ${modalName}`);
     console.log('Current activeContent:', activeContent);
     console.log('Is in modals object?', modalName in modals);
@@ -245,64 +260,19 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
       return;
     }
 
-    // TIER 1 Full-Screen Pages - navigate to routes instead of opening modals
-    if (modalName === 'enterpriseChat') {
-      console.log('Navigating to Chat page');
-      setLocation('/chat');
-      return;
-    }
-
-    if (modalName === 'benefitsPay') {
-      console.log('Navigating to Benefits page');
-      setLocation('/benefits');
-      return;
-    }
-
-    if (modalName === 'leaveManagement') {
-      console.log('Navigating to Leave page');
-      setLocation('/leave');
-      return;
-    }
-
-    if (modalName === 'performanceReview') {
-      console.log('Navigating to Performance page');
-      setLocation('/performance');
-      return;
-    }
-
-    if (modalName === 'employees' || modalName === 'employeeDirectory') {
-      console.log('Navigating to Employees page');
-      setLocation('/employees');
-      return;
-    }
-
-    if (modalName === 'timeTracking') {
-      console.log('Navigating to Time Tracking page');
-      setLocation('/time-tracking');
-      return;
-    }
-
-    if (modalName === 'announcements') {
-      console.log('Navigating to Announcements page');
-      setLocation('/announcements');
-      return;
-    }
-
-    if (modalName === 'systemSettings') {
-      console.log('Navigating to Settings page');
-      setLocation('/settings');
-      return;
-    }
-
-    if (modalName === 'hiring') {
-      console.log('Navigating to Hiring page');
-      setLocation('/hiring');
-      return;
-    }
-
-    if (modalName === 'training') {
-      console.log('Navigating to Training page');
-      setLocation('/training');
+    // TIER 1 Full-Screen Pages - use route map for consistent navigation with query params
+    if (modalName in TIER1_ROUTE_MAP) {
+      const route = TIER1_ROUTE_MAP[modalName];
+      let path = route.path;
+      
+      // Build query string if options provided
+      if (options?.query && Object.keys(options.query).length > 0) {
+        const params = new URLSearchParams(options.query);
+        path = `${path}?${params.toString()}`;
+      }
+      
+      console.log(`Navigating to TIER 1 route: ${path}`);
+      setLocation(path);
       return;
     }
 
@@ -1467,8 +1437,7 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
         {/* Chat Notification Bubbles */}
         <ChatNotificationBubble
           onOpenChat={(channelId) => {
-            _setInitialChatChannelId(channelId || undefined);
-            setModals(prev => ({ ...prev, enterpriseChat: true }));
+            openModal('enterpriseChat', { query: { channelId: channelId || '' } });
           }}
         />
 
