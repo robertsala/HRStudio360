@@ -11,7 +11,7 @@ interface MFAMethod {
 
 export default function MFAVerificationPage() {
   const [, navigate] = useLocation();
-  const { refreshSession, isAuthenticated } = useAuth();
+  const { refreshSession } = useAuth();
   
   // Get MFA data from sessionStorage (set by login flow)
   const mfaData = sessionStorage.getItem('mfaData');
@@ -29,7 +29,6 @@ export default function MFAVerificationPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [usingBackupCode, setUsingBackupCode] = useState(false);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
   
   // Redirect if no MFA data
   useEffect(() => {
@@ -37,16 +36,6 @@ export default function MFAVerificationPage() {
       navigate('/');
     }
   }, [parsedData, sessionToken, navigate]);
-  
-  // Navigate to dashboard only after auth state is fully updated
-  useEffect(() => {
-    console.log('[MFA] Redirect effect triggered:', { shouldRedirect, isAuthenticated });
-    if (shouldRedirect && isAuthenticated) {
-      console.log('[MFA] Navigating to /dashboard with replace:true');
-      navigate('/dashboard', { replace: true });
-      console.log('[MFA] Navigate() call completed');
-    }
-  }, [shouldRedirect, isAuthenticated, navigate]);
   
   // Countdown timer for resend
   useEffect(() => {
@@ -79,15 +68,14 @@ export default function MFAVerificationPage() {
         sessionStorage.removeItem('mfaData');
         setSuccess('Verification successful! Redirecting...');
         
-        console.log('[MFA] Before refreshSession(), isAuthenticated:', isAuthenticated);
         // Refresh session to load user data
         await refreshSession();
-        console.log('[MFA] After refreshSession(), isAuthenticated:', isAuthenticated);
         
-        // Set flag to trigger redirect via useEffect
-        // This ensures navigation happens AFTER auth state updates propagate
-        console.log('[MFA] Setting shouldRedirect=true');
-        setShouldRedirect(true);
+        // Small delay to let React state updates propagate, then navigate
+        setTimeout(() => {
+          console.log('[MFA] Navigating to /dashboard after state settled');
+          window.location.href = '/dashboard';
+        }, 100);
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
