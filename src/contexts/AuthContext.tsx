@@ -314,6 +314,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         console.log('[AuthContext] Session found, loading profile...');
         await loadUserProfile(session.user.id, session.user.email || '');
+        // CRITICAL: Ensure React has committed state updates before returning
+        // This prevents the ProtectedRoute from briefly showing "Access Restricted"
+        await new Promise(resolve => setTimeout(resolve, 0));
+        console.log('[AuthContext] Profile loaded and state updated, session refresh complete');
       } else {
         console.log('[AuthContext] No session found, clearing auth state');
         setUser(null);
