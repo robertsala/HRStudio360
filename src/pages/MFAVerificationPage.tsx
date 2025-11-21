@@ -65,10 +65,31 @@ export default function MFAVerificationPage() {
         // Clear MFA data
         sessionStorage.removeItem('mfaData');
         
-        // Client-side navigation - ProtectedRoute will show loading while session verifies
-        setTimeout(() => {
+        // CRITICAL: Poll session endpoint until we confirm session exists
+        // This ensures AuthContext will have isAuthenticated=true before we navigate
+        let sessionReady = false;
+        for (let i = 0; i < 20; i++) {
+          try {
+            const sessionResponse = await fetch('/api/auth/session');
+            const sessionData = await sessionResponse.json();
+            if (sessionData.user) {
+              console.log('[MFA] Session verified on attempt', i + 1);
+              sessionReady = true;
+              break;
+            }
+          } catch (e) {
+            console.log('[MFA] Session check failed, retrying...');
+          }
+          if (i < 19) await new Promise(resolve => setTimeout(resolve, 50)); // 50ms between attempts
+        }
+        
+        if (sessionReady) {
+          console.log('[MFA] Navigating to dashboard - session confirmed');
           navigate('/dashboard', { replace: true });
-        }, 0);
+        } else {
+          console.error('[MFA] Session not ready, forcing reload');
+          window.location.href = '/dashboard'; // Fallback
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');

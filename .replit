@@ -44,10 +44,6 @@ localPort = 24678
 externalPort = 3000
 
 [[ports]]
-localPort = 33099
-externalPort = 8080
-
-[[ports]]
 localPort = 34295
 externalPort = 5000
 
@@ -86,6 +82,10 @@ externalPort = 6000
 [[ports]]
 localPort = 44913
 externalPort = 5173
+
+[[ports]]
+localPort = 46157
+externalPort = 8080
 
 [objectStorage]
 defaultBucketID = "replit-objstore-2b26c0d4-c890-4ccf-b083-33fd25c6909d"
