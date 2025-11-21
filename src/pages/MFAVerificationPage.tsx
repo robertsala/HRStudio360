@@ -11,7 +11,6 @@ interface MFAMethod {
 
 export default function MFAVerificationPage() {
   const [, navigate] = useLocation();
-  const { refreshSession } = useAuth();
   
   // Get MFA data from sessionStorage (set by login flow)
   const mfaData = sessionStorage.getItem('mfaData');
@@ -66,16 +65,9 @@ export default function MFAVerificationPage() {
       if (response.success) {
         // Clear MFA data
         sessionStorage.removeItem('mfaData');
-        setSuccess('Verification successful! Redirecting...');
         
-        // Refresh session to load user data
-        await refreshSession();
-        
-        // Small delay to let React state updates propagate, then navigate
-        setTimeout(() => {
-          console.log('[MFA] Navigating to /dashboard after state settled');
-          window.location.href = '/dashboard';
-        }, 100);
+        // Navigate directly to dashboard - ProtectedRoute will handle auth check
+        navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
