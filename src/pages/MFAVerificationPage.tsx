@@ -53,43 +53,32 @@ export default function MFAVerificationPage() {
     setIsVerifying(true);
     
     try {
-      const response = await apiRequest('/api/mfa/verify-login', {
+      // Server-side redirect approach: backend will redirect to /dashboard
+      // Use fetch with redirect: 'follow' to let browser follow the redirect
+      const response = await fetch('/api/mfa/verify-login', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           sessionToken,
           code: code.trim()
-        })
+        }),
+        redirect: 'follow' // Follow redirects automatically
       });
       
-      if (response.success) {
+      // If we get here and response is OK, the redirect happened
+      // Browser has already navigated to /dashboard with cookie set
+      if (response.ok) {
+        console.log('[MFA] Verification successful - server redirect to dashboard completed');
         // Clear MFA data
         sessionStorage.removeItem('mfaData');
-        
-        // CRITICAL: Poll session endpoint until we confirm session exists
-        // This ensures AuthContext will have isAuthenticated=true before we navigate
-        let sessionReady = false;
-        for (let i = 0; i < 20; i++) {
-          try {
-            const sessionResponse = await fetch('/api/auth/session');
-            const sessionData = await sessionResponse.json();
-            if (sessionData.user) {
-              console.log('[MFA] Session verified on attempt', i + 1);
-              sessionReady = true;
-              break;
-            }
-          } catch (e) {
-            console.log('[MFA] Session check failed, retrying...');
-          }
-          if (i < 19) await new Promise(resolve => setTimeout(resolve, 50)); // 50ms between attempts
-        }
-        
-        if (sessionReady) {
-          console.log('[MFA] Navigating to dashboard - session confirmed');
-          navigate('/dashboard', { replace: true });
-        } else {
-          console.error('[MFA] Session not ready, forcing reload');
-          window.location.href = '/dashboard'; // Fallback
-        }
+        // Page will have already navigated via server redirect
+      } else {
+        // Handle error response
+        const error = await response.json();
+        setError(error.error || 'Invalid verification code');
+        setCode('');
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
