@@ -69,24 +69,15 @@ export default function MFAVerificationPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          console.log('[MFA] Verification successful - refreshing session state');
+          console.log('[MFA] Verification successful - navigating to dashboard');
           // Clear MFA data
           sessionStorage.removeItem('mfaData');
           
-          // CRITICAL: Refresh session in AuthContext BEFORE navigating
-          // This updates the auth state so ProtectedRoute won't show "Access Restricted"
-          try {
-            await refreshSession();
-            console.log('[MFA] Session refreshed in AuthContext - navigating to dashboard');
-            // Now navigate using wouter - auth state is already updated
-            navigate('/dashboard', { replace: true });
-            return;
-          } catch (e) {
-            console.error('[MFA] Session refresh failed:', e);
-            // Fallback: force reload if refresh fails
-            window.location.href = '/dashboard';
-            return;
-          }
+          // Session cookie is already set on backend from MFA verification
+          // Do a full page reload to avoid any React re-render flashes
+          // This ensures AuthContext checks the session fresh without landing page showing
+          window.location.href = '/dashboard';
+          return;
         }
       }
       
