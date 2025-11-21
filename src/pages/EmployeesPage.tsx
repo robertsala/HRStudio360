@@ -7,7 +7,6 @@ import ComprehensiveEmployeeProfileModal from '../components/modals/Comprehensiv
 import { mockEmployees } from '../data/mockEmployees';
 import { mapEmployeesFromBackend, type MappedEmployee } from '../lib/employeeDataMapper';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 const EmployeesPage: React.FC = () => {
   const { user, startImpersonation } = useAuth();
@@ -172,7 +171,6 @@ const EmployeesPage: React.FC = () => {
               <p className="text-blue-100">Connect with your colleagues</p>
             </div>
           </div>
-          <DashboardExitButton className="text-blue-100 hover:text-white" />
         </div>
 
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">

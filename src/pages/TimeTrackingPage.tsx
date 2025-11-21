@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Clock, Play, Pause, Square, Calendar, Users, TrendingUp, AlertTriangle, CheckCircle, Eye, Send, Save, Filter, Search, Brain, Zap, MapPin, Coffee, Timer, Target, Award, Bell, Download } from 'lucide-react';
 import AIAssistantModal from '../components/modals/AIAssistantModal';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface TimeEntry {
   id: string;
@@ -385,7 +384,6 @@ const TimeTrackingPage: React.FC = () => {
             <Brain className="h-4 w-4 mr-2" />
             AI Help
           </button>
-          <DashboardExitButton className="text-blue-100 hover:text-white" />
         </div>
       </div>
 

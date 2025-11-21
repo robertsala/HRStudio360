@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Inbox, User, DollarSign, Star, CheckCircle, Clock, AlertTriangle, Eye, Filter, Search, X, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface InboxTask {
   id: string;
@@ -218,10 +217,6 @@ const InboxPage: React.FC<InboxPageProps> = ({ initialFilter }) => {
       <div className="bg-white dark:bg-gray-800 rounded-lg w-full min-h-screen overflow-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
-            <DashboardExitButton />
-            
-            <div className="h-6 w-px bg-gray-300 dark:border-gray-600"></div>
-            
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">HR Inbox</h2>
               <p className="text-gray-600 dark:text-gray-400">Manage pending approvals and tasks</p>

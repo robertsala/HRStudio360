@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Star, User, Calendar, TrendingUp, DollarSign, Send, CheckCircle, AlertCircle, Award, Target, Users, Brain, Clock, FileText } from 'lucide-react';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
 
 interface PerformanceQuestion {
@@ -376,7 +375,6 @@ const PerformancePage: React.FC = () => {
             <p className="text-purple-100">Comprehensive performance evaluation and salary review system</p>
           </div>
         </div>
-        <DashboardExitButton className="text-purple-100 hover:text-white" />
       </div>
 
       {notification && (

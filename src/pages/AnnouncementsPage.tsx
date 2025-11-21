@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, Bell, Filter, Search, Plus, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
 
 interface Announcement {
@@ -252,7 +251,6 @@ const AnnouncementsPage: React.FC = () => {
             <p className="text-blue-100">Stay informed with company-wide updates</p>
           </div>
         </div>
-        <DashboardExitButton className="text-blue-100 hover:text-white" />
       </div>
 
       <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">

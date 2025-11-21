@@ -3,7 +3,6 @@ import { Send, Bot, Sparkles, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '../lib/queryClient';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface StudioAIPageProps {
   context?: 'recruitment' | 'payroll';
@@ -110,17 +109,6 @@ const StudioAIPage: React.FC<StudioAIPageProps> = ({ context = 'recruitment' }) 
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-600 to-blue-600">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setLocation('/dashboard')}
-            className="text-white hover:text-gray-200 transition-colors flex items-center gap-2"
-            data-testid="button-exit-dashboard"
-          >
-            <ArrowLeft className="w-6 h-6" />
-            <span className="text-sm font-medium">Exit to Dashboard</span>
-          </button>
-          
-          <div className="h-8 w-px bg-white/30 mx-2"></div>
-          
           <div className="flex items-center gap-3">
             <div className="relative">
               <Bot className="w-8 h-8 text-white" />

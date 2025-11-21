@@ -8,7 +8,6 @@ import EmojiPicker from '../components/EmojiPicker';
 import CallModal from '../components/modals/CallModal';
 import { callingService, CallSession } from '../utils/callingService';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
 
 interface ChatPageProps {
@@ -643,7 +642,6 @@ const ChatPage: React.FC<ChatPageProps> = ({ initialChannelId }) => {
               Enterprise Chat
             </h2>
           </div>
-          <DashboardExitButton />
         </div>
 
         {/* Loading/Progress State */}

@@ -8,7 +8,6 @@ import { apiClient } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface Candidate {
   id: string;
@@ -965,7 +964,6 @@ const HiringPage: React.FC<HiringPageProps> = ({ onNavigateToOnboarding, onOpenS
 
   return (
     <>
-      <DashboardExitButton />
       <div className="bg-white dark:bg-gray-800 rounded-lg w-full h-full overflow-auto">
         <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-emerald-600 text-white">
           <div className="flex items-center">

@@ -5,7 +5,6 @@ import PermissionManagementModal from '../components/modals/PermissionManagement
 import CorrectionRequestModal from '../components/modals/CorrectionRequestModal';
 import MFASettings from '../components/MFASettings';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 
@@ -237,7 +236,6 @@ const SettingsPage: React.FC = () => {
               <p className="text-blue-100">Configure company and system preferences</p>
             </div>
           </div>
-          <DashboardExitButton className="text-blue-100 hover:text-white" />
         </div>
 
         {recoveryStatus?.inRecoveryMode && (

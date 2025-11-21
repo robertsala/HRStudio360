@@ -145,7 +145,7 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col" data-testid="page-onboarding">
       {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 flex items-center justify-between shadow-lg">
+      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 shadow-lg">
         <div className="flex items-center space-x-3">
           <Users className="h-8 w-8" />
           <div>
@@ -153,14 +153,6 @@ export default function OnboardingPage() {
             <p className="text-teal-100 text-sm">Manage onboarding process and compliance forms</p>
           </div>
         </div>
-        <button
-          onClick={() => setLocation('/dashboard')}
-          className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-colors flex items-center space-x-2"
-          data-testid="button-back-to-dashboard"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span>Dashboard</span>
-        </button>
       </div>
 
       {/* Tabs */}

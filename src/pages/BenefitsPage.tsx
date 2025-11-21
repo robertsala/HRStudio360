@@ -4,7 +4,6 @@ import { generatePayStubPDF, generateW2PDF } from '../utils/pdfGenerator';
 import { getRandomFunFact, getCategoryIcon, getManualFunFact, getDailyUsageInfo, type FunFactResult, type DailyUsageInfo } from '../utils/paycheckFunFacts';
 import { useAuth } from '../contexts/AuthContext';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 const BenefitsPage: React.FC = () => {
   const { user } = useAuth();
@@ -344,7 +343,6 @@ const BenefitsPage: React.FC = () => {
                 <p className="text-emerald-100">Access your compensation and benefits information</p>
               </div>
             </div>
-            <DashboardExitButton className="text-emerald-100 hover:text-white" />
           </div>
 
           {notification && (

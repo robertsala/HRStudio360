@@ -5,7 +5,6 @@ import { apiClient, type EmployeeDirectoryEntry } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { LeaveRequest as DBLeaveRequest, LeaveBalance } from '../../shared/schema';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 import { useLocation } from 'wouter';
 
 interface LeaveRequestWithEmployee {
@@ -390,7 +389,6 @@ const LeavePage: React.FC<LeavePageProps> = ({ initialFilter, navigationParams }
             <p className="text-emerald-100">Comprehensive leave tracking and approval system</p>
           </div>
         </div>
-        <DashboardExitButton />
       </div>
 
       {notification && (

@@ -5,7 +5,6 @@ import TutorialViewer from '../components/modals/TutorialViewer';
 import { useQuery } from '@tanstack/react-query';
 import { Tutorial } from '../../shared/schema';
 import { useDashboardEscape } from '../hooks/useDashboardEscape';
-import { DashboardExitButton } from '../components/DashboardExitButton';
 
 interface TrainingProgram {
   id: string;
@@ -181,7 +180,6 @@ const TrainingPage: React.FC = () => {
             <p className="text-green-100">Manage training programs and skill development</p>
           </div>
         </div>
-        <DashboardExitButton className="text-green-100 hover:text-white" />
       </div>
 
       <div className="border-b border-gray-200 dark:border-gray-700">
