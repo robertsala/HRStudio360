@@ -560,9 +560,15 @@ const HiringPage: React.FC<HiringPageProps> = ({ onNavigateToOnboarding, onOpenS
     if (!user) return;
 
     try {
+      // Update candidates list
       setCandidates(prev => prev.map(c =>
         c.id === _candidateId ? { ...c, rating } : c
       ));
+
+      // Update the selected candidate modal immediately (optimistic update)
+      if (selectedCandidate && selectedCandidate.id === _candidateId) {
+        setSelectedCandidate({ ...selectedCandidate, rating });
+      }
 
       const candidate = candidates.find(c => c.id === _candidateId);
       setNotification({
