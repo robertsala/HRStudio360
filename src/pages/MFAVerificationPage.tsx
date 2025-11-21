@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { apiRequest } from '../lib/queryClient';
+import { useAuth } from '../contexts/AuthContext';
 import { Shield, Smartphone, Mail, RefreshCw, AlertCircle, Key } from 'lucide-react';
 
 interface MFAMethod {
@@ -10,6 +11,7 @@ interface MFAMethod {
 
 export default function MFAVerificationPage() {
   const [, navigate] = useLocation();
+  const { refreshSession } = useAuth();
   
   // Get MFA data from sessionStorage (set by login flow)
   const mfaData = sessionStorage.getItem('mfaData');
@@ -67,29 +69,24 @@ export default function MFAVerificationPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          console.log('[MFA] Verification successful - confirming session before navigation');
+          console.log('[MFA] Verification successful - refreshing session state');
           // Clear MFA data
           sessionStorage.removeItem('mfaData');
           
-          // CRITICAL: Verify session is valid BEFORE navigating
-          // This prevents the landing page from showing during the session check
+          // CRITICAL: Refresh session in AuthContext BEFORE navigating
+          // This updates the auth state so ProtectedRoute won't show "Access Restricted"
           try {
-            const sessionResponse = await fetch('/api/auth/session');
-            const sessionData = await sessionResponse.json();
-            if (sessionData.user) {
-              console.log('[MFA] Session confirmed - navigating to dashboard');
-              // Use wouter's navigate instead of window.location
-              // This avoids a full page reload and prevents landing page flash
-              navigate('/dashboard', { replace: true });
-              return;
-            }
+            await refreshSession();
+            console.log('[MFA] Session refreshed in AuthContext - navigating to dashboard');
+            // Now navigate using wouter - auth state is already updated
+            navigate('/dashboard', { replace: true });
+            return;
           } catch (e) {
-            console.error('[MFA] Session verification failed, forcing reload', e);
+            console.error('[MFA] Session refresh failed:', e);
+            // Fallback: force reload if refresh fails
+            window.location.href = '/dashboard';
+            return;
           }
-          
-          // Fallback: force reload if session check fails
-          window.location.href = '/dashboard';
-          return;
         }
       }
       
