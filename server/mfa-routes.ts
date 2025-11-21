@@ -1043,9 +1043,10 @@ export function registerMFARoutes(app: Express) {
 
       await logMFAAudit(challenge.profileId, 'login_verified', challenge.methodType, true, req);
 
-      console.log('[MFA Login] MFA verification successful - redirecting to dashboard');
-      // Server-side redirect ensures cookie is set BEFORE navigation
-      res.redirect(303, '/dashboard');
+      console.log('[MFA Login] MFA verification successful');
+      // Return success - session cookie is already set by req.session.save()
+      // Frontend will navigate after receiving this
+      res.json({ success: true, profileId: challenge.profileId });
     } catch (error: any) {
       console.error('[MFA Login] Failed to verify MFA:', error);
       res.status(500).json({ error: 'Failed to verify MFA code' });

@@ -53,7 +53,6 @@ export default function MFAVerificationPage() {
     setIsVerifying(true);
     
     try {
-      // Make verification request - backend returns 303 redirect
       const response = await fetch('/api/mfa/verify-login', {
         method: 'POST',
         headers: {
@@ -65,23 +64,25 @@ export default function MFAVerificationPage() {
         })
       });
       
-      // Check if verification was successful (could be 303 redirect or 200)
-      if (response.ok || response.status === 303) {
-        console.log('[MFA] Verification successful - navigating to dashboard');
-        // Clear MFA data
-        sessionStorage.removeItem('mfaData');
-        // Force browser navigation to dashboard - session cookie is now set on backend
-        window.location.href = '/dashboard';
-      } else {
-        // Handle error response
-        try {
-          const error = await response.json();
-          setError(error.error || 'Invalid verification code');
-        } catch {
-          setError('Invalid verification code');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log('[MFA] Verification successful, session cookie set, navigating...');
+          // Clear MFA data
+          sessionStorage.removeItem('mfaData');
+          // Small delay to ensure cookie is fully processed, then navigate
+          // This ensures the browser has time to set the session cookie before page reload
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 50);
+          return;
         }
-        setCode('');
       }
+      
+      // Handle error
+      const error = await response.json();
+      setError(error.error || 'Invalid verification code');
+      setCode('');
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
       setCode('');
