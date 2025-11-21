@@ -65,8 +65,10 @@ export default function MFAVerificationPage() {
         // Clear MFA data
         sessionStorage.removeItem('mfaData');
         
-        // Full page reload to /dashboard - ensures AuthContext sees new session
-        window.location.href = '/dashboard';
+        // Client-side navigation - ProtectedRoute will show loading while session verifies
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 0);
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
