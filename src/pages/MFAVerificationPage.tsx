@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { apiRequest } from '../lib/queryClient';
-import { useAuth } from '../contexts/AuthContext';
 import { Shield, Smartphone, Mail, RefreshCw, AlertCircle, Key } from 'lucide-react';
 
 interface MFAMethod {
