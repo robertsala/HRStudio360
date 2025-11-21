@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../utils/supabaseClient';
 import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark';
@@ -49,19 +48,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log('[ThemeContext] Loading theme preference from database for user:', user.id);
 
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('theme_preference')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[ThemeContext] Error loading theme from DB:', error);
+      const response = await fetch(`/api/profiles/${user.id}`);
+      if (!response.ok) {
+        console.error('[ThemeContext] Error loading theme from DB:', response.statusText);
         return;
       }
 
-      if (profile?.theme_preference && (profile.theme_preference === 'light' || profile.theme_preference === 'dark')) {
-        const dbTheme = profile.theme_preference as Theme;
+      const profile = await response.json();
+
+      if (profile?.themePreference && (profile.themePreference === 'light' || profile.themePreference === 'dark')) {
+        const dbTheme = profile.themePreference as Theme;
         const localTheme = localStorage.getItem('theme');
 
         console.log('[ThemeContext] DB theme:', dbTheme);
