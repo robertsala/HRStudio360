@@ -893,6 +893,11 @@ const HiringPage: React.FC<HiringPageProps> = ({ onNavigateToOnboarding, onOpenS
       return;
     }
 
+    // Close modal immediately
+    setShowDisqualifyModal(false);
+    setDisqualifyReason('');
+    setCustomReason('');
+
     try {
       await apiClient.updateCandidate(selectedCandidate.id, {
         status: 'Disqualified',
@@ -920,10 +925,7 @@ const HiringPage: React.FC<HiringPageProps> = ({ onNavigateToOnboarding, onOpenS
 
       setTimeout(() => {
         setNotification(null);
-        setShowDisqualifyModal(false);
         setSelectedCandidate(null);
-        setDisqualifyReason('');
-        setCustomReason('');
       }, 2000);
     } catch (error) {
       console.error('Error disqualifying candidate:', error);

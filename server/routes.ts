@@ -934,7 +934,17 @@ export function registerRoutes(app: Express) {
   app.patch('/api/candidates/:id', async (req, res) => {
     try {
       console.log('Updating candidate:', req.params.id, 'with data:', req.body);
-      const candidate = await storage.updateCandidate(req.params.id, req.body);
+      
+      // Convert ISO date strings to Date objects for timestamp fields
+      const updateData = { ...req.body };
+      if (updateData.disqualifiedDate && typeof updateData.disqualifiedDate === 'string') {
+        updateData.disqualifiedDate = new Date(updateData.disqualifiedDate);
+      }
+      if (updateData.appliedDate && typeof updateData.appliedDate === 'string') {
+        updateData.appliedDate = new Date(updateData.appliedDate);
+      }
+      
+      const candidate = await storage.updateCandidate(req.params.id, updateData);
       if (!candidate) {
         return res.status(404).json({ error: 'Candidate not found' });
       }
