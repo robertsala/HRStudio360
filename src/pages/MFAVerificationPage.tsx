@@ -67,14 +67,28 @@ export default function MFAVerificationPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          console.log('[MFA] Verification successful, session cookie set, navigating...');
+          console.log('[MFA] Verification successful - confirming session before navigation');
           // Clear MFA data
           sessionStorage.removeItem('mfaData');
-          // Small delay to ensure cookie is fully processed, then navigate
-          // This ensures the browser has time to set the session cookie before page reload
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 50);
+          
+          // CRITICAL: Verify session is valid BEFORE navigating
+          // This prevents the landing page from showing during the session check
+          try {
+            const sessionResponse = await fetch('/api/auth/session');
+            const sessionData = await sessionResponse.json();
+            if (sessionData.user) {
+              console.log('[MFA] Session confirmed - navigating to dashboard');
+              // Use wouter's navigate instead of window.location
+              // This avoids a full page reload and prevents landing page flash
+              navigate('/dashboard', { replace: true });
+              return;
+            }
+          } catch (e) {
+            console.error('[MFA] Session verification failed, forcing reload', e);
+          }
+          
+          // Fallback: force reload if session check fails
+          window.location.href = '/dashboard';
           return;
         }
       }
