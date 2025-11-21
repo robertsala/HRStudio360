@@ -933,12 +933,16 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/candidates/:id', async (req, res) => {
     try {
+      console.log('Updating candidate:', req.params.id, 'with data:', req.body);
       const candidate = await storage.updateCandidate(req.params.id, req.body);
       if (!candidate) {
         return res.status(404).json({ error: 'Candidate not found' });
       }
+      console.log('Candidate updated successfully:', candidate);
       res.json(candidate);
     } catch (error: any) {
+      console.error('Error updating candidate:', error);
+      console.error('Update data was:', req.body);
       res.status(500).json({ error: error.message });
     }
   });
