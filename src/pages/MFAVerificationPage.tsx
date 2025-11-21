@@ -65,8 +65,8 @@ export default function MFAVerificationPage() {
         // Clear MFA data
         sessionStorage.removeItem('mfaData');
         
-        // Navigate directly to dashboard - ProtectedRoute will handle auth check
-        navigate('/dashboard', { replace: true });
+        // Full page reload to /dashboard - ensures AuthContext sees new session
+        window.location.href = '/dashboard';
       }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code');
