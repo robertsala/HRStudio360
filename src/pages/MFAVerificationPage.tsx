@@ -69,14 +69,17 @@ export default function MFAVerificationPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          console.log('[MFA] Verification successful - navigating to dashboard');
+          console.log('[MFA] Verification successful - refreshing auth state');
           // Clear MFA data
           sessionStorage.removeItem('mfaData');
           
-          // Session cookie is already set on backend from MFA verification
-          // Do a full page reload to avoid any React re-render flashes
-          // This ensures AuthContext checks the session fresh without landing page showing
-          window.location.href = '/dashboard';
+          // CRITICAL: Session cookie is set on backend, refresh auth state in AuthContext
+          // This updates authPhase to 'authenticated' BEFORE navigation
+          await refreshSession();
+          console.log('[MFA] Auth state refreshed - navigating to dashboard');
+          
+          // Now navigate - ProtectedRoute will see authPhase='authenticated' immediately
+          navigate('/dashboard', { replace: true });
           return;
         }
       }

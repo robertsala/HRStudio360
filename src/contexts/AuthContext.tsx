@@ -13,8 +13,11 @@ interface User {
   department?: string;
 }
 
+type AuthPhase = 'checking' | 'authenticated' | 'unauthenticated';
+
 interface AuthContextType {
   user: User | null;
+  authPhase: AuthPhase;
   isAuthenticated: boolean;
   isLoading: boolean;
   celebration: CelebrationData | null;
@@ -36,12 +39,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [, setLocation] = useLocation();
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authPhase, setAuthPhase] = useState<AuthPhase>('checking');
   const [celebration, setCelebration] = useState<CelebrationData | null>(null);
   const [actualUser, setActualUser] = useState<User | null>(null);
   const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
+
+  // Computed properties for backward compatibility
+  const isAuthenticated = authPhase === 'authenticated';
+  const isLoading = authPhase === 'checking';
 
   const loadUserProfile = React.useCallback(async (userId: string, email: string) => {
     try {
@@ -67,8 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // ALWAYS set user as authenticated, even if optional data queries fail
       setUser(userData);
-      setIsAuthenticated(true);
-      setIsLoading(false);
+      setAuthPhase('authenticated');
 
       // CRITICAL: Set language from database preference FIRST, with fallback to 'en'
       // This ensures database preference ALWAYS overrides browser/localStorage detection
@@ -109,8 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.warn('Profile load failed, using fallback auth with email only. User will have no privileges until profile loads.');
       setUser(userData);
-      setIsAuthenticated(true);
-      setIsLoading(false);
+      setAuthPhase('authenticated');
     }
   }, []);
 
@@ -141,8 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           console.log('[AuthContext] No session found - showing landing page');
           setUser(null);
-          setIsAuthenticated(false);
-          setIsLoading(false);
+          setAuthPhase('unauthenticated');
         }
       } catch (error: any) {
         console.error('[AuthContext] Auth initialization error:', error);
@@ -165,8 +168,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Mark as complete even on error to prevent fallback from triggering
           authCheckComplete = true;
           console.log('[AuthContext] Auth check failed after retries, but not forcing sign-out');
-          // Only set loading to false, don't clear user state on errors
-          setIsLoading(false);
+          // Only set to unauthenticated, don't clear user state on errors
+          setAuthPhase('unauthenticated');
         }
       }
     };
@@ -176,10 +179,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Extended fallback timeout (60 seconds) to handle slow networks
     // Only triggers if auth check hasn't completed at all
     const fallbackTimeout = setTimeout(() => {
-      if (mounted && isLoading && !authCheckComplete) {
+      if (mounted && authPhase === 'checking' && !authCheckComplete) {
         console.log('[AuthContext] Fallback timeout after 60s - showing landing page without forcing sign-out');
         // Don't clear user state, just stop showing loading spinner
-        setIsLoading(false);
+        setAuthPhase('unauthenticated');
       }
     }, 60000);
 
@@ -268,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Clear auth state
       setUser(null);
-      setIsAuthenticated(false);
+      setAuthPhase('unauthenticated');
 
       // Redirect to homepage
       setLocation('/');
@@ -293,8 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Manually update state as fallback
       setUser(null);
-      setIsAuthenticated(false);
-      setIsLoading(false);
+      setAuthPhase('unauthenticated');
       setActualUser(null);
       setImpersonatedUser(null);
       setIsImpersonating(false);
@@ -314,20 +316,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         console.log('[AuthContext] Session found, loading profile...');
         await loadUserProfile(session.user.id, session.user.email || '');
-        // CRITICAL: Ensure React has committed state updates before returning
-        // This prevents the ProtectedRoute from briefly showing "Access Restricted"
-        await new Promise(resolve => setTimeout(resolve, 0));
         console.log('[AuthContext] Profile loaded and state updated, session refresh complete');
       } else {
         console.log('[AuthContext] No session found, clearing auth state');
         setUser(null);
-        setIsAuthenticated(false);
+        setAuthPhase('unauthenticated');
       }
     } catch (error) {
       console.error('[AuthContext] Error refreshing session:', error);
       // Clear auth state on error
       setUser(null);
-      setIsAuthenticated(false);
+      setAuthPhase('unauthenticated');
       throw error;
     }
   };
@@ -409,6 +408,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = {
     user,
+    authPhase,
     isAuthenticated,
     isLoading,
     celebration,

@@ -209,7 +209,11 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
       // Only navigate to dashboard if MFA is not required
       // If MFA is required, signIn() already redirected to /mfa-verify
       if (!mfaRequired) {
-        console.log('[Layout] Navigating to dashboard after successful sign-in');
+        console.log('[Layout] Sign-in successful - ensuring auth state is committed');
+        // CRITICAL: Wait for React to commit authPhase state changes before navigating
+        // This prevents ProtectedRoute from briefly showing "Access Restricted"
+        await new Promise(resolve => setTimeout(resolve, 0));
+        console.log('[Layout] Navigating to dashboard');
         setLocation('/dashboard');
       } else {
         console.log('[Layout] MFA required - user redirected to verification page');

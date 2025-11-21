@@ -7,9 +7,10 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { authPhase } = useAuth();
 
-  if (isLoading) {
+  // Show loader while checking auth status
+  if (authPhase === 'checking') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -20,7 +21,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) =
     );
   }
 
-  if (!isAuthenticated) {
+  // Show access restricted when unauthenticated
+  if (authPhase === 'unauthenticated') {
     return fallback || (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
@@ -39,6 +41,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) =
     );
   }
 
+  // Render children when authenticated
   return <>{children}</>;
 };
 

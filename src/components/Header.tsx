@@ -31,11 +31,12 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen, onNa
       // Only navigate to dashboard if MFA is not required
       // If MFA is required, signIn() already redirected to /mfa-verify
       if (!mfaRequired) {
-        setTimeout(() => {
-          if (onNavigate) {
-            onNavigate('dashboard');
-          }
-        }, 100);
+        // CRITICAL: Wait for React to commit authPhase state changes before navigating
+        // This prevents ProtectedRoute from briefly showing "Access Restricted"
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (onNavigate) {
+          onNavigate('dashboard');
+        }
       }
     } catch (error) {
       // Error will be displayed in SignInModal
