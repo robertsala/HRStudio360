@@ -1028,6 +1028,19 @@ export function registerMFARoutes(app: Express) {
       console.log('[MFA Login] Creating session for user:', challenge.profileId);
       (req.session as any).userId = challenge.profileId;
 
+      // Save session explicitly - this is critical!
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error('[MFA Login] Session save error:', err);
+            reject(err);
+          } else {
+            console.log('[MFA Login] Session saved successfully');
+            resolve();
+          }
+        });
+      });
+
       await logMFAAudit(challenge.profileId, 'login_verified', challenge.methodType, true, req);
 
       console.log('[MFA Login] MFA verification successful');
