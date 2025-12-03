@@ -39,6 +39,11 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
     -   **Components**: 4 production-ready form components (I-9 Section 1 & 2, Massachusetts M-4, document upload with object storage)
     -   **Modal Interface**: Fully integrated NewHireOnboardingModal with 4-tab navigation (Overview, Forms & Compliance, Documents, Tasks), role-based access control, real-time progress tracking, and hierarchical TanStack Query cache invalidation
     -   **Federal Compliance**: Complete I-9 verification workflow supporting all 50 states and US territories with conditional validation (List A OR List B+C documents)
+-   **Navigation Architecture**: Hybrid page/modal navigation system that works from any page:
+    -   **TIER 1 Pages**: Full-screen pages (Benefits, Employees, Hiring, Chat, Leave, Performance, etc.) routed via `PAGE_ROUTES` in App.tsx
+    -   **Legacy Modals**: Dashboard inline modals (Payroll, Reports, Events, Offboarding, TimeAttendance) opened via `?openModal=` query parameter
+    -   **Cross-Page Navigation**: Clicking sidebar items from any page navigates correctly - pages route directly, modals navigate to `/dashboard?openModal=modalName` and Dashboard opens them on mount
+    -   **Modal Validation**: Dashboard validates `openModal` query params against `VALID_INLINE_CONTENT` whitelist to prevent blank states
 -   **Design Patterns**: Utilizes a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries.
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library.
 -   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors`.

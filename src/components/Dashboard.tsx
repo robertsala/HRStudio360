@@ -189,6 +189,44 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
     }
   }, [userPermissions]);
 
+  // Valid inline content types that can be opened via query param
+  const VALID_INLINE_CONTENT = ['payroll', 'events', 'reports', 'offboarding', 'timeAttendance'];
+  
+  // Check for openModal query parameter on mount and open the modal if present
+  // This enables navigation from other pages to dashboard with a specific modal
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const modalToOpen = params.get('openModal');
+    
+    if (modalToOpen) {
+      console.log('[Dashboard] Found openModal query param:', modalToOpen);
+      
+      // Clear the query param from URL to prevent re-opening on refresh
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      
+      // Validate the modal name before attempting to open
+      const isValidModal = modalToOpen in modals;
+      const isValidInlineContent = VALID_INLINE_CONTENT.includes(modalToOpen);
+      
+      if (!isValidModal && !isValidInlineContent) {
+        console.warn('[Dashboard] Invalid openModal value ignored:', modalToOpen);
+        return;
+      }
+      
+      // Use setTimeout to ensure component is fully mounted before opening modal
+      setTimeout(() => {
+        console.log('[Dashboard] Opening modal from query param:', modalToOpen);
+        // Check if it's a true modal or inline content
+        if (isValidModal) {
+          setModals(prev => ({ ...prev, [modalToOpen as keyof typeof modals]: true }));
+        } else {
+          setActiveContent(modalToOpen);
+        }
+      }, 100);
+    }
+  }, []); // Run only on mount
+
   // Time-based greeting utility
   const getTimeBasedGreeting = () => {
     const hour = new Date().getHours();

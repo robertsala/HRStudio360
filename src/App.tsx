@@ -48,21 +48,69 @@ function App() {
     else if (view === 'profile') setLocation('/profile');
   };
 
-  // Handle opening modals from sidebar
+  // Route map for TIER 1 pages only (pages that have actual page components)
+  // NOTE: Do NOT include modals here - they should use Dashboard's modal system
+  const PAGE_ROUTES: Record<string, string> = {
+    // Converted full-screen pages
+    enterpriseChat: '/chat',
+    benefitsPay: '/benefits',
+    leaveManagement: '/leave',
+    performanceReview: '/performance',
+    employees: '/employees',
+    employeeDirectory: '/employees',
+    timeTracking: '/time-tracking',
+    // timeAttendance is a MODAL, not a page - handled by Dashboard inline content
+    announcements: '/announcements',
+    systemSettings: '/settings',
+    hiring: '/hiring',
+    training: '/training',
+    onboarding: '/onboarding',
+    newHireOnboarding: '/onboarding',
+    studioAIChat: '/ai-assistant',
+    inbox: '/inbox',
+    // Special navigation
+    dashboard: '/dashboard',
+  };
+
+  // Handle opening modals/pages from sidebar - now works from ANY page
   const handleOpenModal = (modalName: string) => {
     console.log('[App.tsx] handleOpenModal called with:', modalName);
+    
+    // Handle systemSettings with tab parameter (e.g., "systemSettings:changelog")
+    if (modalName.startsWith('systemSettings:')) {
+      const tab = modalName.split(':')[1];
+      console.log(`[App.tsx] Navigating to Settings with tab: ${tab}`);
+      setLocation(`/settings?tab=${tab}`);
+      return;
+    }
+    
+    // Direct route navigation for converted TIER 1 pages - works from any page
+    if (modalName in PAGE_ROUTES) {
+      const path = PAGE_ROUTES[modalName];
+      console.log(`[App.tsx] Navigating to page: ${path}`);
+      setLocation(path);
+      return;
+    }
+    
+    // For modals that still exist (payroll, reports, events, offboarding, etc.)
+    // Try Dashboard ref first, otherwise navigate to dashboard with query param
     if (dashboardRef.current && dashboardRef.current.openModal) {
+      console.log('[App.tsx] Opening Dashboard modal:', modalName);
       dashboardRef.current.openModal(modalName);
+    } else {
+      console.log('[App.tsx] Dashboard not mounted, navigating to dashboard with openModal query param');
+      // Navigate to dashboard with query param - Dashboard will open the modal on mount
+      setLocation(`/dashboard?openModal=${encodeURIComponent(modalName)}`);
     }
   };
 
-  // Handle opening My Profile comprehensive modal
+  // Handle opening My Profile - prefers Dashboard modal when available, otherwise routes to /profile
   const handleOpenMyProfile = () => {
     console.log('[App.tsx] handleOpenMyProfile called');
     if (dashboardRef.current && dashboardRef.current.openMyProfile) {
+      console.log('[App.tsx] Using Dashboard profile modal');
       dashboardRef.current.openMyProfile();
     } else {
-      // Fallback to profile route when Dashboard is not mounted
       console.log('[App.tsx] Dashboard not mounted, routing to /profile');
       setLocation('/profile');
     }
