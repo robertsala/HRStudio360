@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
 import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff, Upload, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api';
@@ -11,6 +12,7 @@ interface UserProfileProps {
 
 const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) => {
   const { t } = useTranslation();
+  const [, setLocation] = useLocation();
   const { user, signOut, updateProfilePicture } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
@@ -295,8 +297,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) =>
   const handleSignOut = async () => {
     try {
       await signOut();
+      setLocation('/');
     } catch (error) {
       console.error('Sign out error:', error);
+      setLocation('/');
     }
   };
 
@@ -371,25 +375,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) =>
                     </button>
                   </>
                 ) : (
-                  <>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="bg-white dark:bg-gray-800 text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
-                      data-testid="button-edit-profile"
-                    >
-                      <Edit3 className="h-4 w-4 mr-2" />
-                      Edit Profile
-                    </button>
-                    <button
-                      onClick={handleSignOut}
-                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center"
-                      data-testid="button-sign-out"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
-                    </button>
-                  </>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="bg-white dark:bg-gray-800 text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
+                    data-testid="button-edit-profile"
+                  >
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    Edit Profile
+                  </button>
                 )}
+                <button
+                  onClick={handleSignOut}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center"
+                  data-testid="button-sign-out"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </button>
               </div>
             </div>
           </div>
