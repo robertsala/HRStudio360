@@ -9,12 +9,12 @@ interface UserProfileProps {
   onNavigate?: (view: 'landing' | 'dashboard' | 'profile') => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) => {
   const { t } = useTranslation();
-  const { user, signOut, updateProfilePicture } = useAuth();
+  const { user, updateProfilePicture } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -238,16 +238,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
     return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase();
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      // Navigation to landing will happen automatically via App.tsx useEffect
-    } catch (error) {
-      console.error('Sign out error:', error);
-      // Even on error, the fallback in signOut will clear state
-    }
-  };
-
   const handlePasswordChange = async () => {
     try {
       setChangingPassword(true);
@@ -303,37 +293,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <button 
-              onClick={() => onNavigate?.('landing')}
-              className="flex items-center hover:opacity-80 transition-opacity"
-            >
-              <User className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">HRStudio360</span>
-            </button>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => onNavigate?.('dashboard')}
-                className="text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors"
-              >
-                Back to Dashboard
-              </button>
-              <button 
-                onClick={handleSignOut}
-                className="text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-4xl mx-auto">
         {/* Success Message */}
         {saveSuccess && (
           <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center">
