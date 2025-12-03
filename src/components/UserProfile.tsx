@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff, Upload, Shield } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Edit3, Save, X, CheckCircle, Lock, Eye, EyeOff, Upload, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../lib/api';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ interface UserProfileProps {
 
 const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) => {
   const { t } = useTranslation();
-  const { user, updateProfilePicture } = useAuth();
+  const { user, signOut, updateProfilePicture } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [_loading, setLoading] = useState(true);
@@ -292,6 +292,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) =>
     };
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
@@ -363,13 +371,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ onNavigate: _onNavigate }) =>
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="bg-white dark:bg-gray-800 text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-100 dark:bg-gray-700 transition-colors flex items-center"
-                  >
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Edit Profile
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="bg-white dark:bg-gray-800 text-blue-600 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center"
+                      data-testid="button-edit-profile"
+                    >
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={handleSignOut}
+                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center"
+                      data-testid="button-sign-out"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </button>
+                  </>
                 )}
               </div>
             </div>
