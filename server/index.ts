@@ -13,7 +13,16 @@ initSentry();
 
 const app = express();
 
-// Health check endpoint for deployment checks (responds immediately, before ANY middleware)
+// Health check endpoints for deployment checks (responds immediately, before ANY middleware)
+// Root endpoint '/' is checked by default during deployment health checks
+app.get('/', (_req, res, next) => {
+  // Only respond to health checks, not browser navigation
+  if (_req.headers.accept?.includes('text/html')) {
+    return next();
+  }
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });

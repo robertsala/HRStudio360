@@ -19,11 +19,31 @@ export async function seedComplianceData() {
     try {
       existingFrameworks = await db.select().from(complianceFrameworks).limit(1);
     } catch (tableError: any) {
-      if (tableError?.message?.includes('does not exist') || tableError?.code === '42P01') {
+      // Drizzle wraps PostgreSQL errors - check both the error itself and its cause
+      const errorMessage = tableError?.message || '';
+      const causeMessage = tableError?.cause?.message || '';
+      const errorCode = tableError?.code || tableError?.cause?.code || '';
+      
+      // PostgreSQL error code 42P01 = undefined_table
+      const isTableMissing = 
+        errorCode === '42P01' ||
+        errorMessage.includes('does not exist') ||
+        errorMessage.includes('relation') ||
+        causeMessage.includes('does not exist') ||
+        causeMessage.includes('relation');
+      
+      if (isTableMissing) {
         console.log('[Compliance Seed] Compliance tables not yet created, skipping seed (run migrations first)');
         return;
       }
-      throw tableError;
+      
+      // Log the full error for debugging but don't crash
+      console.error('[Compliance Seed] Unexpected error checking table existence:', {
+        message: errorMessage,
+        causeMessage,
+        code: errorCode
+      });
+      return;
     }
     
     if (existingFrameworks.length > 0) {
