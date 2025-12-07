@@ -275,12 +275,9 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
     },
     { id: 'profile', label: t('sidebar.myProfile'), icon: User, action: () => {
         setActiveSidebarItem('profile');
-        // Try to open comprehensive modal if on dashboard, otherwise route to profile page
-        if (onOpenMyProfile) {
-          onOpenMyProfile();
-        } else {
-          setLocation('/profile');
-        }
+        // Always navigate to the full profile page from sidebar
+        // The modal behavior is reserved for header profile picture/name clicks
+        setLocation('/profile');
       }
     },
     { id: 'employees', label: t('sidebar.directory'), icon: Users, action: () => onOpenModal?.('employees') },
@@ -754,9 +751,9 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                 </span>
               </button>
 
-              {/* User Profile */}
+              {/* User Profile - Opens modal when clicking avatar/name */}
               <button
-                onClick={() => onNavigate?.('profile')}
+                onClick={() => onOpenMyProfile?.()}
                 className="flex items-center space-x-2 sm:space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl p-1 sm:p-2 transition-all duration-200 touch-manipulation"
               >
                 {user?.profilePicture ? (
