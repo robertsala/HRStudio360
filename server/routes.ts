@@ -2498,17 +2498,20 @@ export function registerRoutes(app: Express) {
         // Compliance audit logging for user registration
         try {
           await storage.createComplianceAuditEntry({
-            action: 'user_registered',
+            eventType: 'create',
             category: 'security',
+            action: 'user_registered',
+            resourceType: 'user',
+            resourceId: profile.id,
+            resourceName: email,
             actorId: profile.id,
-            actorName: `${firstName} ${lastName}`,
-            targetType: 'user',
-            targetId: profile.id,
-            description: `New user registered: ${email}`,
-            details: JSON.stringify({ email, firstName, lastName, role: 'employee' }),
-            ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-            userAgent: req.get('User-Agent') || 'unknown',
-            status: 'success'
+            actorEmail: email,
+            actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+            actorUserAgent: req.get('User-Agent') || 'unknown',
+            changeDescription: `New user registered: ${email}`,
+            moduleSource: 'security',
+            success: true,
+            metadata: { email, firstName, lastName, role: 'employee' }
           });
         } catch (auditError) {
           console.error('Failed to create audit log for user_registered:', auditError);
@@ -2717,17 +2720,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(tokenData.profileId);
         await storage.createComplianceAuditEntry({
-          action: 'password_reset',
+          eventType: 'update',
           category: 'security',
+          action: 'password_reset',
+          resourceType: 'user',
+          resourceId: tokenData.profileId,
+          resourceName: userProfile?.email || 'unknown',
           actorId: tokenData.profileId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'user',
-          targetId: tokenData.profileId,
-          description: `Password reset completed via email link`,
-          details: JSON.stringify({ method: 'email_reset_link' }),
-          ipAddress: ipAddress,
-          userAgent: userAgent,
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: ipAddress,
+          actorUserAgent: userAgent,
+          changeDescription: `Password reset completed via email link`,
+          moduleSource: 'security',
+          success: true,
+          metadata: { method: 'email_reset_link' }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for password_reset:', auditError);
@@ -2830,17 +2836,20 @@ export function registerRoutes(app: Express) {
       // Compliance audit logging for password change
       try {
         await storage.createComplianceAuditEntry({
-          action: 'password_changed',
+          eventType: 'update',
           category: 'security',
+          action: 'password_changed',
+          resourceType: 'user',
+          resourceId: userId,
+          resourceName: profile?.email || 'unknown',
           actorId: userId,
-          actorName: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : 'System',
-          targetType: 'user',
-          targetId: userId,
-          description: `Password changed by user`,
-          details: JSON.stringify({ method: 'user_initiated' }),
-          ipAddress: ipAddress,
-          userAgent: userAgent,
-          status: 'success'
+          actorEmail: profile?.email || 'unknown',
+          actorIpAddress: ipAddress,
+          actorUserAgent: userAgent,
+          changeDescription: `Password changed by user`,
+          moduleSource: 'security',
+          success: true,
+          metadata: { method: 'user_initiated' }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for password_changed:', auditError);
@@ -3744,17 +3753,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'new_hire_created',
+          eventType: 'create',
           category: 'onboarding',
+          action: 'new_hire_created',
+          resourceType: 'new_hire',
+          resourceId: newHire.id,
+          resourceName: `${validatedData.firstName} ${validatedData.lastName}`,
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'new_hire',
-          targetId: newHire.id,
-          description: `New hire created: ${validatedData.firstName} ${validatedData.lastName} (${validatedData.email})`,
-          details: JSON.stringify({ newHireId: newHire.id, email: validatedData.email, position: validatedData.position }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `New hire created: ${validatedData.firstName} ${validatedData.lastName} (${validatedData.email})`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { newHireId: newHire.id, email: validatedData.email, position: validatedData.position }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for new_hire_created:', auditError);
@@ -3788,17 +3800,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'new_hire_updated',
+          eventType: 'update',
           category: 'onboarding',
+          action: 'new_hire_updated',
+          resourceType: 'new_hire',
+          resourceId: id,
+          resourceName: `${updatedHire.firstName} ${updatedHire.lastName}`,
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'new_hire',
-          targetId: id,
-          description: `New hire updated: ${updatedHire.firstName} ${updatedHire.lastName}`,
-          details: JSON.stringify({ newHireId: id, updatedFields: Object.keys(validatedData) }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `New hire updated: ${updatedHire.firstName} ${updatedHire.lastName}`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { newHireId: id, updatedFields: Object.keys(validatedData) }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for new_hire_updated:', auditError);
@@ -4000,17 +4015,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'i9_form_created',
+          eventType: 'create',
           category: 'onboarding',
+          action: 'i9_form_created',
+          resourceType: 'i9_form',
+          resourceId: form.id,
+          resourceName: 'I-9 Form',
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'i9_form',
-          targetId: form.id,
-          description: `I-9 form created for new hire`,
-          details: JSON.stringify({ formId: form.id, newHireId: validatedData.newHireId }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `I-9 form created for new hire`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { formId: form.id, newHireId: validatedData.newHireId }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for i9_form_created:', auditError);
@@ -4039,17 +4057,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'i9_form_updated',
+          eventType: 'update',
           category: 'onboarding',
+          action: 'i9_form_updated',
+          resourceType: 'i9_form',
+          resourceId: id,
+          resourceName: 'I-9 Form',
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'i9_form',
-          targetId: id,
-          description: `I-9 form updated`,
-          details: JSON.stringify({ formId: id, updatedFields: Object.keys(validatedData) }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `I-9 form updated`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { formId: id, updatedFields: Object.keys(validatedData) }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for i9_form_updated:', auditError);
@@ -4077,17 +4098,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'i9_section1_completed',
+          eventType: 'update',
           category: 'onboarding',
+          action: 'i9_section1_completed',
+          resourceType: 'i9_form',
+          resourceId: id,
+          resourceName: 'I-9 Form Section 1',
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'i9_form',
-          targetId: id,
-          description: `I-9 form Section 1 (Employee Information) completed`,
-          details: JSON.stringify({ formId: id }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `I-9 form Section 1 (Employee Information) completed`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { formId: id }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for i9_section1_completed:', auditError);
@@ -4115,17 +4139,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'i9_section2_completed',
+          eventType: 'update',
           category: 'onboarding',
+          action: 'i9_section2_completed',
+          resourceType: 'i9_form',
+          resourceId: id,
+          resourceName: 'I-9 Form Section 2',
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'i9_form',
-          targetId: id,
-          description: `I-9 form Section 2 (Employer Verification) completed by authorized representative`,
-          details: JSON.stringify({ formId: id, verifiedBy: userId }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `I-9 form Section 2 (Employer Verification) completed by authorized representative`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { formId: id, verifiedBy: userId }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for i9_section2_completed:', auditError);
@@ -4171,17 +4198,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'state_tax_form_created',
+          eventType: 'create',
           category: 'onboarding',
+          action: 'state_tax_form_created',
+          resourceType: 'state_tax_form',
+          resourceId: form.id,
+          resourceName: `State Tax Form - ${validatedData.state || 'unknown state'}`,
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'state_tax_form',
-          targetId: form.id,
-          description: `State tax form created for ${validatedData.state || 'unknown state'}`,
-          details: JSON.stringify({ formId: form.id, newHireId: validatedData.newHireId, state: validatedData.state }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `State tax form created for ${validatedData.state || 'unknown state'}`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { formId: form.id, newHireId: validatedData.newHireId, state: validatedData.state }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for state_tax_form_created:', auditError);
@@ -4210,17 +4240,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = userId ? await storage.getProfileById(userId) : null;
         await storage.createComplianceAuditEntry({
-          action: 'state_tax_form_updated',
+          eventType: 'update',
           category: 'onboarding',
+          action: 'state_tax_form_updated',
+          resourceType: 'state_tax_form',
+          resourceId: id,
+          resourceName: 'State Tax Form',
           actorId: userId || null,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'state_tax_form',
-          targetId: id,
-          description: `State tax form updated`,
-          details: JSON.stringify({ formId: id, updatedFields: Object.keys(validatedData) }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'system',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `State tax form updated`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { formId: id, updatedFields: Object.keys(validatedData) }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for state_tax_form_updated:', auditError);
@@ -4292,17 +4325,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'onboarding_document_uploaded',
+          eventType: 'create',
           category: 'onboarding',
+          action: 'onboarding_document_uploaded',
+          resourceType: 'onboarding_document',
+          resourceId: document.id,
+          resourceName: validatedData.documentType || 'Document',
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'onboarding_document',
-          targetId: document.id,
-          description: `Onboarding document uploaded: ${validatedData.documentType || 'unknown type'}`,
-          details: JSON.stringify({ documentId: document.id, newHireId: validatedData.newHireId, documentType: validatedData.documentType }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Onboarding document uploaded: ${validatedData.documentType || 'unknown type'}`,
+          moduleSource: 'onboarding',
+          success: true,
+          metadata: { documentId: document.id, newHireId: validatedData.newHireId, documentType: validatedData.documentType }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for onboarding_document_uploaded:', auditError);
@@ -4799,17 +4835,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'payroll_validated',
+          eventType: 'update',
           category: 'payroll',
+          action: 'payroll_validated',
+          resourceType: 'payroll_run',
+          resourceId: payrollPeriod,
+          resourceName: `Payroll Period ${payrollPeriod}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'payroll_run',
-          targetId: payrollPeriod,
-          description: `AI payroll validation completed for ${employees.length} employees`,
-          details: JSON.stringify({ payrollPeriod, employeeCount: employees.length, hasErrors: (validation as any)?.errors?.length > 0 || false }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `AI payroll validation completed for ${employees.length} employees`,
+          moduleSource: 'payroll',
+          success: true,
+          metadata: { payrollPeriod, employeeCount: employees.length, hasErrors: (validation as any)?.errors?.length > 0 || false }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for payroll_validated:', auditError);
@@ -5465,17 +5504,20 @@ export function registerRoutes(app: Express) {
           const userProfile = await storage.getProfileById(userId);
           const auditAction = isCompleted ? 'tutorial_completed' : 'tutorial_progress_updated';
           await storage.createComplianceAuditEntry({
-            action: auditAction,
+            eventType: 'update',
             category: 'training',
+            action: auditAction,
+            resourceType: 'tutorial',
+            resourceId: tutorialId,
+            resourceName: 'Tutorial Progress',
             actorId: userId,
-            actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-            targetType: 'tutorial',
-            targetId: tutorialId,
-            description: isCompleted ? `Tutorial completed` : `Tutorial progress updated to step ${currentStepNumber}`,
-            details: JSON.stringify({ tutorialId, currentStepNumber, isCompleted, completedSteps }),
-            ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-            userAgent: req.get('User-Agent') || 'unknown',
-            status: 'success'
+            actorEmail: userProfile?.email || 'unknown',
+            actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+            actorUserAgent: req.get('User-Agent') || 'unknown',
+            changeDescription: isCompleted ? `Tutorial completed` : `Tutorial progress updated to step ${currentStepNumber}`,
+            moduleSource: 'training',
+            success: true,
+            metadata: { tutorialId, currentStepNumber, isCompleted, completedSteps }
           });
         } catch (auditError) {
           console.error('Failed to create audit log for tutorial progress:', auditError);
@@ -5498,17 +5540,20 @@ export function registerRoutes(app: Express) {
           const userProfile = await storage.getProfileById(userId);
           const auditAction = isCompleted ? 'tutorial_completed' : 'tutorial_progress_updated';
           await storage.createComplianceAuditEntry({
-            action: auditAction,
+            eventType: 'create',
             category: 'training',
+            action: auditAction,
+            resourceType: 'tutorial',
+            resourceId: tutorialId,
+            resourceName: 'Tutorial Progress',
             actorId: userId,
-            actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-            targetType: 'tutorial',
-            targetId: tutorialId,
-            description: isCompleted ? `Tutorial completed` : `Tutorial progress started`,
-            details: JSON.stringify({ tutorialId, currentStepNumber: currentStepNumber || 1, isCompleted: isCompleted || false }),
-            ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-            userAgent: req.get('User-Agent') || 'unknown',
-            status: 'success'
+            actorEmail: userProfile?.email || 'unknown',
+            actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+            actorUserAgent: req.get('User-Agent') || 'unknown',
+            changeDescription: isCompleted ? `Tutorial completed` : `Tutorial progress started`,
+            moduleSource: 'training',
+            success: true,
+            metadata: { tutorialId, currentStepNumber: currentStepNumber || 1, isCompleted: isCompleted || false }
           });
         } catch (auditError) {
           console.error('Failed to create audit log for tutorial progress:', auditError);
@@ -6822,17 +6867,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'auto_fix_approved',
+          eventType: 'update',
           category: 'payroll',
+          action: 'auto_fix_approved',
+          resourceType: 'auto_fix',
+          resourceId: log.id,
+          resourceName: 'Auto-Fix Correction',
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'auto_fix',
-          targetId: log.id,
-          description: `Auto-fix corrections approved for payroll processing`,
-          details: JSON.stringify({ autoFixLogId: log.id, fixType: validated.fixType || 'general' }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Auto-fix corrections approved for payroll processing`,
+          moduleSource: 'payroll',
+          success: true,
+          metadata: { autoFixLogId: log.id, fixType: validated.fixType || 'general' }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for auto_fix_approved:', auditError);
@@ -6916,17 +6964,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'timesheets_saved',
+          eventType: 'create',
           category: 'payroll',
+          action: 'timesheets_saved',
+          resourceType: 'timesheet',
+          resourceId: payPeriodStart,
+          resourceName: `Timesheets ${payPeriodStart} to ${payPeriodEnd}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'timesheet',
-          targetId: payPeriodStart,
-          description: `${savedTimesheets.length} timesheets saved for pay period ${payPeriodStart} to ${payPeriodEnd}`,
-          details: JSON.stringify({ payPeriodStart, payPeriodEnd, count: savedTimesheets.length, employeeIds: timesheetEntries.map(t => t.employeeId) }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `${savedTimesheets.length} timesheets saved for pay period ${payPeriodStart} to ${payPeriodEnd}`,
+          moduleSource: 'payroll',
+          success: true,
+          metadata: { payPeriodStart, payPeriodEnd, count: savedTimesheets.length, employeeIds: timesheetEntries.map(t => t.employeeId) }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for timesheets_saved:', auditError);
@@ -6984,17 +7035,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'timesheets_approved',
+          eventType: 'update',
           category: 'payroll',
+          action: 'timesheets_approved',
+          resourceType: 'timesheet',
+          resourceId: payPeriodStart || 'bulk',
+          resourceName: `Timesheets ${payPeriodStart || 'bulk'} to ${payPeriodEnd || 'bulk'}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'timesheet',
-          targetId: payPeriodStart || 'bulk',
-          description: `${timesheetIds.length} timesheets approved${payPeriodStart ? ` for pay period ${payPeriodStart} to ${payPeriodEnd}` : ''}`,
-          details: JSON.stringify({ payPeriodStart, payPeriodEnd, count: timesheetIds.length, timesheetIds }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `${timesheetIds.length} timesheets approved${payPeriodStart ? ` for pay period ${payPeriodStart} to ${payPeriodEnd}` : ''}`,
+          moduleSource: 'payroll',
+          success: true,
+          metadata: { payPeriodStart, payPeriodEnd, count: timesheetIds.length, timesheetIds }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for timesheets_approved:', auditError);
@@ -7092,17 +7146,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'payroll_locked',
+          eventType: 'create',
           category: 'payroll',
+          action: 'payroll_locked',
+          resourceType: 'payroll_lock',
+          resourceId: lock.id,
+          resourceName: `Payroll Lock ${payPeriodStart} to ${payPeriodEnd}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'payroll_lock',
-          targetId: lock.id,
-          description: `Payroll locked for period ${payPeriodStart} to ${payPeriodEnd} (${approvedTimesheets.length} timesheets)`,
-          details: JSON.stringify({ lockId: lock.id, payPeriodStart, payPeriodEnd, timesheetsLocked: approvedTimesheets.length, employeeCount: (employeeIds || approvedTimesheets.map(t => t.employeeId)).length }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Payroll locked for period ${payPeriodStart} to ${payPeriodEnd} (${approvedTimesheets.length} timesheets)`,
+          moduleSource: 'payroll',
+          success: true,
+          metadata: { lockId: lock.id, payPeriodStart, payPeriodEnd, timesheetsLocked: approvedTimesheets.length, employeeCount: (employeeIds || approvedTimesheets.map(t => t.employeeId)).length }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for payroll_locked:', auditError);
@@ -7270,17 +7327,20 @@ export function registerRoutes(app: Express) {
       // Compliance audit logging for permission assignment
       try {
         await storage.createComplianceAuditEntry({
-          action: 'permission_changed',
+          eventType: 'update',
           category: 'security',
+          action: 'permission_changed',
+          resourceType: 'role_permission',
+          resourceId: role,
+          resourceName: `Role: ${role}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'role_permission',
-          targetId: role,
-          description: `Permission assigned to role: ${role}`,
-          details: JSON.stringify({ role, permissionId, action: 'assign' }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Permission assigned to role: ${role}`,
+          moduleSource: 'security',
+          success: true,
+          metadata: { role, permissionId, action: 'assign' }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for permission_changed:', auditError);
@@ -7317,17 +7377,20 @@ export function registerRoutes(app: Express) {
       // Compliance audit logging for permission revocation
       try {
         await storage.createComplianceAuditEntry({
-          action: 'permission_changed',
+          eventType: 'delete',
           category: 'security',
+          action: 'permission_changed',
+          resourceType: 'role_permission',
+          resourceId: role,
+          resourceName: `Role: ${role}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'role_permission',
-          targetId: role,
-          description: `Permission revoked from role: ${role}`,
-          details: JSON.stringify({ role, permissionId, action: 'revoke' }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Permission revoked from role: ${role}`,
+          moduleSource: 'security',
+          success: true,
+          metadata: { role, permissionId, action: 'revoke' }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for permission_changed:', auditError);
@@ -8056,17 +8119,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'permission_changed',
+          eventType: 'update',
           category: 'security',
+          action: 'permission_changed',
+          resourceType: 'role_permission',
+          resourceId: role,
+          resourceName: `Role: ${role}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'role_permission',
-          targetId: role,
-          description: `Bulk permission assignment: ${permissionIds.length} permissions assigned to role ${role}`,
-          details: JSON.stringify({ role, permissionCount: permissionIds.length, permissionIds, action: 'bulk_assign', reason }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Bulk permission assignment: ${permissionIds.length} permissions assigned to role ${role}`,
+          moduleSource: 'security',
+          success: true,
+          metadata: { role, permissionCount: permissionIds.length, permissionIds, action: 'bulk_assign', reason }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for bulk permission_changed:', auditError);
@@ -8101,17 +8167,20 @@ export function registerRoutes(app: Express) {
       try {
         const userProfile = await storage.getProfileById(userId);
         await storage.createComplianceAuditEntry({
-          action: 'permission_changed',
+          eventType: 'update',
           category: 'security',
+          action: 'permission_changed',
+          resourceType: 'role_permission',
+          resourceId: role,
+          resourceName: `Role: ${role}`,
           actorId: userId,
-          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
-          targetType: 'role_permission',
-          targetId: role,
-          description: `Bulk permission revocation: ${permissionIds.length} permissions revoked from role ${role}`,
-          details: JSON.stringify({ role, permissionCount: permissionIds.length, permissionIds, action: 'bulk_revoke', reason }),
-          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown',
-          status: 'success'
+          actorEmail: userProfile?.email || 'unknown',
+          actorIpAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          actorUserAgent: req.get('User-Agent') || 'unknown',
+          changeDescription: `Bulk permission revocation: ${permissionIds.length} permissions revoked from role ${role}`,
+          moduleSource: 'security',
+          success: true,
+          metadata: { role, permissionCount: permissionIds.length, permissionIds, action: 'bulk_revoke', reason }
         });
       } catch (auditError) {
         console.error('Failed to create audit log for bulk permission_changed:', auditError);
@@ -8971,8 +9040,8 @@ export function registerRoutes(app: Express) {
       const entry = await storage.createComplianceAuditEntry({
         ...parsed.data,
         actorId: userId,
-        ipAddress: req.ip || 'unknown',
-        userAgent: req.get('user-agent') || 'unknown'
+        actorIpAddress: req.ip || 'unknown',
+        actorUserAgent: req.get('user-agent') || 'unknown'
       });
 
       res.status(201).json(entry);

@@ -62,6 +62,14 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **User Impersonation**: "View As" feature for HR/Product Owner to impersonate employees for troubleshooting.
 -   **Tutorial System**: Role-based tutorials integrated into the Training module with interactive checklists and progress tracking.
 -   **AI-Assisted Tax Configuration**: Enterprise-grade multi-state tax data integration with AI-powered jurisdiction suggestions and human approval workflows.
+-   **Enterprise Compliance Hub**: Full-page compliance management system tracking SOC2, GDPR, HIPAA, and ISO27001 frameworks:
+    -   **Database**: 9 tables (frameworks, controls, evidence, alerts, audit trail, policies, acknowledgments, regulatory updates, metrics)
+    -   **Dashboard**: Real-time compliance scores, framework status, alert summaries, and trends
+    -   **Alerts System**: Severity-based alerts (critical/high/medium/low/info) with status tracking and resolution workflow
+    -   **Audit Trail**: Comprehensive logging across all modules (onboarding, payroll, security, training) with 24+ automated audit events
+    -   **Framework Management**: Multi-framework support with control mapping, evidence collection, and compliance metrics
+    -   **Policy Management**: Policy tracking with employee acknowledgment workflows
+    -   **Navigation**: Dedicated sidebar item with Shield icon, full-screen page at /compliance
 
 ## External Dependencies
 
