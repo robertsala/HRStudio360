@@ -201,6 +201,7 @@ export interface IStorage {
   // User Presence
   upsertUserPresence(presence: InsertUserPresence): Promise<UserPresence>;
   getUserPresence(userId: string): Promise<UserPresence | undefined>;
+  getAllUserPresence(): Promise<UserPresence[]>;
   
   // Call Sessions
   createCallSession(session: InsertCallSession): Promise<CallSession>;
@@ -1149,6 +1150,10 @@ export class DbStorage implements IStorage {
   async getUserPresence(userId: string): Promise<UserPresence | undefined> {
     const result = await db.select().from(userPresence).where(eq(userPresence.userId, userId));
     return result[0];
+  }
+
+  async getAllUserPresence(): Promise<UserPresence[]> {
+    return db.select().from(userPresence);
   }
 
   // Call Sessions

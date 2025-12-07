@@ -75,6 +75,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData);
       setAuthPhase('authenticated');
 
+      // Update user presence to 'online' when they log in
+      try {
+        await fetch(`/api/chat/presence/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'online' })
+        });
+      } catch (presenceError) {
+        console.warn('Failed to update presence status (non-critical):', presenceError);
+      }
+
       // CRITICAL: Set language from database preference FIRST, with fallback to 'en'
       // This ensures database preference ALWAYS overrides browser/localStorage detection
       const userLanguage = profile?.languagePreference || 'en';
@@ -249,6 +260,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       console.log('Starting sign out process...');
+
+      // Update user presence to 'offline' before signing out
+      if (user?.id) {
+        try {
+          await fetch(`/api/chat/presence/${user.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'offline' })
+          });
+        } catch (presenceError) {
+          console.warn('Failed to update presence status (non-critical):', presenceError);
+        }
+      }
 
       // Store non-auth data we want to preserve
       const languagePreference = localStorage.getItem('i18nextLng');

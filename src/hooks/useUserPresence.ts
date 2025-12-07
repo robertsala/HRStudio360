@@ -1,42 +1,29 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface UserPresenceStatus {
-  user_id: string;
+  userId: string;
   status: 'online' | 'away' | 'offline';
-  last_seen_at: string;
+  lastSeenAt: string;
 }
 
 export const useUserPresence = (userIds?: string[]) => {
   const [presenceMap, setPresenceMap] = useState<Map<string, UserPresenceStatus>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadPresence();
-    const subscription = setupRealtimeSubscription();
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [userIds?.join(',')]);
-
-  const loadPresence = async () => {
+  const loadPresence = useCallback(async () => {
     try {
-      let query = supabase
-        .from('user_presence')
-        .select('*');
-
-      if (userIds && userIds.length > 0) {
-        query = query.in('user_id', userIds);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
+      const response = await fetch('/api/chat/presence');
+      if (!response.ok) throw new Error('Failed to fetch presence');
+      
+      const data = await response.json();
+      
       const newMap = new Map<string, UserPresenceStatus>();
-      (data || []).forEach((presence: UserPresenceStatus) => {
-        newMap.set(presence.user_id, presence);
+      (data || []).forEach((presence: any) => {
+        newMap.set(presence.userId, {
+          userId: presence.userId,
+          status: presence.status || 'offline',
+          lastSeenAt: presence.lastSeenAt
+        });
       });
 
       setPresenceMap(newMap);
@@ -45,48 +32,24 @@ export const useUserPresence = (userIds?: string[]) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('user-presence-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_presence'
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const presence = payload.new as UserPresenceStatus;
-            if (!userIds || userIds.includes(presence.user_id)) {
-              setPresenceMap(prev => {
-                const newMap = new Map(prev);
-                newMap.set(presence.user_id, presence);
-                return newMap;
-              });
-            }
-          } else if (payload.eventType === 'DELETE') {
-            const presence = payload.old as UserPresenceStatus;
-            setPresenceMap(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(presence.user_id);
-              return newMap;
-            });
-          }
-        }
-      )
-      .subscribe();
+  useEffect(() => {
+    loadPresence();
+    
+    // Poll for presence updates every 30 seconds
+    const interval = setInterval(loadPresence, 30000);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [loadPresence]);
 
-    return channel;
-  };
-
-  const getPresenceStatus = (userId: string): 'online' | 'away' | 'offline' => {
+  const getPresenceStatus = useCallback((userId: string): 'online' | 'away' | 'offline' => {
     const presence = presenceMap.get(userId);
     if (!presence) return 'offline';
 
-    const lastSeen = new Date(presence.last_seen_at);
+    const lastSeen = new Date(presence.lastSeenAt);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastSeen.getTime()) / (1000 * 60);
 
@@ -97,17 +60,33 @@ export const useUserPresence = (userIds?: string[]) => {
     }
 
     return 'offline';
-  };
+  }, [presenceMap]);
 
-  const isOnline = (userId: string): boolean => {
+  const isOnline = useCallback((userId: string): boolean => {
     return getPresenceStatus(userId) === 'online';
-  };
+  }, [getPresenceStatus]);
+
+  const updateMyPresence = useCallback(async (userId: string, status: 'online' | 'away' | 'offline') => {
+    try {
+      const response = await fetch(`/api/chat/presence/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (response.ok) {
+        await loadPresence();
+      }
+    } catch (error) {
+      console.error('Failed to update presence:', error);
+    }
+  }, [loadPresence]);
 
   return {
     presenceMap,
     getPresenceStatus,
     isOnline,
     isLoading,
-    refresh: loadPresence
+    refresh: loadPresence,
+    updateMyPresence
   };
 };

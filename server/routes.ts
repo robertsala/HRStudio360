@@ -1783,6 +1783,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get all user presence statuses (for directory)
+  app.get('/api/chat/presence', async (req, res) => {
+    try {
+      const presenceList = await storage.getAllUserPresence();
+      res.json(presenceList);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // === CALL ROUTES ===
 
   // Start a new call
