@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, GraduationCap, Clock, Inbox, UserX, Sparkles, Timer } from 'lucide-react';
+import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, GraduationCap, Clock, Inbox, UserX, Sparkles, Timer, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SignInModal from './SignInModal';
 import ThemeToggle from './ThemeToggle';
@@ -45,6 +45,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
       '/benefits': 'benefits',
       '/training': 'training',
       '/settings': 'settings',
+      '/compliance': 'compliance',
       '/chat': 'dashboard',
       '/inbox': 'dashboard',
       '/ai-assistant': 'dashboard',
@@ -292,6 +293,11 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
     { id: 'reports', label: t('sidebar.reports'), icon: FileText, action: () => onOpenModal?.('reports') },
     { id: 'training', label: t('sidebar.training'), icon: GraduationCap, action: () => onOpenModal?.('training') },
     { id: 'offboarding', label: t('sidebar.offboarding'), icon: UserX, action: () => onOpenModal?.('offboarding') },
+    { id: 'compliance', label: t('sidebar.compliance') || 'Compliance', icon: Shield, action: () => {
+        setActiveSidebarItem('compliance');
+        setLocation('/compliance');
+      }
+    },
     { id: 'settings', label: t('sidebar.settings'), icon: Settings, action: () => onOpenModal?.('systemSettings') }
   ];
 
