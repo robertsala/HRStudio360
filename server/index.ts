@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from 'express';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import { registerRoutes } from './routes';
 import { setupVite } from './vite';
 import { createServer } from 'http';
@@ -13,18 +14,26 @@ initSentry();
 
 const app = express();
 
-// Health check endpoints for deployment checks (responds immediately, before ANY middleware)
-// Root endpoint '/' is checked by default during deployment health checks
-app.get('/', (_req, res, next) => {
-  // Only respond to health checks, not browser navigation
-  if (_req.headers.accept?.includes('text/html')) {
-    return next();
-  }
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+// Dedicated simple health check endpoints for deployment (responds immediately, before ANY middleware)
+// These must be the FIRST routes registered to ensure fastest possible response
+app.get('/_health', (_req, res) => {
+  res.status(200).send('ok');
 });
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Root endpoint '/' for deployment health checks - ALWAYS responds 200 immediately
+// The Vite middleware will handle serving the actual app for browser requests
+app.get('/', (_req, res, next) => {
+  // Check if this is a health check (no Accept header or not expecting HTML)
+  const acceptHeader = _req.headers.accept || '';
+  if (!acceptHeader || !acceptHeader.includes('text/html')) {
+    return res.status(200).send('ok');
+  }
+  // For browser requests expecting HTML, pass to Vite middleware
+  next();
 });
 
 // Trust proxy for secure cookies behind TLS
@@ -38,8 +47,23 @@ if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
   console.warn('WARNING: SESSION_SECRET not set. Using insecure default.');
 }
 
+// Session store configuration
+// Use PostgreSQL session store for production (Autoscale compatible)
+// Fall back to MemoryStore for development
+const PgSession = connectPgSimple(session);
+const isProduction = process.env.NODE_ENV === 'production';
+
+const sessionStore = isProduction && process.env.DATABASE_URL
+  ? new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: 'user_sessions',
+      createTableIfMissing: true,
+    })
+  : undefined; // undefined = default MemoryStore for development
+
 // Session configuration
 const sessionMiddleware = session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production-' + Math.random(),
   resave: false,
   saveUninitialized: false,
@@ -50,6 +74,12 @@ const sessionMiddleware = session({
     sameSite: 'lax'
   }
 });
+
+if (isProduction && sessionStore) {
+  console.log('✅ Using PostgreSQL session store for Autoscale compatibility');
+} else {
+  console.log('ℹ️ Using MemoryStore for sessions (development mode)');
+}
 
 app.use(sessionMiddleware);
 
