@@ -6,6 +6,7 @@ import { createServer } from 'http';
 import { initSentry, setupExpressErrorHandler } from './lib/sentry';
 import { ChatWebSocketServer } from './websocket';
 import { storage } from './storage';
+import { seedComplianceData } from './seedCompliance';
 
 // Initialize Sentry for backend error tracking
 initSentry();
@@ -92,6 +93,9 @@ setupVite(app, server).then(async () => {
   
   // Bootstrap: Ensure default access levels exist
   await storage.ensureDefaultAccessLevels();
+  
+  // Bootstrap: Seed compliance demo data
+  await seedComplianceData();
   
   // Setup Sentry error handler AFTER all routes (v10+ API)
   setupExpressErrorHandler(app);
