@@ -17,6 +17,9 @@ import {
   insertOnboardingChecklistSchema, insertOnboardingTaskSchema,
   insertI9FormSchema, insertStateTaxFormSchema, insertOnboardingDocumentSchema,
   insertMfaMethodSchema, insertMfaChallengeSchema, insertMfaAuditLogSchema,
+  insertComplianceFrameworkSchema, insertComplianceControlSchema, insertComplianceEvidenceSchema,
+  insertComplianceAlertSchema, insertComplianceAuditTrailSchema, insertCompliancePolicySchema,
+  insertPolicyAcknowledgmentSchema, insertRegulatoryUpdateSchema, insertComplianceMetricsSchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -7966,6 +7969,880 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error suggesting role hierarchy:', error);
       res.status(500).json({ error: 'Failed to suggest role hierarchy', details: error.message });
+    }
+  });
+
+  // ============================================================================
+  // COMPLIANCE MANAGEMENT SYSTEM API ROUTES
+  // ============================================================================
+
+  // ========== COMPLIANCE FRAMEWORKS ==========
+
+  // GET /api/compliance/frameworks - Get all compliance frameworks
+  app.get('/api/compliance/frameworks', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { status, active } = req.query;
+      let frameworks;
+
+      if (status && typeof status === 'string') {
+        frameworks = await storage.getComplianceFrameworksByStatus(status);
+      } else if (active === 'true') {
+        frameworks = await storage.getActiveComplianceFrameworks();
+      } else {
+        frameworks = await storage.getComplianceFrameworks();
+      }
+
+      res.json(frameworks);
+    } catch (error: any) {
+      console.error('Error fetching compliance frameworks:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance frameworks', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/frameworks - Create a new compliance framework
+  app.post('/api/compliance/frameworks', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertComplianceFrameworkSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid framework data', details: parsed.error.errors });
+      }
+
+      const framework = await storage.createComplianceFramework({
+        ...parsed.data,
+        createdById: userId
+      });
+
+      res.status(201).json(framework);
+    } catch (error: any) {
+      console.error('Error creating compliance framework:', error);
+      res.status(500).json({ error: 'Failed to create compliance framework', details: error.message });
+    }
+  });
+
+  // GET /api/compliance/frameworks/:id - Get a specific framework
+  app.get('/api/compliance/frameworks/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const framework = await storage.getComplianceFrameworkById(req.params.id);
+      if (!framework) {
+        return res.status(404).json({ error: 'Framework not found' });
+      }
+
+      res.json(framework);
+    } catch (error: any) {
+      console.error('Error fetching compliance framework:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance framework', details: error.message });
+    }
+  });
+
+  // PUT /api/compliance/frameworks/:id - Update a framework
+  app.put('/api/compliance/frameworks/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceFrameworkById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Framework not found' });
+      }
+
+      const framework = await storage.updateComplianceFramework(req.params.id, req.body);
+      res.json(framework);
+    } catch (error: any) {
+      console.error('Error updating compliance framework:', error);
+      res.status(500).json({ error: 'Failed to update compliance framework', details: error.message });
+    }
+  });
+
+  // DELETE /api/compliance/frameworks/:id - Delete a framework
+  app.delete('/api/compliance/frameworks/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceFrameworkById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Framework not found' });
+      }
+
+      await storage.deleteComplianceFramework(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting compliance framework:', error);
+      res.status(500).json({ error: 'Failed to delete compliance framework', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE CONTROLS ==========
+
+  // GET /api/compliance/controls - Get all compliance controls
+  app.get('/api/compliance/controls', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { frameworkId, overdue } = req.query;
+      let controls;
+
+      if (frameworkId && typeof frameworkId === 'string') {
+        controls = await storage.getComplianceControlsByFramework(frameworkId);
+      } else if (overdue === 'true') {
+        controls = await storage.getOverdueComplianceControls();
+      } else {
+        controls = await storage.getComplianceControls();
+      }
+
+      res.json(controls);
+    } catch (error: any) {
+      console.error('Error fetching compliance controls:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance controls', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/controls - Create a new control
+  app.post('/api/compliance/controls', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertComplianceControlSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid control data', details: parsed.error.errors });
+      }
+
+      const control = await storage.createComplianceControl({
+        ...parsed.data,
+        createdById: userId
+      });
+
+      res.status(201).json(control);
+    } catch (error: any) {
+      console.error('Error creating compliance control:', error);
+      res.status(500).json({ error: 'Failed to create compliance control', details: error.message });
+    }
+  });
+
+  // GET /api/compliance/controls/:id - Get a specific control
+  app.get('/api/compliance/controls/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const control = await storage.getComplianceControlById(req.params.id);
+      if (!control) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      res.json(control);
+    } catch (error: any) {
+      console.error('Error fetching compliance control:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance control', details: error.message });
+    }
+  });
+
+  // PUT /api/compliance/controls/:id - Update a control
+  app.put('/api/compliance/controls/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceControlById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      const control = await storage.updateComplianceControl(req.params.id, req.body);
+      res.json(control);
+    } catch (error: any) {
+      console.error('Error updating compliance control:', error);
+      res.status(500).json({ error: 'Failed to update compliance control', details: error.message });
+    }
+  });
+
+  // DELETE /api/compliance/controls/:id - Delete a control
+  app.delete('/api/compliance/controls/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceControlById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Control not found' });
+      }
+
+      await storage.deleteComplianceControl(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting compliance control:', error);
+      res.status(500).json({ error: 'Failed to delete compliance control', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE EVIDENCE ==========
+
+  // GET /api/compliance/evidence - Get all evidence
+  app.get('/api/compliance/evidence', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { controlId } = req.query;
+      let evidence;
+
+      if (controlId && typeof controlId === 'string') {
+        evidence = await storage.getComplianceEvidenceByControl(controlId);
+      } else {
+        evidence = await storage.getComplianceEvidence();
+      }
+
+      res.json(evidence);
+    } catch (error: any) {
+      console.error('Error fetching compliance evidence:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance evidence', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/evidence - Create new evidence
+  app.post('/api/compliance/evidence', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertComplianceEvidenceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid evidence data', details: parsed.error.errors });
+      }
+
+      const evidence = await storage.createComplianceEvidence({
+        ...parsed.data,
+        uploadedById: userId
+      });
+
+      res.status(201).json(evidence);
+    } catch (error: any) {
+      console.error('Error creating compliance evidence:', error);
+      res.status(500).json({ error: 'Failed to create compliance evidence', details: error.message });
+    }
+  });
+
+  // GET /api/compliance/evidence/:id - Get specific evidence
+  app.get('/api/compliance/evidence/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const evidence = await storage.getComplianceEvidenceById(req.params.id);
+      if (!evidence) {
+        return res.status(404).json({ error: 'Evidence not found' });
+      }
+
+      res.json(evidence);
+    } catch (error: any) {
+      console.error('Error fetching compliance evidence:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance evidence', details: error.message });
+    }
+  });
+
+  // PUT /api/compliance/evidence/:id - Update evidence
+  app.put('/api/compliance/evidence/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceEvidenceById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Evidence not found' });
+      }
+
+      const evidence = await storage.updateComplianceEvidence(req.params.id, req.body);
+      res.json(evidence);
+    } catch (error: any) {
+      console.error('Error updating compliance evidence:', error);
+      res.status(500).json({ error: 'Failed to update compliance evidence', details: error.message });
+    }
+  });
+
+  // DELETE /api/compliance/evidence/:id - Delete evidence
+  app.delete('/api/compliance/evidence/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceEvidenceById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Evidence not found' });
+      }
+
+      await storage.deleteComplianceEvidence(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting compliance evidence:', error);
+      res.status(500).json({ error: 'Failed to delete compliance evidence', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE ALERTS ==========
+
+  // GET /api/compliance/alerts - Get all alerts
+  app.get('/api/compliance/alerts', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { severity, open } = req.query;
+      let alerts;
+
+      if (severity && typeof severity === 'string') {
+        alerts = await storage.getComplianceAlertsBySeverity(severity);
+      } else if (open === 'true') {
+        alerts = await storage.getOpenComplianceAlerts();
+      } else {
+        alerts = await storage.getComplianceAlerts();
+      }
+
+      res.json(alerts);
+    } catch (error: any) {
+      console.error('Error fetching compliance alerts:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance alerts', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/alerts - Create a new alert
+  app.post('/api/compliance/alerts', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertComplianceAlertSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid alert data', details: parsed.error.errors });
+      }
+
+      const alert = await storage.createComplianceAlert(parsed.data);
+      res.status(201).json(alert);
+    } catch (error: any) {
+      console.error('Error creating compliance alert:', error);
+      res.status(500).json({ error: 'Failed to create compliance alert', details: error.message });
+    }
+  });
+
+  // GET /api/compliance/alerts/:id - Get specific alert
+  app.get('/api/compliance/alerts/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const alert = await storage.getComplianceAlertById(req.params.id);
+      if (!alert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      res.json(alert);
+    } catch (error: any) {
+      console.error('Error fetching compliance alert:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance alert', details: error.message });
+    }
+  });
+
+  // PUT /api/compliance/alerts/:id - Update an alert
+  app.put('/api/compliance/alerts/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceAlertById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      const alert = await storage.updateComplianceAlert(req.params.id, req.body);
+      res.json(alert);
+    } catch (error: any) {
+      console.error('Error updating compliance alert:', error);
+      res.status(500).json({ error: 'Failed to update compliance alert', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/alerts/:id/acknowledge - Acknowledge an alert
+  app.post('/api/compliance/alerts/:id/acknowledge', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceAlertById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      const alert = await storage.acknowledgeComplianceAlert(req.params.id, userId);
+      res.json(alert);
+    } catch (error: any) {
+      console.error('Error acknowledging compliance alert:', error);
+      res.status(500).json({ error: 'Failed to acknowledge compliance alert', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/alerts/:id/resolve - Resolve an alert
+  app.post('/api/compliance/alerts/:id/resolve', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getComplianceAlertById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      const { resolutionNotes } = req.body;
+      const alert = await storage.resolveComplianceAlert(req.params.id, userId, resolutionNotes);
+      res.json(alert);
+    } catch (error: any) {
+      console.error('Error resolving compliance alert:', error);
+      res.status(500).json({ error: 'Failed to resolve compliance alert', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE AUDIT TRAIL ==========
+
+  // GET /api/compliance/audit-trail - Get audit trail entries
+  app.get('/api/compliance/audit-trail', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { category, startDate, endDate, actorId } = req.query;
+      const filters: { category?: string; startDate?: string; endDate?: string; actorId?: string } = {};
+
+      if (category && typeof category === 'string') filters.category = category;
+      if (startDate && typeof startDate === 'string') filters.startDate = startDate;
+      if (endDate && typeof endDate === 'string') filters.endDate = endDate;
+      if (actorId && typeof actorId === 'string') filters.actorId = actorId;
+
+      const auditTrail = await storage.getComplianceAuditTrail(Object.keys(filters).length > 0 ? filters : undefined);
+      res.json(auditTrail);
+    } catch (error: any) {
+      console.error('Error fetching compliance audit trail:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance audit trail', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/audit-trail - Create audit trail entry
+  app.post('/api/compliance/audit-trail', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertComplianceAuditTrailSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid audit trail data', details: parsed.error.errors });
+      }
+
+      const entry = await storage.createComplianceAuditEntry({
+        ...parsed.data,
+        actorId: userId,
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('user-agent') || 'unknown'
+      });
+
+      res.status(201).json(entry);
+    } catch (error: any) {
+      console.error('Error creating compliance audit entry:', error);
+      res.status(500).json({ error: 'Failed to create compliance audit entry', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE POLICIES ==========
+
+  // GET /api/compliance/policies - Get all policies
+  app.get('/api/compliance/policies', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { active } = req.query;
+      let policies;
+
+      if (active === 'true') {
+        policies = await storage.getActiveCompliancePolicies();
+      } else {
+        policies = await storage.getCompliancePolicies();
+      }
+
+      res.json(policies);
+    } catch (error: any) {
+      console.error('Error fetching compliance policies:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance policies', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/policies - Create a new policy
+  app.post('/api/compliance/policies', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertCompliancePolicySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid policy data', details: parsed.error.errors });
+      }
+
+      const policy = await storage.createCompliancePolicy({
+        ...parsed.data,
+        createdById: userId
+      });
+
+      res.status(201).json(policy);
+    } catch (error: any) {
+      console.error('Error creating compliance policy:', error);
+      res.status(500).json({ error: 'Failed to create compliance policy', details: error.message });
+    }
+  });
+
+  // GET /api/compliance/policies/:id - Get a specific policy
+  app.get('/api/compliance/policies/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const policy = await storage.getCompliancePolicyById(req.params.id);
+      if (!policy) {
+        return res.status(404).json({ error: 'Policy not found' });
+      }
+
+      res.json(policy);
+    } catch (error: any) {
+      console.error('Error fetching compliance policy:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance policy', details: error.message });
+    }
+  });
+
+  // PUT /api/compliance/policies/:id - Update a policy
+  app.put('/api/compliance/policies/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getCompliancePolicyById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Policy not found' });
+      }
+
+      const policy = await storage.updateCompliancePolicy(req.params.id, req.body);
+      res.json(policy);
+    } catch (error: any) {
+      console.error('Error updating compliance policy:', error);
+      res.status(500).json({ error: 'Failed to update compliance policy', details: error.message });
+    }
+  });
+
+  // DELETE /api/compliance/policies/:id - Delete a policy
+  app.delete('/api/compliance/policies/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getCompliancePolicyById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Policy not found' });
+      }
+
+      await storage.deleteCompliancePolicy(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting compliance policy:', error);
+      res.status(500).json({ error: 'Failed to delete compliance policy', details: error.message });
+    }
+  });
+
+  // ========== POLICY ACKNOWLEDGMENTS ==========
+
+  // GET /api/compliance/policy-acknowledgments - Get all acknowledgments
+  app.get('/api/compliance/policy-acknowledgments', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { policyId, employeeId, pending } = req.query;
+      let acknowledgments;
+
+      if (policyId && typeof policyId === 'string') {
+        acknowledgments = await storage.getPolicyAcknowledgmentsByPolicy(policyId);
+        res.json(acknowledgments);
+      } else if (pending === 'true' && employeeId && typeof employeeId === 'string') {
+        acknowledgments = await storage.getEmployeePendingPolicyAcknowledgments(employeeId);
+        res.json(acknowledgments);
+      } else {
+        acknowledgments = await storage.getPolicyAcknowledgments();
+        res.json(acknowledgments);
+      }
+    } catch (error: any) {
+      console.error('Error fetching policy acknowledgments:', error);
+      res.status(500).json({ error: 'Failed to fetch policy acknowledgments', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/policy-acknowledgments - Create an acknowledgment
+  app.post('/api/compliance/policy-acknowledgments', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertPolicyAcknowledgmentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid acknowledgment data', details: parsed.error.errors });
+      }
+
+      const acknowledgment = await storage.createPolicyAcknowledgment({
+        ...parsed.data,
+        ipAddress: req.ip || 'unknown'
+      });
+
+      res.status(201).json(acknowledgment);
+    } catch (error: any) {
+      console.error('Error creating policy acknowledgment:', error);
+      res.status(500).json({ error: 'Failed to create policy acknowledgment', details: error.message });
+    }
+  });
+
+  // ========== REGULATORY UPDATES ==========
+
+  // GET /api/compliance/regulatory-updates - Get all regulatory updates
+  app.get('/api/compliance/regulatory-updates', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { unreviewed } = req.query;
+      let updates;
+
+      if (unreviewed === 'true') {
+        updates = await storage.getUnreviewedRegulatoryUpdates();
+      } else {
+        updates = await storage.getRegulatoryUpdates();
+      }
+
+      res.json(updates);
+    } catch (error: any) {
+      console.error('Error fetching regulatory updates:', error);
+      res.status(500).json({ error: 'Failed to fetch regulatory updates', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/regulatory-updates - Create a regulatory update
+  app.post('/api/compliance/regulatory-updates', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertRegulatoryUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid regulatory update data', details: parsed.error.errors });
+      }
+
+      const update = await storage.createRegulatoryUpdate(parsed.data);
+      res.status(201).json(update);
+    } catch (error: any) {
+      console.error('Error creating regulatory update:', error);
+      res.status(500).json({ error: 'Failed to create regulatory update', details: error.message });
+    }
+  });
+
+  // PUT /api/compliance/regulatory-updates/:id - Update a regulatory update
+  app.put('/api/compliance/regulatory-updates/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const existing = await storage.getRegulatoryUpdateById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Regulatory update not found' });
+      }
+
+      const update = await storage.updateRegulatoryUpdate(req.params.id, req.body);
+      res.json(update);
+    } catch (error: any) {
+      console.error('Error updating regulatory update:', error);
+      res.status(500).json({ error: 'Failed to update regulatory update', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE METRICS ==========
+
+  // GET /api/compliance/metrics - Get latest metrics
+  app.get('/api/compliance/metrics', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { frameworkId } = req.query;
+      const metrics = await storage.getLatestComplianceMetrics(
+        frameworkId && typeof frameworkId === 'string' ? frameworkId : undefined
+      );
+
+      res.json(metrics);
+    } catch (error: any) {
+      console.error('Error fetching compliance metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance metrics', details: error.message });
+    }
+  });
+
+  // POST /api/compliance/metrics - Create new metrics entry
+  app.post('/api/compliance/metrics', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const parsed = insertComplianceMetricsSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid metrics data', details: parsed.error.errors });
+      }
+
+      const metrics = await storage.createComplianceMetrics(parsed.data);
+      res.status(201).json(metrics);
+    } catch (error: any) {
+      console.error('Error creating compliance metrics:', error);
+      res.status(500).json({ error: 'Failed to create compliance metrics', details: error.message });
+    }
+  });
+
+  // ========== COMPLIANCE DASHBOARD ==========
+
+  // GET /api/compliance/dashboard - Get aggregated compliance dashboard data
+  app.get('/api/compliance/dashboard', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const [
+        frameworks,
+        activeFrameworks,
+        controls,
+        overdueControls,
+        openAlerts,
+        activePolicies,
+        latestMetrics,
+        unreviewed
+      ] = await Promise.all([
+        storage.getComplianceFrameworks(),
+        storage.getActiveComplianceFrameworks(),
+        storage.getComplianceControls(),
+        storage.getOverdueComplianceControls(),
+        storage.getOpenComplianceAlerts(),
+        storage.getActiveCompliancePolicies(),
+        storage.getLatestComplianceMetrics(),
+        storage.getUnreviewedRegulatoryUpdates()
+      ]);
+
+      const alertsBySeverity = {
+        critical: openAlerts.filter(a => a.severity === 'critical').length,
+        high: openAlerts.filter(a => a.severity === 'high').length,
+        medium: openAlerts.filter(a => a.severity === 'medium').length,
+        low: openAlerts.filter(a => a.severity === 'low').length
+      };
+
+      const dashboard = {
+        summary: {
+          totalFrameworks: frameworks.length,
+          activeFrameworks: activeFrameworks.length,
+          totalControls: controls.length,
+          overdueControls: overdueControls.length,
+          openAlerts: openAlerts.length,
+          activePolicies: activePolicies.length,
+          unreviewedUpdates: unreviewed.length
+        },
+        alertsBySeverity,
+        recentAlerts: openAlerts.slice(0, 5),
+        overdueControlsList: overdueControls.slice(0, 10),
+        latestMetrics: latestMetrics.slice(0, 5),
+        complianceScore: latestMetrics.length > 0 
+          ? Math.round(latestMetrics.reduce((sum, m) => sum + Number(m.overallScore || 0), 0) / latestMetrics.length)
+          : 0
+      };
+
+      res.json(dashboard);
+    } catch (error: any) {
+      console.error('Error fetching compliance dashboard:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance dashboard', details: error.message });
     }
   });
 }

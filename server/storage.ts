@@ -51,7 +51,16 @@ import type {
   OnboardingTask, InsertOnboardingTask,
   I9Form, InsertI9Form,
   StateTaxForm, InsertStateTaxForm,
-  OnboardingDocument, InsertOnboardingDocument
+  OnboardingDocument, InsertOnboardingDocument,
+  ComplianceFramework, InsertComplianceFramework,
+  ComplianceControl, InsertComplianceControl,
+  ComplianceEvidence, InsertComplianceEvidence,
+  ComplianceAlert, InsertComplianceAlert,
+  ComplianceAuditTrail, InsertComplianceAuditTrail,
+  CompliancePolicy, InsertCompliancePolicy,
+  PolicyAcknowledgment, InsertPolicyAcknowledgment,
+  RegulatoryUpdate, InsertRegulatoryUpdate,
+  ComplianceMetrics, InsertComplianceMetrics
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, addressChangeRequests, announcements, employees, leaveRequests, leaveBalances,
@@ -70,7 +79,9 @@ import {
   permissions, rolePermissions, timesheetCorrectionRequests, timesheetChangeAudit,
   permissionTemplates, roleHierarchy, timeBasedPermissionGrants, permissionRequests, permissionChangeAudit,
   accessLevels, employeeAccessAssignments,
-  callSessions, callParticipants, callSignaling
+  callSessions, callParticipants, callSignaling,
+  complianceFrameworks, complianceControls, complianceEvidence, complianceAlerts,
+  complianceAuditTrail, compliancePolicies, policyAcknowledgments, regulatoryUpdates, complianceMetrics
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -473,6 +484,79 @@ export interface IStorage {
   assignEmployeeAccessLevel(assignment: import('../shared/schema.js').InsertEmployeeAccessAssignment): Promise<import('../shared/schema.js').EmployeeAccessAssignment>;
   revokeEmployeeAccessLevel(employeeId: string): Promise<void>;
   bulkAssignEmployeeAccessLevels(assignments: import('../shared/schema.js').InsertEmployeeAccessAssignment[]): Promise<void>;
+
+  // ============================================================================
+  // COMPLIANCE MANAGEMENT SYSTEM
+  // ============================================================================
+
+  // Compliance Frameworks
+  getComplianceFrameworks(): Promise<ComplianceFramework[]>;
+  getComplianceFrameworkById(id: string): Promise<ComplianceFramework | undefined>;
+  getActiveComplianceFrameworks(): Promise<ComplianceFramework[]>;
+  getComplianceFrameworksByStatus(status: string): Promise<ComplianceFramework[]>;
+  createComplianceFramework(framework: InsertComplianceFramework): Promise<ComplianceFramework>;
+  updateComplianceFramework(id: string, framework: Partial<InsertComplianceFramework>): Promise<ComplianceFramework | undefined>;
+  deleteComplianceFramework(id: string): Promise<void>;
+
+  // Compliance Controls
+  getComplianceControls(): Promise<ComplianceControl[]>;
+  getComplianceControlById(id: string): Promise<ComplianceControl | undefined>;
+  getComplianceControlsByFramework(frameworkId: string): Promise<ComplianceControl[]>;
+  getOverdueComplianceControls(): Promise<ComplianceControl[]>;
+  createComplianceControl(control: InsertComplianceControl): Promise<ComplianceControl>;
+  updateComplianceControl(id: string, control: Partial<InsertComplianceControl>): Promise<ComplianceControl | undefined>;
+  deleteComplianceControl(id: string): Promise<void>;
+
+  // Compliance Evidence
+  getComplianceEvidence(): Promise<ComplianceEvidence[]>;
+  getComplianceEvidenceById(id: string): Promise<ComplianceEvidence | undefined>;
+  getComplianceEvidenceByControl(controlId: string): Promise<ComplianceEvidence[]>;
+  createComplianceEvidence(evidence: InsertComplianceEvidence): Promise<ComplianceEvidence>;
+  updateComplianceEvidence(id: string, evidence: Partial<InsertComplianceEvidence>): Promise<ComplianceEvidence | undefined>;
+  deleteComplianceEvidence(id: string): Promise<void>;
+
+  // Compliance Alerts
+  getComplianceAlerts(): Promise<ComplianceAlert[]>;
+  getComplianceAlertById(id: string): Promise<ComplianceAlert | undefined>;
+  getOpenComplianceAlerts(): Promise<ComplianceAlert[]>;
+  getComplianceAlertsBySeverity(severity: string): Promise<ComplianceAlert[]>;
+  createComplianceAlert(alert: InsertComplianceAlert): Promise<ComplianceAlert>;
+  updateComplianceAlert(id: string, alert: Partial<InsertComplianceAlert>): Promise<ComplianceAlert | undefined>;
+  acknowledgeComplianceAlert(id: string, acknowledgedById: string): Promise<ComplianceAlert | undefined>;
+  resolveComplianceAlert(id: string, resolvedById: string, resolutionNotes?: string): Promise<ComplianceAlert | undefined>;
+
+  // Compliance Audit Trail
+  createComplianceAuditEntry(entry: InsertComplianceAuditTrail): Promise<ComplianceAuditTrail>;
+  getComplianceAuditTrail(filters?: { category?: string; startDate?: string; endDate?: string; actorId?: string }): Promise<ComplianceAuditTrail[]>;
+
+  // Compliance Policies
+  getCompliancePolicies(): Promise<CompliancePolicy[]>;
+  getCompliancePolicyById(id: string): Promise<CompliancePolicy | undefined>;
+  getActiveCompliancePolicies(): Promise<CompliancePolicy[]>;
+  createCompliancePolicy(policy: InsertCompliancePolicy): Promise<CompliancePolicy>;
+  updateCompliancePolicy(id: string, policy: Partial<InsertCompliancePolicy>): Promise<CompliancePolicy | undefined>;
+  deleteCompliancePolicy(id: string): Promise<void>;
+
+  // Policy Acknowledgments
+  getPolicyAcknowledgments(): Promise<PolicyAcknowledgment[]>;
+  getPolicyAcknowledgmentById(id: string): Promise<PolicyAcknowledgment | undefined>;
+  getPolicyAcknowledgmentsByPolicy(policyId: string): Promise<PolicyAcknowledgment[]>;
+  getEmployeePendingPolicyAcknowledgments(employeeId: string): Promise<CompliancePolicy[]>;
+  createPolicyAcknowledgment(acknowledgment: InsertPolicyAcknowledgment): Promise<PolicyAcknowledgment>;
+  updatePolicyAcknowledgment(id: string, acknowledgment: Partial<InsertPolicyAcknowledgment>): Promise<PolicyAcknowledgment | undefined>;
+  deletePolicyAcknowledgment(id: string): Promise<void>;
+
+  // Regulatory Updates
+  getRegulatoryUpdates(): Promise<RegulatoryUpdate[]>;
+  getRegulatoryUpdateById(id: string): Promise<RegulatoryUpdate | undefined>;
+  getUnreviewedRegulatoryUpdates(): Promise<RegulatoryUpdate[]>;
+  createRegulatoryUpdate(update: InsertRegulatoryUpdate): Promise<RegulatoryUpdate>;
+  updateRegulatoryUpdate(id: string, update: Partial<InsertRegulatoryUpdate>): Promise<RegulatoryUpdate | undefined>;
+  deleteRegulatoryUpdate(id: string): Promise<void>;
+
+  // Compliance Metrics
+  createComplianceMetrics(metrics: InsertComplianceMetrics): Promise<ComplianceMetrics>;
+  getLatestComplianceMetrics(frameworkId?: string): Promise<ComplianceMetrics[]>;
 }
 
 // Database storage implementation
@@ -3371,6 +3455,369 @@ export class DbStorage implements IStorage {
     }
 
     console.log(`✅ Seeded ${defaultAccessLevels.length} default access levels`);
+  }
+
+  // ============================================================================
+  // COMPLIANCE MANAGEMENT SYSTEM IMPLEMENTATION
+  // ============================================================================
+
+  // Compliance Frameworks
+  async getComplianceFrameworks(): Promise<ComplianceFramework[]> {
+    return db.select().from(complianceFrameworks).orderBy(desc(complianceFrameworks.createdAt));
+  }
+
+  async getComplianceFrameworkById(id: string): Promise<ComplianceFramework | undefined> {
+    const result = await db.select().from(complianceFrameworks).where(eq(complianceFrameworks.id, id));
+    return result[0];
+  }
+
+  async getActiveComplianceFrameworks(): Promise<ComplianceFramework[]> {
+    return db.select().from(complianceFrameworks)
+      .where(eq(complianceFrameworks.isActive, true))
+      .orderBy(desc(complianceFrameworks.createdAt));
+  }
+
+  async getComplianceFrameworksByStatus(status: string): Promise<ComplianceFramework[]> {
+    return db.select().from(complianceFrameworks)
+      .where(eq(complianceFrameworks.overallStatus, status as any))
+      .orderBy(desc(complianceFrameworks.createdAt));
+  }
+
+  async createComplianceFramework(framework: InsertComplianceFramework): Promise<ComplianceFramework> {
+    const result = await db.insert(complianceFrameworks).values(framework).returning();
+    return result[0];
+  }
+
+  async updateComplianceFramework(id: string, framework: Partial<InsertComplianceFramework>): Promise<ComplianceFramework | undefined> {
+    const result = await db
+      .update(complianceFrameworks)
+      .set({ ...framework, updatedAt: new Date() })
+      .where(eq(complianceFrameworks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteComplianceFramework(id: string): Promise<void> {
+    await db.delete(complianceFrameworks).where(eq(complianceFrameworks.id, id));
+  }
+
+  // Compliance Controls
+  async getComplianceControls(): Promise<ComplianceControl[]> {
+    return db.select().from(complianceControls).orderBy(desc(complianceControls.createdAt));
+  }
+
+  async getComplianceControlById(id: string): Promise<ComplianceControl | undefined> {
+    const result = await db.select().from(complianceControls).where(eq(complianceControls.id, id));
+    return result[0];
+  }
+
+  async getComplianceControlsByFramework(frameworkId: string): Promise<ComplianceControl[]> {
+    return db.select().from(complianceControls)
+      .where(eq(complianceControls.frameworkId, frameworkId))
+      .orderBy(complianceControls.priority);
+  }
+
+  async getOverdueComplianceControls(): Promise<ComplianceControl[]> {
+    const now = new Date();
+    return db.select().from(complianceControls)
+      .where(and(
+        isNotNull(complianceControls.dueDate),
+        lte(complianceControls.dueDate, now)
+      ))
+      .orderBy(complianceControls.dueDate);
+  }
+
+  async createComplianceControl(control: InsertComplianceControl): Promise<ComplianceControl> {
+    const result = await db.insert(complianceControls).values(control).returning();
+    return result[0];
+  }
+
+  async updateComplianceControl(id: string, control: Partial<InsertComplianceControl>): Promise<ComplianceControl | undefined> {
+    const result = await db
+      .update(complianceControls)
+      .set({ ...control, updatedAt: new Date() })
+      .where(eq(complianceControls.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteComplianceControl(id: string): Promise<void> {
+    await db.delete(complianceControls).where(eq(complianceControls.id, id));
+  }
+
+  // Compliance Evidence
+  async getComplianceEvidence(): Promise<ComplianceEvidence[]> {
+    return db.select().from(complianceEvidence).orderBy(desc(complianceEvidence.createdAt));
+  }
+
+  async getComplianceEvidenceById(id: string): Promise<ComplianceEvidence | undefined> {
+    const result = await db.select().from(complianceEvidence).where(eq(complianceEvidence.id, id));
+    return result[0];
+  }
+
+  async getComplianceEvidenceByControl(controlId: string): Promise<ComplianceEvidence[]> {
+    return db.select().from(complianceEvidence)
+      .where(eq(complianceEvidence.controlId, controlId))
+      .orderBy(desc(complianceEvidence.createdAt));
+  }
+
+  async createComplianceEvidence(evidence: InsertComplianceEvidence): Promise<ComplianceEvidence> {
+    const result = await db.insert(complianceEvidence).values(evidence).returning();
+    return result[0];
+  }
+
+  async updateComplianceEvidence(id: string, evidence: Partial<InsertComplianceEvidence>): Promise<ComplianceEvidence | undefined> {
+    const result = await db
+      .update(complianceEvidence)
+      .set(evidence)
+      .where(eq(complianceEvidence.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteComplianceEvidence(id: string): Promise<void> {
+    await db.delete(complianceEvidence).where(eq(complianceEvidence.id, id));
+  }
+
+  // Compliance Alerts
+  async getComplianceAlerts(): Promise<ComplianceAlert[]> {
+    return db.select().from(complianceAlerts).orderBy(desc(complianceAlerts.createdAt));
+  }
+
+  async getComplianceAlertById(id: string): Promise<ComplianceAlert | undefined> {
+    const result = await db.select().from(complianceAlerts).where(eq(complianceAlerts.id, id));
+    return result[0];
+  }
+
+  async getOpenComplianceAlerts(): Promise<ComplianceAlert[]> {
+    return db.select().from(complianceAlerts)
+      .where(eq(complianceAlerts.status, 'open'))
+      .orderBy(desc(complianceAlerts.createdAt));
+  }
+
+  async getComplianceAlertsBySeverity(severity: string): Promise<ComplianceAlert[]> {
+    return db.select().from(complianceAlerts)
+      .where(eq(complianceAlerts.severity, severity as any))
+      .orderBy(desc(complianceAlerts.createdAt));
+  }
+
+  async createComplianceAlert(alert: InsertComplianceAlert): Promise<ComplianceAlert> {
+    const result = await db.insert(complianceAlerts).values(alert).returning();
+    return result[0];
+  }
+
+  async updateComplianceAlert(id: string, alert: Partial<InsertComplianceAlert>): Promise<ComplianceAlert | undefined> {
+    const result = await db
+      .update(complianceAlerts)
+      .set({ ...alert, updatedAt: new Date() })
+      .where(eq(complianceAlerts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async acknowledgeComplianceAlert(id: string, acknowledgedById: string): Promise<ComplianceAlert | undefined> {
+    const result = await db
+      .update(complianceAlerts)
+      .set({
+        status: 'acknowledged',
+        acknowledgedAt: new Date(),
+        acknowledgedById,
+        updatedAt: new Date()
+      })
+      .where(eq(complianceAlerts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async resolveComplianceAlert(id: string, resolvedById: string, resolutionNotes?: string): Promise<ComplianceAlert | undefined> {
+    const result = await db
+      .update(complianceAlerts)
+      .set({
+        status: 'resolved',
+        resolvedAt: new Date(),
+        resolvedById,
+        resolutionNotes,
+        updatedAt: new Date()
+      })
+      .where(eq(complianceAlerts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Compliance Audit Trail
+  async createComplianceAuditEntry(entry: InsertComplianceAuditTrail): Promise<ComplianceAuditTrail> {
+    const result = await db.insert(complianceAuditTrail).values(entry).returning();
+    return result[0];
+  }
+
+  async getComplianceAuditTrail(filters?: { category?: string; startDate?: string; endDate?: string; actorId?: string }): Promise<ComplianceAuditTrail[]> {
+    let query = db.select().from(complianceAuditTrail);
+    const conditions: any[] = [];
+
+    if (filters?.category) {
+      conditions.push(eq(complianceAuditTrail.category, filters.category as any));
+    }
+    if (filters?.actorId) {
+      conditions.push(eq(complianceAuditTrail.actorId, filters.actorId));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(complianceAuditTrail.createdAt, new Date(filters.startDate)));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(complianceAuditTrail.createdAt, new Date(filters.endDate)));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    return query.orderBy(desc(complianceAuditTrail.createdAt));
+  }
+
+  // Compliance Policies
+  async getCompliancePolicies(): Promise<CompliancePolicy[]> {
+    return db.select().from(compliancePolicies).orderBy(desc(compliancePolicies.createdAt));
+  }
+
+  async getCompliancePolicyById(id: string): Promise<CompliancePolicy | undefined> {
+    const result = await db.select().from(compliancePolicies).where(eq(compliancePolicies.id, id));
+    return result[0];
+  }
+
+  async getActiveCompliancePolicies(): Promise<CompliancePolicy[]> {
+    return db.select().from(compliancePolicies)
+      .where(eq(compliancePolicies.isActive, true))
+      .orderBy(desc(compliancePolicies.createdAt));
+  }
+
+  async createCompliancePolicy(policy: InsertCompliancePolicy): Promise<CompliancePolicy> {
+    const result = await db.insert(compliancePolicies).values(policy).returning();
+    return result[0];
+  }
+
+  async updateCompliancePolicy(id: string, policy: Partial<InsertCompliancePolicy>): Promise<CompliancePolicy | undefined> {
+    const result = await db
+      .update(compliancePolicies)
+      .set({ ...policy, updatedAt: new Date() })
+      .where(eq(compliancePolicies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCompliancePolicy(id: string): Promise<void> {
+    await db.delete(compliancePolicies).where(eq(compliancePolicies.id, id));
+  }
+
+  // Policy Acknowledgments
+  async getPolicyAcknowledgments(): Promise<PolicyAcknowledgment[]> {
+    return db.select().from(policyAcknowledgments).orderBy(desc(policyAcknowledgments.createdAt));
+  }
+
+  async getPolicyAcknowledgmentById(id: string): Promise<PolicyAcknowledgment | undefined> {
+    const result = await db.select().from(policyAcknowledgments).where(eq(policyAcknowledgments.id, id));
+    return result[0];
+  }
+
+  async getPolicyAcknowledgmentsByPolicy(policyId: string): Promise<PolicyAcknowledgment[]> {
+    return db.select().from(policyAcknowledgments)
+      .where(eq(policyAcknowledgments.policyId, policyId))
+      .orderBy(desc(policyAcknowledgments.acknowledgedAt));
+  }
+
+  async getEmployeePendingPolicyAcknowledgments(employeeId: string): Promise<CompliancePolicy[]> {
+    const acknowledgedPolicies = await db
+      .select({ policyId: policyAcknowledgments.policyId })
+      .from(policyAcknowledgments)
+      .where(eq(policyAcknowledgments.employeeId, employeeId));
+    
+    const acknowledgedPolicyIds = acknowledgedPolicies.map(p => p.policyId);
+    
+    if (acknowledgedPolicyIds.length === 0) {
+      return db.select().from(compliancePolicies)
+        .where(and(
+          eq(compliancePolicies.isActive, true),
+          eq(compliancePolicies.requiresAcknowledgment, true)
+        ))
+        .orderBy(desc(compliancePolicies.createdAt));
+    }
+    
+    return db.select().from(compliancePolicies)
+      .where(and(
+        eq(compliancePolicies.isActive, true),
+        eq(compliancePolicies.requiresAcknowledgment, true),
+        notInArray(compliancePolicies.id, acknowledgedPolicyIds)
+      ))
+      .orderBy(desc(compliancePolicies.createdAt));
+  }
+
+  async createPolicyAcknowledgment(acknowledgment: InsertPolicyAcknowledgment): Promise<PolicyAcknowledgment> {
+    const result = await db.insert(policyAcknowledgments).values(acknowledgment).returning();
+    return result[0];
+  }
+
+  async updatePolicyAcknowledgment(id: string, acknowledgment: Partial<InsertPolicyAcknowledgment>): Promise<PolicyAcknowledgment | undefined> {
+    const result = await db
+      .update(policyAcknowledgments)
+      .set(acknowledgment)
+      .where(eq(policyAcknowledgments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePolicyAcknowledgment(id: string): Promise<void> {
+    await db.delete(policyAcknowledgments).where(eq(policyAcknowledgments.id, id));
+  }
+
+  // Regulatory Updates
+  async getRegulatoryUpdates(): Promise<RegulatoryUpdate[]> {
+    return db.select().from(regulatoryUpdates).orderBy(desc(regulatoryUpdates.createdAt));
+  }
+
+  async getRegulatoryUpdateById(id: string): Promise<RegulatoryUpdate | undefined> {
+    const result = await db.select().from(regulatoryUpdates).where(eq(regulatoryUpdates.id, id));
+    return result[0];
+  }
+
+  async getUnreviewedRegulatoryUpdates(): Promise<RegulatoryUpdate[]> {
+    return db.select().from(regulatoryUpdates)
+      .where(eq(regulatoryUpdates.isReviewed, false))
+      .orderBy(desc(regulatoryUpdates.createdAt));
+  }
+
+  async createRegulatoryUpdate(update: InsertRegulatoryUpdate): Promise<RegulatoryUpdate> {
+    const result = await db.insert(regulatoryUpdates).values(update).returning();
+    return result[0];
+  }
+
+  async updateRegulatoryUpdate(id: string, update: Partial<InsertRegulatoryUpdate>): Promise<RegulatoryUpdate | undefined> {
+    const result = await db
+      .update(regulatoryUpdates)
+      .set(update)
+      .where(eq(regulatoryUpdates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRegulatoryUpdate(id: string): Promise<void> {
+    await db.delete(regulatoryUpdates).where(eq(regulatoryUpdates.id, id));
+  }
+
+  // Compliance Metrics
+  async createComplianceMetrics(metrics: InsertComplianceMetrics): Promise<ComplianceMetrics> {
+    const result = await db.insert(complianceMetrics).values(metrics).returning();
+    return result[0];
+  }
+
+  async getLatestComplianceMetrics(frameworkId?: string): Promise<ComplianceMetrics[]> {
+    if (frameworkId) {
+      return db.select().from(complianceMetrics)
+        .where(eq(complianceMetrics.frameworkId, frameworkId))
+        .orderBy(desc(complianceMetrics.metricDate))
+        .limit(10);
+    }
+    return db.select().from(complianceMetrics)
+      .orderBy(desc(complianceMetrics.metricDate))
+      .limit(50);
   }
 }
 

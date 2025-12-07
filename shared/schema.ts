@@ -2357,3 +2357,334 @@ export const insertMfaRecoveryTokenSchema = createInsertSchema(mfaRecoveryTokens
 });
 export type InsertMfaRecoveryToken = z.infer<typeof insertMfaRecoveryTokenSchema>;
 export type MfaRecoveryToken = typeof mfaRecoveryTokens.$inferSelect;
+
+// ============================================================================
+// COMPLIANCE MANAGEMENT SYSTEM
+// ============================================================================
+
+// Compliance Framework Enum
+export const complianceFrameworkEnum = pgEnum('compliance_framework', [
+  'SOC1', 'SOC2', 'GDPR', 'HIPAA', 'ISO27001', 'PCI_DSS', 'CCPA', 'NIST', 'CUSTOM'
+]);
+
+// Compliance Alert Severity Enum
+export const complianceAlertSeverityEnum = pgEnum('compliance_alert_severity', [
+  'critical', 'high', 'medium', 'low', 'info'
+]);
+
+// Compliance Alert Status Enum
+export const complianceAlertStatusEnum = pgEnum('compliance_alert_status', [
+  'open', 'acknowledged', 'in_progress', 'resolved', 'dismissed'
+]);
+
+// Compliance Control Status Enum
+export const complianceControlStatusEnum = pgEnum('compliance_control_status', [
+  'compliant', 'non_compliant', 'partial', 'not_applicable', 'pending_review'
+]);
+
+// Audit Event Category Enum
+export const auditEventCategoryEnum = pgEnum('audit_event_category', [
+  'authentication', 'authorization', 'data_access', 'data_modification', 
+  'system_change', 'user_management', 'security', 'compliance', 
+  'onboarding', 'offboarding', 'payroll', 'benefits', 'performance'
+]);
+
+// Compliance Frameworks - Track organizational compliance with various standards
+export const complianceFrameworks = pgTable('compliance_frameworks', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: text('name').notNull(),
+  code: complianceFrameworkEnum('code').notNull(),
+  description: text('description'),
+  version: text('version'),
+  isActive: boolean('is_active').default(true).notNull(),
+  lastAuditDate: timestamp('last_audit_date'),
+  nextAuditDate: timestamp('next_audit_date'),
+  certificationDate: timestamp('certification_date'),
+  certificationExpiry: timestamp('certification_expiry'),
+  auditorName: text('auditor_name'),
+  auditorOrganization: text('auditor_organization'),
+  overallStatus: complianceControlStatusEnum('overall_status').default('pending_review'),
+  complianceScore: integer('compliance_score'), // 0-100
+  totalControls: integer('total_controls').default(0),
+  compliantControls: integer('compliant_controls').default(0),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Compliance Controls - Individual requirements within frameworks
+export const complianceControls = pgTable('compliance_controls', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  frameworkId: uuid('framework_id').references(() => complianceFrameworks.id, { onDelete: 'cascade' }).notNull(),
+  controlId: text('control_id').notNull(), // e.g., "CC6.1" for SOC2
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category'), // e.g., "Access Control", "Data Protection"
+  subcategory: text('subcategory'),
+  status: complianceControlStatusEnum('status').default('pending_review').notNull(),
+  ownerId: uuid('owner_id').references(() => profiles.id),
+  dueDate: timestamp('due_date'),
+  lastReviewDate: timestamp('last_review_date'),
+  nextReviewDate: timestamp('next_review_date'),
+  evidenceRequired: boolean('evidence_required').default(true),
+  automatedCheck: boolean('automated_check').default(false),
+  implementationNotes: text('implementation_notes'),
+  riskLevel: text('risk_level'), // high, medium, low
+  priority: integer('priority').default(1),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Compliance Evidence - Documents and artifacts supporting control compliance
+export const complianceEvidence = pgTable('compliance_evidence', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  controlId: uuid('control_id').references(() => complianceControls.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  evidenceType: text('evidence_type').notNull(), // document, screenshot, log, report, policy
+  fileUrl: text('file_url'),
+  fileName: text('file_name'),
+  fileSize: integer('file_size'),
+  mimeType: text('mime_type'),
+  uploadedById: uuid('uploaded_by_id').references(() => profiles.id).notNull(),
+  collectionDate: timestamp('collection_date').defaultNow(),
+  validFrom: timestamp('valid_from'),
+  validUntil: timestamp('valid_until'),
+  isAutoCollected: boolean('is_auto_collected').default(false),
+  sourceSystem: text('source_system'), // e.g., "onboarding", "security", "training"
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Compliance Alerts - Real-time notifications for compliance issues
+export const complianceAlerts = pgTable('compliance_alerts', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  severity: complianceAlertSeverityEnum('severity').notNull(),
+  status: complianceAlertStatusEnum('status').default('open').notNull(),
+  frameworkId: uuid('framework_id').references(() => complianceFrameworks.id),
+  controlId: uuid('control_id').references(() => complianceControls.id),
+  category: text('category').notNull(), // regulatory_update, deadline, violation, audit_finding
+  sourceModule: text('source_module'), // onboarding, security, training, payroll
+  affectedEmployeeId: uuid('affected_employee_id').references(() => profiles.id),
+  assignedToId: uuid('assigned_to_id').references(() => profiles.id),
+  dueDate: timestamp('due_date'),
+  acknowledgedAt: timestamp('acknowledged_at'),
+  acknowledgedById: uuid('acknowledged_by_id').references(() => profiles.id),
+  resolvedAt: timestamp('resolved_at'),
+  resolvedById: uuid('resolved_by_id').references(() => profiles.id),
+  resolutionNotes: text('resolution_notes'),
+  automatedAlert: boolean('automated_alert').default(false),
+  requiresAction: boolean('requires_action').default(true),
+  actionUrl: text('action_url'), // Deep link to fix the issue
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Unified Audit Trail - Comprehensive logging across all modules
+export const complianceAuditTrail = pgTable('compliance_audit_trail', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text('event_type').notNull(), // create, read, update, delete, login, logout, etc.
+  category: auditEventCategoryEnum('category').notNull(),
+  action: text('action').notNull(), // Detailed action description
+  resourceType: text('resource_type').notNull(), // employee, document, payroll, etc.
+  resourceId: text('resource_id'), // ID of the affected resource
+  resourceName: text('resource_name'), // Human-readable name
+  actorId: uuid('actor_id').references(() => profiles.id),
+  actorEmail: text('actor_email'),
+  actorRole: text('actor_role'),
+  actorIpAddress: text('actor_ip_address'),
+  actorUserAgent: text('actor_user_agent'),
+  targetUserId: uuid('target_user_id').references(() => profiles.id), // If action affects another user
+  previousValue: json('previous_value'),
+  newValue: json('new_value'),
+  changeDescription: text('change_description'),
+  moduleSource: text('module_source').notNull(), // Which module generated this
+  sessionId: text('session_id'),
+  requestId: text('request_id'),
+  success: boolean('success').default(true).notNull(),
+  errorMessage: text('error_message'),
+  riskScore: integer('risk_score'), // 0-100, for anomaly detection
+  isSensitive: boolean('is_sensitive').default(false), // For data access auditing
+  retentionPeriod: integer('retention_period'), // Days to retain
+  metadata: json('metadata'),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => ({
+  categoryIdx: index('audit_trail_category_idx').on(table.category),
+  actorIdx: index('audit_trail_actor_idx').on(table.actorId),
+  resourceIdx: index('audit_trail_resource_idx').on(table.resourceType, table.resourceId),
+  createdAtIdx: index('audit_trail_created_at_idx').on(table.createdAt)
+}));
+
+// Compliance Policies - Organization policies and their acknowledgments
+export const compliancePolicies = pgTable('compliance_policies', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  description: text('description'),
+  content: text('content'), // Full policy text or Markdown
+  version: text('version').notNull(),
+  category: text('category').notNull(), // security, privacy, hr, safety
+  frameworkId: uuid('framework_id').references(() => complianceFrameworks.id),
+  effectiveDate: timestamp('effective_date').notNull(),
+  expiryDate: timestamp('expiry_date'),
+  reviewFrequencyDays: integer('review_frequency_days').default(365),
+  nextReviewDate: timestamp('next_review_date'),
+  ownerId: uuid('owner_id').references(() => profiles.id),
+  approvedById: uuid('approved_by_id').references(() => profiles.id),
+  approvedAt: timestamp('approved_at'),
+  requiresAcknowledgment: boolean('requires_acknowledgment').default(true),
+  isActive: boolean('is_active').default(true),
+  fileUrl: text('file_url'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Policy Acknowledgments - Track employee acknowledgments of policies
+export const policyAcknowledgments = pgTable('policy_acknowledgments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  policyId: uuid('policy_id').references(() => compliancePolicies.id, { onDelete: 'cascade' }).notNull(),
+  employeeId: uuid('employee_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  acknowledgedAt: timestamp('acknowledged_at').defaultNow().notNull(),
+  policyVersion: text('policy_version').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  signatureData: text('signature_data'), // E-signature if required
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Compliance Training Requirements - Link training to compliance
+export const complianceTrainingRequirements = pgTable('compliance_training_requirements', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  frameworkId: uuid('framework_id').references(() => complianceFrameworks.id),
+  controlId: uuid('control_id').references(() => complianceControls.id),
+  trainingTitle: text('training_title').notNull(),
+  trainingDescription: text('training_description'),
+  frequencyDays: integer('frequency_days').notNull(), // How often training must be completed
+  isMandatory: boolean('is_mandatory').default(true),
+  targetRoles: text('target_roles').array(), // Which roles need this training
+  targetDepartments: text('target_departments').array(),
+  passingScore: integer('passing_score').default(80), // Minimum passing percentage
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// Regulatory Updates - Track external regulatory changes
+export const regulatoryUpdates = pgTable('regulatory_updates', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  framework: complianceFrameworkEnum('framework'),
+  jurisdiction: text('jurisdiction'), // Country/State
+  effectiveDate: timestamp('effective_date'),
+  source: text('source'), // Where the update came from
+  sourceUrl: text('source_url'),
+  impactLevel: complianceAlertSeverityEnum('impact_level').default('medium'),
+  affectedAreas: text('affected_areas').array(), // hr, payroll, security, etc.
+  actionRequired: boolean('action_required').default(false),
+  actionDescription: text('action_description'),
+  actionDueDate: timestamp('action_due_date'),
+  isReviewed: boolean('is_reviewed').default(false),
+  reviewedById: uuid('reviewed_by_id').references(() => profiles.id),
+  reviewedAt: timestamp('reviewed_at'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Compliance Dashboard Metrics - Cached metrics for performance
+export const complianceMetrics = pgTable('compliance_metrics', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  metricDate: date('metric_date').notNull(),
+  frameworkId: uuid('framework_id').references(() => complianceFrameworks.id),
+  totalControls: integer('total_controls').default(0),
+  compliantControls: integer('compliant_controls').default(0),
+  nonCompliantControls: integer('non_compliant_controls').default(0),
+  partialControls: integer('partial_controls').default(0),
+  pendingReviewControls: integer('pending_review_controls').default(0),
+  openAlerts: integer('open_alerts').default(0),
+  criticalAlerts: integer('critical_alerts').default(0),
+  overdueTasks: integer('overdue_tasks').default(0),
+  policyAcknowledgmentRate: integer('policy_acknowledgment_rate'), // Percentage
+  trainingCompletionRate: integer('training_completion_rate'), // Percentage
+  averageResolutionTime: integer('average_resolution_time'), // Hours
+  riskScore: integer('risk_score'), // Overall risk 0-100
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// Insert schemas for Compliance tables
+export const insertComplianceFrameworkSchema = createInsertSchema(complianceFrameworks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertComplianceFramework = z.infer<typeof insertComplianceFrameworkSchema>;
+export type ComplianceFramework = typeof complianceFrameworks.$inferSelect;
+
+export const insertComplianceControlSchema = createInsertSchema(complianceControls).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertComplianceControl = z.infer<typeof insertComplianceControlSchema>;
+export type ComplianceControl = typeof complianceControls.$inferSelect;
+
+export const insertComplianceEvidenceSchema = createInsertSchema(complianceEvidence).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertComplianceEvidence = z.infer<typeof insertComplianceEvidenceSchema>;
+export type ComplianceEvidence = typeof complianceEvidence.$inferSelect;
+
+export const insertComplianceAlertSchema = createInsertSchema(complianceAlerts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertComplianceAlert = z.infer<typeof insertComplianceAlertSchema>;
+export type ComplianceAlert = typeof complianceAlerts.$inferSelect;
+
+export const insertComplianceAuditTrailSchema = createInsertSchema(complianceAuditTrail).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertComplianceAuditTrail = z.infer<typeof insertComplianceAuditTrailSchema>;
+export type ComplianceAuditTrail = typeof complianceAuditTrail.$inferSelect;
+
+export const insertCompliancePolicySchema = createInsertSchema(compliancePolicies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertCompliancePolicy = z.infer<typeof insertCompliancePolicySchema>;
+export type CompliancePolicy = typeof compliancePolicies.$inferSelect;
+
+export const insertPolicyAcknowledgmentSchema = createInsertSchema(policyAcknowledgments).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertPolicyAcknowledgment = z.infer<typeof insertPolicyAcknowledgmentSchema>;
+export type PolicyAcknowledgment = typeof policyAcknowledgments.$inferSelect;
+
+export const insertComplianceTrainingRequirementSchema = createInsertSchema(complianceTrainingRequirements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertComplianceTrainingRequirement = z.infer<typeof insertComplianceTrainingRequirementSchema>;
+export type ComplianceTrainingRequirement = typeof complianceTrainingRequirements.$inferSelect;
+
+export const insertRegulatoryUpdateSchema = createInsertSchema(regulatoryUpdates).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertRegulatoryUpdate = z.infer<typeof insertRegulatoryUpdateSchema>;
+export type RegulatoryUpdate = typeof regulatoryUpdates.$inferSelect;
+
+export const insertComplianceMetricsSchema = createInsertSchema(complianceMetrics).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertComplianceMetrics = z.infer<typeof insertComplianceMetricsSchema>;
+export type ComplianceMetrics = typeof complianceMetrics.$inferSelect;
