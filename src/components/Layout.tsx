@@ -345,7 +345,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                       <span className="text-gray-800 dark:text-gray-200 font-medium">{t('header.welcomeUser', { name: user?.name })}</span>
                     </div>
                     <button
-                      onClick={() => onNavigate?.('profile')}
+                      onClick={() => onOpenMyProfile?.()}
                       className="px-3 py-3 text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 font-medium min-h-[44px] touch-manipulation"
                     >
                       {t('common.profile')}
@@ -478,7 +478,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
                     <>
                       <button
                         onClick={() => {
-                          onNavigate?.('profile');
+                          onOpenMyProfile?.();
                           setMobileMenuOpen(false);
                         }}
                         className="w-full px-4 py-3 text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors font-medium text-center border border-gray-200 dark:border-gray-600"
