@@ -44,6 +44,7 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
     -   **Legacy Modals**: Dashboard inline modals (Payroll, Reports, Events, Offboarding, TimeAttendance) opened via `?openModal=` query parameter
     -   **Cross-Page Navigation**: Clicking sidebar items from any page navigates correctly - pages route directly, modals navigate to `/dashboard?openModal=modalName` and Dashboard opens them on mount
     -   **Modal Validation**: Dashboard validates `openModal` query params against `VALID_INLINE_CONTENT` whitelist to prevent blank states
+    -   **Profile Navigation**: Sidebar "My Profile" navigates to full /profile page (with sidebar visible); Header profile picture/name opens ComprehensiveEmployeeProfileModal (compact view)
 -   **Design Patterns**: Utilizes a modal-based interface, a service layer for business logic, optimistic UI updates, and error boundaries.
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library.
 -   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors`.
