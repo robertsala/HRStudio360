@@ -2487,13 +2487,32 @@ export function registerRoutes(app: Express) {
       });
       
       // Log the user in immediately by creating a session
-      req.session.regenerate((err) => {
+      req.session.regenerate(async (err) => {
         if (err) {
           console.error('Session regeneration error:', err);
           return res.status(500).json({ error: 'Signup successful but login failed' });
         }
         
         (req.session as any).userId = profile.id;
+        
+        // Compliance audit logging for user registration
+        try {
+          await storage.createComplianceAuditEntry({
+            action: 'user_registered',
+            category: 'security',
+            actorId: profile.id,
+            actorName: `${firstName} ${lastName}`,
+            targetType: 'user',
+            targetId: profile.id,
+            description: `New user registered: ${email}`,
+            details: JSON.stringify({ email, firstName, lastName, role: 'employee' }),
+            ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown',
+            status: 'success'
+          });
+        } catch (auditError) {
+          console.error('Failed to create audit log for user_registered:', auditError);
+        }
         
         req.session.save((err) => {
           if (err) {
@@ -2694,6 +2713,26 @@ export function registerRoutes(app: Express) {
         success: true
       });
 
+      // Compliance audit logging for password reset
+      try {
+        const userProfile = await storage.getProfileById(tokenData.profileId);
+        await storage.createComplianceAuditEntry({
+          action: 'password_reset',
+          category: 'security',
+          actorId: tokenData.profileId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'user',
+          targetId: tokenData.profileId,
+          description: `Password reset completed via email link`,
+          details: JSON.stringify({ method: 'email_reset_link' }),
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for password_reset:', auditError);
+      }
+
       res.json({ success: true, message: 'Password has been reset successfully' });
     } catch (error: any) {
       console.error('Reset password error:', error);
@@ -2787,6 +2826,25 @@ export function registerRoutes(app: Express) {
         userAgent,
         success: true
       });
+
+      // Compliance audit logging for password change
+      try {
+        await storage.createComplianceAuditEntry({
+          action: 'password_changed',
+          category: 'security',
+          actorId: userId,
+          actorName: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : 'System',
+          targetType: 'user',
+          targetId: userId,
+          description: `Password changed by user`,
+          details: JSON.stringify({ method: 'user_initiated' }),
+          ipAddress: ipAddress,
+          userAgent: userAgent,
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for password_changed:', auditError);
+      }
 
       res.json({ success: true, message: 'Password changed successfully' });
     } catch (error: any) {
@@ -3667,6 +3725,7 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/new-hires', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const { insertNewHireSchema } = await import('../shared/schema.js');
       
       // Validate request body
@@ -3680,6 +3739,27 @@ export function registerRoutes(app: Express) {
       
       // Create new hire
       const newHire = await storage.createNewHire(validatedData);
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'new_hire_created',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'new_hire',
+          targetId: newHire.id,
+          description: `New hire created: ${validatedData.firstName} ${validatedData.lastName} (${validatedData.email})`,
+          details: JSON.stringify({ newHireId: newHire.id, email: validatedData.email, position: validatedData.position }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for new_hire_created:', auditError);
+      }
+      
       res.status(201).json(newHire);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -3691,6 +3771,7 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/new-hires/:id', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const { id } = req.params;
       const { insertNewHireSchema } = await import('../shared/schema.js');
       
@@ -3702,6 +3783,27 @@ export function registerRoutes(app: Express) {
       if (!updatedHire) {
         return res.status(404).json({ error: 'New hire not found' });
       }
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'new_hire_updated',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'new_hire',
+          targetId: id,
+          description: `New hire updated: ${updatedHire.firstName} ${updatedHire.lastName}`,
+          details: JSON.stringify({ newHireId: id, updatedFields: Object.keys(validatedData) }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for new_hire_updated:', auditError);
+      }
+      
       res.json(updatedHire);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -3890,8 +3992,30 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/onboarding/i9-forms', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const validatedData = insertI9FormSchema.parse(req.body);
       const form = await storage.createI9Form(validatedData);
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'i9_form_created',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'i9_form',
+          targetId: form.id,
+          description: `I-9 form created for new hire`,
+          details: JSON.stringify({ formId: form.id, newHireId: validatedData.newHireId }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for i9_form_created:', auditError);
+      }
+      
       res.status(201).json(form);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -3903,12 +4027,34 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/onboarding/i9-forms/:id', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const { id } = req.params;
       const validatedData = insertI9FormSchema.partial().parse(req.body);
       const form = await storage.updateI9Form(id, validatedData);
       if (!form) {
         return res.status(404).json({ error: 'I-9 form not found' });
       }
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'i9_form_updated',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'i9_form',
+          targetId: id,
+          description: `I-9 form updated`,
+          details: JSON.stringify({ formId: id, updatedFields: Object.keys(validatedData) }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for i9_form_updated:', auditError);
+      }
+      
       res.json(form);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -3920,11 +4066,33 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/onboarding/i9-forms/:id/section1', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const { id } = req.params;
       const form = await storage.updateI9FormSection1(id, req.body);
       if (!form) {
         return res.status(404).json({ error: 'I-9 form not found' });
       }
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'i9_section1_completed',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'i9_form',
+          targetId: id,
+          description: `I-9 form Section 1 (Employee Information) completed`,
+          details: JSON.stringify({ formId: id }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for i9_section1_completed:', auditError);
+      }
+      
       res.json(form);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3942,6 +4110,27 @@ export function registerRoutes(app: Express) {
       if (!form) {
         return res.status(404).json({ error: 'I-9 form not found' });
       }
+      
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'i9_section2_completed',
+          category: 'onboarding',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'i9_form',
+          targetId: id,
+          description: `I-9 form Section 2 (Employer Verification) completed by authorized representative`,
+          details: JSON.stringify({ formId: id, verifiedBy: userId }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for i9_section2_completed:', auditError);
+      }
+      
       res.json(form);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3974,8 +4163,30 @@ export function registerRoutes(app: Express) {
 
   app.post('/api/onboarding/state-tax-forms', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const validatedData = insertStateTaxFormSchema.parse(req.body);
       const form = await storage.createStateTaxForm(validatedData);
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'state_tax_form_created',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'state_tax_form',
+          targetId: form.id,
+          description: `State tax form created for ${validatedData.state || 'unknown state'}`,
+          details: JSON.stringify({ formId: form.id, newHireId: validatedData.newHireId, state: validatedData.state }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for state_tax_form_created:', auditError);
+      }
+      
       res.status(201).json(form);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -3987,12 +4198,34 @@ export function registerRoutes(app: Express) {
 
   app.patch('/api/onboarding/state-tax-forms/:id', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
       const { id } = req.params;
       const validatedData = insertStateTaxFormSchema.partial().parse(req.body);
       const form = await storage.updateStateTaxForm(id, validatedData);
       if (!form) {
         return res.status(404).json({ error: 'State tax form not found' });
       }
+      
+      // Compliance audit logging
+      try {
+        const userProfile = userId ? await storage.getProfileById(userId) : null;
+        await storage.createComplianceAuditEntry({
+          action: 'state_tax_form_updated',
+          category: 'onboarding',
+          actorId: userId || null,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'state_tax_form',
+          targetId: id,
+          description: `State tax form updated`,
+          details: JSON.stringify({ formId: id, updatedFields: Object.keys(validatedData) }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for state_tax_form_updated:', auditError);
+      }
+      
       res.json(form);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -4054,6 +4287,27 @@ export function registerRoutes(app: Express) {
         uploadedBy: userId
       });
       const document = await storage.createOnboardingDocument(validatedData);
+      
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'onboarding_document_uploaded',
+          category: 'onboarding',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'onboarding_document',
+          targetId: document.id,
+          description: `Onboarding document uploaded: ${validatedData.documentType || 'unknown type'}`,
+          details: JSON.stringify({ documentId: document.id, newHireId: validatedData.newHireId, documentType: validatedData.documentType }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for onboarding_document_uploaded:', auditError);
+      }
+      
       res.status(201).json(document);
     } catch (error: any) {
       if (error.name === 'ZodError') {
@@ -4540,6 +4794,26 @@ export function registerRoutes(app: Express) {
       console.log(`[AI Payroll] Validating payroll for ${employees.length} employees`);
       
       const validation = await validatePayrollRun(employees, payrollPeriod);
+
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'payroll_validated',
+          category: 'payroll',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'payroll_run',
+          targetId: payrollPeriod,
+          description: `AI payroll validation completed for ${employees.length} employees`,
+          details: JSON.stringify({ payrollPeriod, employeeCount: employees.length, hasErrors: (validation as any)?.errors?.length > 0 || false }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for payroll_validated:', auditError);
+      }
 
       res.json({
         success: true,
@@ -5186,6 +5460,27 @@ export function registerRoutes(app: Express) {
           where: eq(tutorialCompletions.id, existingProgress.id)
         });
 
+        // Compliance audit logging for tutorial progress update
+        try {
+          const userProfile = await storage.getProfileById(userId);
+          const auditAction = isCompleted ? 'tutorial_completed' : 'tutorial_progress_updated';
+          await storage.createComplianceAuditEntry({
+            action: auditAction,
+            category: 'training',
+            actorId: userId,
+            actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+            targetType: 'tutorial',
+            targetId: tutorialId,
+            description: isCompleted ? `Tutorial completed` : `Tutorial progress updated to step ${currentStepNumber}`,
+            details: JSON.stringify({ tutorialId, currentStepNumber, isCompleted, completedSteps }),
+            ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown',
+            status: 'success'
+          });
+        } catch (auditError) {
+          console.error('Failed to create audit log for tutorial progress:', auditError);
+        }
+
         res.json(updatedProgress);
       } else {
         // Create new progress record
@@ -5197,6 +5492,27 @@ export function registerRoutes(app: Express) {
           isCompleted: isCompleted || false,
           completedAt: isCompleted ? new Date() : null
         }).returning();
+
+        // Compliance audit logging for new tutorial progress
+        try {
+          const userProfile = await storage.getProfileById(userId);
+          const auditAction = isCompleted ? 'tutorial_completed' : 'tutorial_progress_updated';
+          await storage.createComplianceAuditEntry({
+            action: auditAction,
+            category: 'training',
+            actorId: userId,
+            actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+            targetType: 'tutorial',
+            targetId: tutorialId,
+            description: isCompleted ? `Tutorial completed` : `Tutorial progress started`,
+            details: JSON.stringify({ tutorialId, currentStepNumber: currentStepNumber || 1, isCompleted: isCompleted || false }),
+            ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown',
+            status: 'success'
+          });
+        } catch (auditError) {
+          console.error('Failed to create audit log for tutorial progress:', auditError);
+        }
 
         res.json(newProgress[0]);
       }
@@ -6501,6 +6817,27 @@ export function registerRoutes(app: Express) {
       });
 
       const log = await storage.createAutoFixAuditLog(validated);
+      
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'auto_fix_approved',
+          category: 'payroll',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'auto_fix',
+          targetId: log.id,
+          description: `Auto-fix corrections approved for payroll processing`,
+          details: JSON.stringify({ autoFixLogId: log.id, fixType: validated.fixType || 'general' }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for auto_fix_approved:', auditError);
+      }
+      
       res.status(201).json(log);
     } catch (error: any) {
       console.error('Error creating auto-fix audit log:', error);
@@ -6575,6 +6912,26 @@ export function registerRoutes(app: Express) {
         }
       }
 
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'timesheets_saved',
+          category: 'payroll',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'timesheet',
+          targetId: payPeriodStart,
+          description: `${savedTimesheets.length} timesheets saved for pay period ${payPeriodStart} to ${payPeriodEnd}`,
+          details: JSON.stringify({ payPeriodStart, payPeriodEnd, count: savedTimesheets.length, employeeIds: timesheetEntries.map(t => t.employeeId) }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for timesheets_saved:', auditError);
+      }
+
       res.status(201).json({ 
         message: 'Timesheets saved successfully',
         timesheets: savedTimesheets
@@ -6621,6 +6978,26 @@ export function registerRoutes(app: Express) {
           comments: 'Approved via payroll wizard'
         });
         approvals.push(approval);
+      }
+
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'timesheets_approved',
+          category: 'payroll',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'timesheet',
+          targetId: payPeriodStart || 'bulk',
+          description: `${timesheetIds.length} timesheets approved${payPeriodStart ? ` for pay period ${payPeriodStart} to ${payPeriodEnd}` : ''}`,
+          details: JSON.stringify({ payPeriodStart, payPeriodEnd, count: timesheetIds.length, timesheetIds }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for timesheets_approved:', auditError);
       }
 
       res.json({ 
@@ -6710,6 +7087,26 @@ export function registerRoutes(app: Express) {
         employeeIds: employeeIds || approvedTimesheets.map(t => t.employeeId),
         notes: notes || 'Payroll processing started'
       });
+
+      // Compliance audit logging
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'payroll_locked',
+          category: 'payroll',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'payroll_lock',
+          targetId: lock.id,
+          description: `Payroll locked for period ${payPeriodStart} to ${payPeriodEnd} (${approvedTimesheets.length} timesheets)`,
+          details: JSON.stringify({ lockId: lock.id, payPeriodStart, payPeriodEnd, timesheetsLocked: approvedTimesheets.length, employeeCount: (employeeIds || approvedTimesheets.map(t => t.employeeId)).length }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for payroll_locked:', auditError);
+      }
 
       res.status(201).json({ 
         message: 'Payroll locked successfully',
@@ -6870,6 +7267,25 @@ export function registerRoutes(app: Express) {
         permissionId
       });
 
+      // Compliance audit logging for permission assignment
+      try {
+        await storage.createComplianceAuditEntry({
+          action: 'permission_changed',
+          category: 'security',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'role_permission',
+          targetId: role,
+          description: `Permission assigned to role: ${role}`,
+          details: JSON.stringify({ role, permissionId, action: 'assign' }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for permission_changed:', auditError);
+      }
+
       res.status(201).json(rolePermission);
     } catch (error: any) {
       console.error('Error assigning permission to role:', error);
@@ -6897,6 +7313,25 @@ export function registerRoutes(app: Express) {
       }
 
       await storage.revokePermissionFromRole(role, permissionId);
+
+      // Compliance audit logging for permission revocation
+      try {
+        await storage.createComplianceAuditEntry({
+          action: 'permission_changed',
+          category: 'security',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'role_permission',
+          targetId: role,
+          description: `Permission revoked from role: ${role}`,
+          details: JSON.stringify({ role, permissionId, action: 'revoke' }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for permission_changed:', auditError);
+      }
 
       res.json({ message: 'Permission revoked successfully' });
     } catch (error: any) {
@@ -7616,6 +8051,27 @@ export function registerRoutes(app: Express) {
       }
 
       await storage.bulkAssignPermissions(role, permissionIds, assignedBy, reason);
+      
+      // Compliance audit logging for bulk permission assignment
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'permission_changed',
+          category: 'security',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'role_permission',
+          targetId: role,
+          description: `Bulk permission assignment: ${permissionIds.length} permissions assigned to role ${role}`,
+          details: JSON.stringify({ role, permissionCount: permissionIds.length, permissionIds, action: 'bulk_assign', reason }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for bulk permission_changed:', auditError);
+      }
+      
       res.json({ message: 'Permissions assigned successfully' });
     } catch (error: any) {
       console.error('Error bulk assigning permissions:', error);
@@ -7640,6 +8096,27 @@ export function registerRoutes(app: Express) {
       }
 
       await storage.bulkRevokePermissions(role, permissionIds, revokedBy, reason);
+      
+      // Compliance audit logging for bulk permission revocation
+      try {
+        const userProfile = await storage.getProfileById(userId);
+        await storage.createComplianceAuditEntry({
+          action: 'permission_changed',
+          category: 'security',
+          actorId: userId,
+          actorName: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'System',
+          targetType: 'role_permission',
+          targetId: role,
+          description: `Bulk permission revocation: ${permissionIds.length} permissions revoked from role ${role}`,
+          details: JSON.stringify({ role, permissionCount: permissionIds.length, permissionIds, action: 'bulk_revoke', reason }),
+          ipAddress: req.ip || (req.connection as any)?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown',
+          status: 'success'
+        });
+      } catch (auditError) {
+        console.error('Failed to create audit log for bulk permission_changed:', auditError);
+      }
+      
       res.json({ message: 'Permissions revoked successfully' });
     } catch (error: any) {
       console.error('Error bulk revoking permissions:', error);
