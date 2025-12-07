@@ -13,7 +13,19 @@ export async function seedComplianceData() {
   console.log('[Compliance Seed] Starting compliance demo data seeding...');
 
   try {
-    const existingFrameworks = await db.select().from(complianceFrameworks).limit(1);
+    // Check if the table exists by attempting a simple query
+    // If it fails, tables haven't been migrated yet - skip silently
+    let existingFrameworks;
+    try {
+      existingFrameworks = await db.select().from(complianceFrameworks).limit(1);
+    } catch (tableError: any) {
+      if (tableError?.message?.includes('does not exist') || tableError?.code === '42P01') {
+        console.log('[Compliance Seed] Compliance tables not yet created, skipping seed (run migrations first)');
+        return;
+      }
+      throw tableError;
+    }
+    
     if (existingFrameworks.length > 0) {
       console.log('[Compliance Seed] Compliance data already exists, skipping seed');
       return;
@@ -403,7 +415,7 @@ export async function seedComplianceData() {
 
     console.log('[Compliance Seed] ✅ Compliance demo data seeded successfully!');
   } catch (error) {
-    console.error('[Compliance Seed] Error seeding compliance data:', error);
-    throw error;
+    // Log error but don't crash the app - seeding is optional
+    console.error('[Compliance Seed] Error seeding compliance data (non-fatal):', error);
   }
 }

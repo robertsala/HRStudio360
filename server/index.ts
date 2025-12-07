@@ -89,13 +89,21 @@ app.set('wsServer', wsServer);
 setupVite(app, server).then(async () => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+    
+    // Run bootstrap operations asynchronously AFTER server starts listening
+    // This ensures health checks respond immediately during deployment
+    setImmediate(async () => {
+      try {
+        // Bootstrap: Ensure default access levels exist
+        await storage.ensureDefaultAccessLevels();
+        
+        // Bootstrap: Seed compliance demo data (runs async, won't block health checks)
+        await seedComplianceData();
+      } catch (error) {
+        console.error('[Bootstrap] Error during startup initialization (non-fatal):', error);
+      }
+    });
   });
-  
-  // Bootstrap: Ensure default access levels exist
-  await storage.ensureDefaultAccessLevels();
-  
-  // Bootstrap: Seed compliance demo data
-  await seedComplianceData();
   
   // Setup Sentry error handler AFTER all routes (v10+ API)
   setupExpressErrorHandler(app);
