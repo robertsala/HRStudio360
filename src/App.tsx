@@ -171,7 +171,7 @@ function App() {
 
         {/* Profile route - protected */}
         <Route path="/profile">
-          {renderProtectedPage('profile', <UserProfile onNavigate={handleNavigation} />)}
+          {renderProtectedPage('dashboard', <UserProfile onNavigate={handleNavigation} />)}
         </Route>
 
         {/* Onboarding route - protected */}

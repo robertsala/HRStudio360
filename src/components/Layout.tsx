@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, Shield, Smartphone, GraduationCap, Clock, Inbox, UserX, Star, Sparkles, Timer } from 'lucide-react';
+import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, GraduationCap, Clock, Inbox, UserX, Sparkles, Timer } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SignInModal from './SignInModal';
 import ThemeToggle from './ThemeToggle';
@@ -19,7 +19,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNavigate, onOpenModal, onOpenMyProfile }) => {
   const { t } = useTranslation();
   const { user, isAuthenticated, signIn, signOut } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
@@ -27,6 +27,39 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Sync sidebar active item with current URL path (only for page routes, not modals)
+  React.useEffect(() => {
+    // Map all full-screen page routes to their corresponding sidebar items
+    // Modal-driven items (payroll, reports, events, offboarding, calendar) are not page routes
+    // and should keep their active state when clicked via sidebar
+    const pathToSidebarItem: Record<string, string> = {
+      '/dashboard': 'dashboard',
+      '/profile': 'profile',
+      '/employees': 'employees',
+      '/hiring': 'recruitment',
+      '/onboarding': 'onboarding',
+      '/performance': 'performance',
+      '/leave': 'time',
+      '/time-tracking': 'timeTracking',
+      '/benefits': 'benefits',
+      '/training': 'training',
+      '/settings': 'settings',
+      '/chat': 'dashboard',
+      '/inbox': 'dashboard',
+      '/ai-assistant': 'dashboard',
+      '/announcements': 'dashboard',
+    };
+    
+    // Normalize location by stripping query params and hash
+    const basePath = location.split('?')[0].split('#')[0];
+    
+    // Only update if we have a specific mapping for this path
+    // This preserves the active state for modal-driven items
+    if (pathToSidebarItem[basePath]) {
+      setActiveSidebarItem(pathToSidebarItem[basePath]);
+    }
+  }, [location]);
 
   // Mock data for AI search
   const searchableData = {
