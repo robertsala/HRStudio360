@@ -13,7 +13,7 @@ interface User {
   department?: string;
 }
 
-type AuthPhase = 'checking' | 'authenticated' | 'unauthenticated';
+type AuthPhase = 'checking' | 'authenticating' | 'authenticated' | 'unauthenticated';
 
 interface AuthContextType {
   user: User | null;
@@ -198,6 +198,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // No manual activity tracking needed
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
+    // Set transitional state immediately to prevent "Access restricted" flash
+    setAuthPhase('authenticating');
+    
     try {
       const response = await apiClient.login(email, password);
 
@@ -223,6 +226,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false; // MFA not required
     } catch (error) {
       console.error('Sign in error:', error);
+      // Reset to unauthenticated on login failure
+      setAuthPhase('unauthenticated');
       throw error;
     }
   };

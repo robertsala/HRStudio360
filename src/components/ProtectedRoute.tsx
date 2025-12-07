@@ -9,13 +9,18 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) => {
   const { authPhase } = useAuth();
 
-  // Show loader while checking auth status
-  if (authPhase === 'checking') {
+  // Show loader while checking auth status or during login transition
+  if (authPhase === 'checking' || authPhase === 'authenticating') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 dark:border-blue-800 mx-auto"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-blue-600 dark:border-t-blue-400 mx-auto absolute inset-0"></div>
+          </div>
+          <p className="text-gray-600 dark:text-gray-300 mt-6 font-medium">
+            {authPhase === 'authenticating' ? 'Signing you in...' : 'Loading...'}
+          </p>
         </div>
       </div>
     );
