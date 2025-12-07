@@ -7,7 +7,7 @@ integrations = ["javascript_database:1.0.0", "javascript_object_storage:1.0.0", 
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "vm"
 run = ["npm", "start"]
 build = ["npm", "run", "build"]
 
@@ -56,10 +56,6 @@ localPort = 35719
 externalPort = 6800
 
 [[ports]]
-localPort = 35975
-externalPort = 8081
-
-[[ports]]
 localPort = 36423
 externalPort = 3003
 
@@ -74,6 +70,10 @@ externalPort = 3002
 [[ports]]
 localPort = 37275
 externalPort = 8008
+
+[[ports]]
+localPort = 39789
+externalPort = 8081
 
 [[ports]]
 localPort = 40267
