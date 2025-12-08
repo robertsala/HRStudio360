@@ -6,6 +6,10 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const server = createServer(app);
 
+// One-time initialization guard
+let initialized = false;
+let appReady = false;
+
 // ============================================================================
 // HEALTH CHECK ENDPOINTS - MUST BE FIRST, BEFORE ANY MIDDLEWARE
 // These respond immediately with 200 OK - no logic, no dependencies
@@ -18,12 +22,17 @@ app.get('/_health', (_req, res) => {
   res.status(200).send('ok');
 });
 
-// Root endpoint: Health probes get 'ok', browsers get passed to Vite later
-// If no Accept header or wildcard, assume health probe
+// Root endpoint: Return 200 OK for health probes, serve frontend for browsers
 app.get('/', (req, res, next) => {
   const acceptHeader = req.headers.accept || '';
-  // Only pass to Vite if explicitly requesting HTML (browser navigation)
-  if (acceptHeader.includes('text/html') && !acceptHeader.startsWith('*/*')) {
+  
+  // Health probes: no Accept header or wildcard - always return 200 immediately
+  if (!acceptHeader || acceptHeader === '*/*' || !acceptHeader.includes('text/html')) {
+    return res.status(200).send('ok');
+  }
+  
+  // Browser requesting HTML - serve frontend if ready, otherwise return 200
+  if (appReady) {
     return next();
   }
   res.status(200).send('ok');
@@ -41,20 +50,18 @@ server.listen(PORT, '0.0.0.0', () => {
 });
 
 // ============================================================================
-// ASYNC INITIALIZATION - Runs in background after server is listening
+// ASYNC INITIALIZATION - Runs exactly once after server is listening
 // ============================================================================
 async function initializeApp() {
+  // Guard against multiple initializations
+  if (initialized) {
+    console.log('[Init] Already initialized, skipping');
+    return;
+  }
+  initialized = true;
+
   try {
     console.log('[Init] Starting async initialization...');
-
-    // Sentry initialization - fire and forget, wrapped in try-catch
-    try {
-      const { initSentry } = await import('./lib/sentry');
-      initSentry();
-      console.log('✅ Sentry initialized');
-    } catch (sentryErr: any) {
-      console.warn('[Sentry] Initialization failed (non-fatal):', sentryErr.message);
-    }
 
     // Trust proxy for secure cookies behind TLS
     app.set('trust proxy', 1);
@@ -63,7 +70,7 @@ async function initializeApp() {
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
 
-    // Request logging middleware
+    // Request logging middleware (only for API routes)
     app.use((req, res, next) => {
       const start = Date.now();
       const path = req.path;
@@ -160,12 +167,18 @@ async function initializeApp() {
     await setupVite(app, server);
     console.log('✅ Vite middleware ready');
 
-    // Setup Sentry error handler
+    // Mark app as fully ready - now "/" can serve frontend
+    appReady = true;
+    console.log('✅ App fully ready - frontend serving enabled');
+
+    // Sentry initialization - deferred and non-blocking
     try {
-      const { setupExpressErrorHandler } = await import('./lib/sentry');
+      const { initSentry, setupExpressErrorHandler } = await import('./lib/sentry');
+      initSentry();
       setupExpressErrorHandler(app);
-    } catch (err) {
-      console.warn('[Sentry] Error handler setup failed (non-fatal)');
+      console.log('✅ Sentry initialized');
+    } catch (sentryErr: any) {
+      console.warn('[Sentry] Initialization failed (non-fatal):', sentryErr.message);
     }
 
     // General error handling middleware
