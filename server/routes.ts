@@ -9343,46 +9343,44 @@ export function registerRoutes(app: Express) {
         frameworks,
         activeFrameworks,
         controls,
-        overdueControls,
-        openAlerts,
-        activePolicies,
-        latestMetrics,
-        unreviewed
+        openAlertsData,
+        policies,
+        latestMetrics
       ] = await Promise.all([
         storage.getComplianceFrameworks(),
         storage.getActiveComplianceFrameworks(),
         storage.getComplianceControls(),
-        storage.getOverdueComplianceControls(),
         storage.getOpenComplianceAlerts(),
         storage.getActiveCompliancePolicies(),
-        storage.getLatestComplianceMetrics(),
-        storage.getUnreviewedRegulatoryUpdates()
+        storage.getLatestComplianceMetrics()
       ]);
 
-      const alertsBySeverity = {
-        critical: openAlerts.filter(a => a.severity === 'critical').length,
-        high: openAlerts.filter(a => a.severity === 'high').length,
-        medium: openAlerts.filter(a => a.severity === 'medium').length,
-        low: openAlerts.filter(a => a.severity === 'low').length
-      };
+      const compliantControls = controls.filter(c => c.status === 'compliant').length;
+      const totalControls = controls.length;
+      
+      const overallScore = totalControls > 0 
+        ? Math.round((compliantControls / totalControls) * 100)
+        : (latestMetrics.length > 0 
+          ? Math.round(latestMetrics.reduce((sum, m) => sum + Number(m.overallScore || 0), 0) / latestMetrics.length)
+          : 0);
+
+      const pendingPolicies = policies.filter(p => 
+        p.effectiveDate && new Date(p.effectiveDate) > new Date()
+      ).length;
 
       const dashboard = {
-        summary: {
-          totalFrameworks: frameworks.length,
-          activeFrameworks: activeFrameworks.length,
-          totalControls: controls.length,
-          overdueControls: overdueControls.length,
-          openAlerts: openAlerts.length,
-          activePolicies: activePolicies.length,
-          unreviewedUpdates: unreviewed.length
-        },
-        alertsBySeverity,
-        recentAlerts: openAlerts.slice(0, 5),
-        overdueControlsList: overdueControls.slice(0, 10),
-        latestMetrics: latestMetrics.slice(0, 5),
-        complianceScore: latestMetrics.length > 0 
-          ? Math.round(latestMetrics.reduce((sum, m) => sum + Number(m.overallScore || 0), 0) / latestMetrics.length)
-          : 0
+        frameworks,
+        activeFrameworks,
+        controls,
+        alerts: openAlertsData,
+        policies,
+        overallScore,
+        totalControls,
+        compliantControls,
+        openAlerts: openAlertsData.length,
+        criticalAlerts: openAlertsData.filter(a => a.severity === 'critical').length,
+        pendingPolicies,
+        overdueTraining: 0
       };
 
       res.json(dashboard);
