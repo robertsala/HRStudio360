@@ -9,7 +9,15 @@ const server = createServer(app);
 
 // CRITICAL: Health check endpoints registered FIRST, before ANY other setup
 // These MUST respond immediately for Replit Autoscale deployment
-app.get('/', (_req, res) => {
+// Note: / only returns "ok" for non-browser requests (health probes)
+// Browsers (Accept: text/html) fall through to Vite middleware
+app.get('/', (req, res, next) => {
+  const acceptHeader = req.headers.accept || '';
+  if (acceptHeader.includes('text/html')) {
+    // Browser request - let Vite handle it
+    return next();
+  }
+  // Health check probe - respond immediately
   res.status(200).send('ok');
 });
 
