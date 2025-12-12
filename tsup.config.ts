@@ -12,10 +12,17 @@ export default defineConfig({
   dts: false,
   minify: false,
   bundle: true,
-  skipNodeModulesBundle: true,
-  esbuildOptions(options) {
-    options.alias = {
-      '@shared': './shared',
-    };
-  },
+  external: [
+    'vite',
+    'argon2',
+    '@sentry/node',
+    'openai',
+    'resend',
+    '@google-cloud/storage',
+    'google-auth-library',
+    'speakeasy',
+    'qrcode',
+    'jspdf',
+    'html2canvas',
+  ],
 });

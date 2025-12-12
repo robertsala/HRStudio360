@@ -51,25 +51,26 @@ server.listen(PORT, '0.0.0.0', () => {
 // ============================================================================
 async function bootstrap() {
   console.log('[Bootstrap] Starting application initialization...');
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // Dynamic imports - these don't block health checks
+  // Only import vite in development, only import staticMiddleware in production
+  // Note: .js extensions required for Node ESM in production
   const [
     { default: session },
     { registerRoutes },
-    { setupVite },
     { initSentry, setupExpressErrorHandler },
     { ChatWebSocketServer },
     { storage },
   ] = await Promise.all([
     import('express-session'),
-    import('./routes'),
-    import('./vite'),
-    import('./lib/sentry'),
-    import('./websocket'),
-    import('./storage'),
+    import('./routes.js'),
+    import('./lib/sentry.js'),
+    import('./websocket.js'),
+    import('./storage.js'),
   ]);
 
-  console.log('[Bootstrap] Modules loaded');
+  console.log('[Bootstrap] Core modules loaded');
 
   // Initialize Sentry
   try {
@@ -144,9 +145,16 @@ async function bootstrap() {
   app.set('wsServer', wsServer);
   console.log('✅ WebSocket server initialized');
 
-  // Setup Vite/static file serving
-  await setupVite(app, server);
-  console.log('✅ Vite middleware ready');
+  // Setup static file serving (production) or Vite dev server (development)
+  if (isProduction) {
+    const { setupStaticServing } = await import('./staticMiddleware.js');
+    setupStaticServing(app);
+    console.log('✅ Static file serving ready');
+  } else {
+    const { setupVite } = await import('./vite.js');
+    await setupVite(app, server);
+    console.log('✅ Vite dev server ready');
+  }
 
   // Setup Sentry error handler
   try {
