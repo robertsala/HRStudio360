@@ -13,8 +13,14 @@ let isReady = false;
 // ============================================================================
 // HEALTH CHECK ROUTES - Defined IMMEDIATELY, before any other code runs
 // ============================================================================
-app.get('/', (_req, res) => {
-  res.status(200).json({ status: 'ok', ready: isReady });
+app.get('/', (req, res, next) => {
+  const acceptHeader = req.headers.accept || '';
+  // Health probes don't request HTML - return JSON immediately
+  if (!isReady || !acceptHeader.includes('text/html')) {
+    return res.status(200).json({ status: 'ok', ready: isReady });
+  }
+  // Browser requesting HTML after app is ready - pass to Vite
+  next();
 });
 
 app.get('/health', (_req, res) => {
