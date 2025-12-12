@@ -49,7 +49,12 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Testing Infrastructure**: Comprehensive testing suite with Jest and Testing Library.
 -   **Error Handling & Resilience**: Robust error handling with `ErrorBoundary`, centralized logging, and `apiErrors`.
 -   **Production Monitoring**: Sentry integration for error tracking and performance monitoring.
--   **Production Deployment**: Configured for VM deployment to support native Node.js modules, with a `/health` endpoint for monitoring.
+-   **Production Deployment**: Configured for Autoscale deployment with optimized cold starts:
+    -   **Build Pipeline**: `vite build` for frontend + `tsup` for server compilation (sub-300ms builds)
+    -   **Health Checks**: `/`, `/health`, `/_health` endpoints respond in ~1ms before full initialization
+    -   **Lazy Loading**: Heavy modules (vite, argon2, sentry, openai, etc.) marked as external and loaded after `server.listen()`
+    -   **Static Serving**: Production uses `staticMiddleware.ts` which never imports Vite, avoiding slow cold starts
+    -   **Path Resolution**: Uses `process.cwd()` with optional `CLIENT_DIST` env var for robust asset serving
 
 ### Feature Specifications
 
