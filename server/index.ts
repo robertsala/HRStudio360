@@ -13,6 +13,10 @@ initSentry();
 const app = express();
 
 // Health check endpoints for deployment checks (responds immediately, before ANY middleware)
+app.get('/', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -89,11 +93,15 @@ const wsServer = new ChatWebSocketServer(server, sessionMiddleware);
 // Make WebSocket server available to routes
 app.set('wsServer', wsServer);
 
-// Setup Vite dev server
+// Start server IMMEDIATELY so health checks can respond
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log('✅ Health check endpoints ready');
+});
+
+// Setup Vite dev server in background (doesn't block health checks)
 setupVite(app, server).then(async () => {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-  });
+  console.log('✅ Vite middleware ready');
   
   // Bootstrap: Ensure default access levels exist (non-blocking)
   try {
