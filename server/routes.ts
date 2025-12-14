@@ -2111,6 +2111,30 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get('/api/tutorials/seed', async (req, res) => {
+    try {
+      const { seedHRTicketingTutorials } = await import('./seed-tutorials.js');
+      const result = await seedHRTicketingTutorials();
+      
+      if (result.seeded) {
+        return res.json({
+          message: 'Successfully seeded HR Ticketing tutorials',
+          count: result.count,
+          seeded: true
+        });
+      } else {
+        return res.json({
+          message: 'HR Ticketing tutorials already exist',
+          count: result.count,
+          skipped: true
+        });
+      }
+    } catch (error: any) {
+      console.error('Error seeding tutorials:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/changelog/:id', async (req, res) => {
     try {
       const log = await storage.getChangeLogById(req.params.id);

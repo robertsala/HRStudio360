@@ -563,17 +563,40 @@ const HRTicketDashboard: React.FC<HRTicketDashboardProps> = ({ isOpen, onClose }
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTicketSelect(ticket);
-                            }}
-                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
-                            title="View Details"
-                            data-testid={`button-view-ticket-${ticket.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={ticket.assigneeId || ''}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                updateTicketMutation.mutate({
+                                  ticketId: ticket.id,
+                                  updates: { assigneeId: e.target.value || null }
+                                });
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 max-w-[120px]"
+                              title="Quick Assign"
+                              data-testid={`select-quick-assign-${ticket.id}`}
+                            >
+                              <option value="">Unassigned</option>
+                              {hrStaff.map(staff => (
+                                <option key={staff.id} value={staff.id}>
+                                  {`${staff.firstName || ''} ${staff.lastName || ''}`.trim() || staff.email}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTicketSelect(ticket);
+                              }}
+                              className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
+                              title="View Details"
+                              data-testid={`button-view-ticket-${ticket.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

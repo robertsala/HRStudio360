@@ -201,6 +201,46 @@ const historicalChanges = [
     visibilityScope: 'product_owner_only',
     notificationSent: false,
     version: '3.2.0'
+  },
+  {
+    changeType: 'feature',
+    title: 'Enterprise Compliance Hub',
+    description: 'Launched full-page compliance management system tracking SOC2, GDPR, HIPAA, and ISO27001 frameworks. Features real-time compliance scores, alert management, audit trail logging, and policy acknowledgment workflows',
+    affectedModules: ['Compliance', 'Security', 'Audit'],
+    impactLevel: 'high',
+    visibilityScope: 'hr_only',
+    notificationSent: false,
+    version: '3.3.0'
+  },
+  {
+    changeType: 'feature',
+    title: 'E-Verify Integration',
+    description: 'Implemented complete E-Verify case management system with 3-business-day deadline calculation, status tracking, case history, and deadline alerts. Added dashboard widget for HR/Product Owners showing pending and overdue cases',
+    affectedModules: ['Onboarding', 'Compliance', 'Government'],
+    impactLevel: 'high',
+    visibilityScope: 'hr_only',
+    notificationSent: false,
+    version: '3.4.0'
+  },
+  {
+    changeType: 'feature',
+    title: 'Multi-Factor Authentication (MFA)',
+    description: 'Launched enterprise-grade MFA system with TOTP (Google/Microsoft Authenticator), SMS, and Email verification. Includes backup code recovery, HR admin tools, and comprehensive audit logging',
+    affectedModules: ['Security', 'Authentication'],
+    impactLevel: 'critical',
+    visibilityScope: 'all_employees',
+    notificationSent: false,
+    version: '3.5.0'
+  },
+  {
+    changeType: 'feature',
+    title: 'HR Ticketing System',
+    description: 'Complete employee support ticket system for HR inquiries. Features ticket submission, priority levels (Low/Medium/High/Urgent), category management, status workflow (Open/In Progress/Pending/Resolved/Closed), HR admin dashboard with quick-assign, comment threads, internal notes, and full audit history. Includes email notifications via Resend',
+    affectedModules: ['HR Support', 'Communication', 'Workflow'],
+    impactLevel: 'high',
+    visibilityScope: 'all_employees',
+    notificationSent: false,
+    version: '3.6.0'
   }
 ];
 
