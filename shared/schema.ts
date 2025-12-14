@@ -2795,3 +2795,100 @@ export const insertEVerifyCaseHistorySchema = createInsertSchema(eVerifyCaseHist
 });
 export type InsertEVerifyCaseHistory = z.infer<typeof insertEVerifyCaseHistorySchema>;
 export type EVerifyCaseHistory = typeof eVerifyCaseHistory.$inferSelect;
+
+// HR Ticketing System
+// Ticket status and priority enums
+export const hrTicketStatusEnum = pgEnum('hr_ticket_status', ['Open', 'In Progress', 'Pending', 'Resolved', 'Closed']);
+export const hrTicketPriorityEnum = pgEnum('hr_ticket_priority', ['Low', 'Medium', 'High', 'Urgent']);
+export const hrTicketCategoryEnum = pgEnum('hr_ticket_category', [
+  'Payroll', 'Benefits', 'Time Off', 'Workplace', 'Policy', 'Training', 'Technical', 'Other'
+]);
+
+// HR Tickets table - Main ticket entity
+export const hrTickets = pgTable('hr_tickets', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  ticketNumber: text('ticket_number').unique().notNull(), // Format: HR-2025-00001
+  
+  // Ticket details
+  subject: text('subject').notNull(),
+  description: text('description').notNull(),
+  category: hrTicketCategoryEnum('category').notNull(),
+  priority: hrTicketPriorityEnum('priority').default('Medium').notNull(),
+  status: hrTicketStatusEnum('status').default('Open').notNull(),
+  
+  // Submitter and assignment
+  submitterId: uuid('submitter_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  assigneeId: uuid('assignee_id').references(() => profiles.id, { onDelete: 'set null' }),
+  
+  // Resolution details
+  resolution: text('resolution'),
+  resolvedAt: timestamp('resolved_at'),
+  resolvedById: uuid('resolved_by_id').references(() => profiles.id, { onDelete: 'set null' }),
+  closedAt: timestamp('closed_at'),
+  
+  // Metadata
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  submitterIdx: index('hr_tickets_submitter_idx').on(table.submitterId),
+  assigneeIdx: index('hr_tickets_assignee_idx').on(table.assigneeId),
+  statusIdx: index('hr_tickets_status_idx').on(table.status),
+  categoryIdx: index('hr_tickets_category_idx').on(table.category),
+  createdAtIdx: index('hr_tickets_created_at_idx').on(table.createdAt)
+}));
+
+// HR Ticket Comments - Comment thread on tickets
+export const hrTicketComments = pgTable('hr_ticket_comments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: uuid('ticket_id').references(() => hrTickets.id, { onDelete: 'cascade' }).notNull(),
+  authorId: uuid('author_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  
+  content: text('content').notNull(),
+  isInternal: boolean('is_internal').default(false).notNull(), // Internal notes visible only to HR
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  ticketIdx: index('hr_ticket_comments_ticket_idx').on(table.ticketId),
+  authorIdx: index('hr_ticket_comments_author_idx').on(table.authorId)
+}));
+
+// HR Ticket Status History - Track all status changes
+export const hrTicketStatusHistory = pgTable('hr_ticket_status_history', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: uuid('ticket_id').references(() => hrTickets.id, { onDelete: 'cascade' }).notNull(),
+  changedById: uuid('changed_by_id').references(() => profiles.id, { onDelete: 'set null' }),
+  
+  previousStatus: hrTicketStatusEnum('previous_status'),
+  newStatus: hrTicketStatusEnum('new_status').notNull(),
+  changeNote: text('change_note'),
+  
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => ({
+  ticketIdx: index('hr_ticket_status_history_ticket_idx').on(table.ticketId)
+}));
+
+// Insert schemas for HR Tickets
+export const insertHrTicketSchema = createInsertSchema(hrTickets).omit({
+  id: true,
+  ticketNumber: true, // Auto-generated
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertHrTicket = z.infer<typeof insertHrTicketSchema>;
+export type HrTicket = typeof hrTickets.$inferSelect;
+
+export const insertHrTicketCommentSchema = createInsertSchema(hrTicketComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertHrTicketComment = z.infer<typeof insertHrTicketCommentSchema>;
+export type HrTicketComment = typeof hrTicketComments.$inferSelect;
+
+export const insertHrTicketStatusHistorySchema = createInsertSchema(hrTicketStatusHistory).omit({
+  id: true,
+  createdAt: true
+});
+export type InsertHrTicketStatusHistory = z.infer<typeof insertHrTicketStatusHistorySchema>;
+export type HrTicketStatusHistory = typeof hrTicketStatusHistory.$inferSelect;

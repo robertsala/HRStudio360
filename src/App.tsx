@@ -28,6 +28,7 @@ import SettingsPage from './pages/SettingsPage';
 import HiringPage from './pages/HiringPage';
 import TrainingPage from './pages/TrainingPage';
 import CompliancePage from './pages/CompliancePage';
+import HRSupportPage from './pages/HRSupportPage';
 import MFAVerificationPage from './pages/MFAVerificationPage';
 import MFARecoveryRequestPage from './pages/MFARecoveryRequestPage';
 import MFARecoveryVerifyPage from './pages/MFARecoveryVerifyPage';
@@ -70,6 +71,7 @@ function App() {
     studioAIChat: '/ai-assistant',
     inbox: '/inbox',
     compliance: '/compliance',
+    hrSupport: '/hr-support',
     // Special navigation
     dashboard: '/dashboard',
   };
@@ -234,6 +236,10 @@ function App() {
 
         <Route path="/compliance">
           {renderProtectedPage('dashboard', <CompliancePage />)}
+        </Route>
+
+        <Route path="/hr-support">
+          {renderProtectedPage('dashboard', <HRSupportPage />)}
         </Route>
 
         {/* Landing page - default route */}

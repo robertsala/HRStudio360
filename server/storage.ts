@@ -62,7 +62,10 @@ import type {
   RegulatoryUpdate, InsertRegulatoryUpdate,
   ComplianceMetrics, InsertComplianceMetrics,
   EVerifyCase, InsertEVerifyCase,
-  EVerifyCaseHistory, InsertEVerifyCaseHistory
+  EVerifyCaseHistory, InsertEVerifyCaseHistory,
+  HrTicket, InsertHrTicket,
+  HrTicketComment, InsertHrTicketComment,
+  HrTicketStatusHistory, InsertHrTicketStatusHistory
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, addressChangeRequests, announcements, employees, leaveRequests, leaveBalances,
@@ -84,7 +87,8 @@ import {
   callSessions, callParticipants, callSignaling,
   complianceFrameworks, complianceControls, complianceEvidence, complianceAlerts,
   complianceAuditTrail, compliancePolicies, policyAcknowledgments, regulatoryUpdates, complianceMetrics,
-  eVerifyCases, eVerifyCaseHistory
+  eVerifyCases, eVerifyCaseHistory,
+  hrTickets, hrTicketComments, hrTicketStatusHistory
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -578,6 +582,26 @@ export interface IStorage {
   // E-Verify Case History
   getEVerifyCaseHistory(caseId: string): Promise<EVerifyCaseHistory[]>;
   createEVerifyCaseHistoryEntry(entry: InsertEVerifyCaseHistory): Promise<EVerifyCaseHistory>;
+
+  // ============================================================================
+  // HR TICKETING SYSTEM
+  // ============================================================================
+
+  // HR Tickets CRUD
+  getHrTickets(): Promise<HrTicket[]>;
+  getHrTicketById(id: string): Promise<HrTicket | undefined>;
+  getHrTicketsBySubmitterId(submitterId: string): Promise<HrTicket[]>;
+  getHrTicketsByAssigneeId(assigneeId: string): Promise<HrTicket[]>;
+  createHrTicket(ticket: InsertHrTicket): Promise<HrTicket>;
+  updateHrTicket(id: string, updates: Partial<InsertHrTicket>): Promise<HrTicket | undefined>;
+
+  // HR Ticket Comments
+  getHrTicketComments(ticketId: string): Promise<HrTicketComment[]>;
+  createHrTicketComment(comment: InsertHrTicketComment): Promise<HrTicketComment>;
+
+  // HR Ticket Status History
+  getHrTicketStatusHistory(ticketId: string): Promise<HrTicketStatusHistory[]>;
+  createHrTicketStatusHistory(history: InsertHrTicketStatusHistory): Promise<HrTicketStatusHistory>;
 }
 
 // Database storage implementation
@@ -3900,6 +3924,95 @@ export class DbStorage implements IStorage {
 
   async createEVerifyCaseHistoryEntry(entry: InsertEVerifyCaseHistory): Promise<EVerifyCaseHistory> {
     const result = await db.insert(eVerifyCaseHistory).values(entry).returning();
+    return result[0];
+  }
+
+  // ============================================================================
+  // HR TICKETING SYSTEM
+  // ============================================================================
+
+  // HR Tickets
+  async getHrTickets(): Promise<HrTicket[]> {
+    return db.select().from(hrTickets).orderBy(desc(hrTickets.createdAt));
+  }
+
+  async getHrTicketById(id: string): Promise<HrTicket | undefined> {
+    const result = await db.select().from(hrTickets).where(eq(hrTickets.id, id));
+    return result[0];
+  }
+
+  async getHrTicketsBySubmitterId(submitterId: string): Promise<HrTicket[]> {
+    return db.select().from(hrTickets)
+      .where(eq(hrTickets.submitterId, submitterId))
+      .orderBy(desc(hrTickets.createdAt));
+  }
+
+  async getHrTicketsByAssigneeId(assigneeId: string): Promise<HrTicket[]> {
+    return db.select().from(hrTickets)
+      .where(eq(hrTickets.assigneeId, assigneeId))
+      .orderBy(desc(hrTickets.createdAt));
+  }
+
+  async createHrTicket(ticket: InsertHrTicket): Promise<HrTicket> {
+    // Generate ticket number in HR-YYYY-NNNNN format
+    const year = new Date().getFullYear();
+    const yearPrefix = `HR-${year}-`;
+    
+    // Get the latest ticket number for this year to determine the next sequence
+    const latestTickets = await db.select({ ticketNumber: hrTickets.ticketNumber })
+      .from(hrTickets)
+      .where(drizzleSql`${hrTickets.ticketNumber} LIKE ${yearPrefix + '%'}`)
+      .orderBy(desc(hrTickets.ticketNumber))
+      .limit(1);
+    
+    let nextNumber = 1;
+    if (latestTickets.length > 0) {
+      const lastTicketNumber = latestTickets[0].ticketNumber;
+      const lastSequence = parseInt(lastTicketNumber.replace(yearPrefix, ''), 10);
+      if (!isNaN(lastSequence)) {
+        nextNumber = lastSequence + 1;
+      }
+    }
+    
+    const ticketNumber = `${yearPrefix}${String(nextNumber).padStart(5, '0')}`;
+    
+    const result = await db.insert(hrTickets).values({
+      ...ticket,
+      ticketNumber
+    }).returning();
+    return result[0];
+  }
+
+  async updateHrTicket(id: string, updates: Partial<InsertHrTicket>): Promise<HrTicket | undefined> {
+    const result = await db
+      .update(hrTickets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(hrTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // HR Ticket Comments
+  async getHrTicketComments(ticketId: string): Promise<HrTicketComment[]> {
+    return db.select().from(hrTicketComments)
+      .where(eq(hrTicketComments.ticketId, ticketId))
+      .orderBy(desc(hrTicketComments.createdAt));
+  }
+
+  async createHrTicketComment(comment: InsertHrTicketComment): Promise<HrTicketComment> {
+    const result = await db.insert(hrTicketComments).values(comment).returning();
+    return result[0];
+  }
+
+  // HR Ticket Status History
+  async getHrTicketStatusHistory(ticketId: string): Promise<HrTicketStatusHistory[]> {
+    return db.select().from(hrTicketStatusHistory)
+      .where(eq(hrTicketStatusHistory.ticketId, ticketId))
+      .orderBy(desc(hrTicketStatusHistory.createdAt));
+  }
+
+  async createHrTicketStatusHistory(history: InsertHrTicketStatusHistory): Promise<HrTicketStatusHistory> {
+    const result = await db.insert(hrTicketStatusHistory).values(history).returning();
     return result[0];
   }
 }

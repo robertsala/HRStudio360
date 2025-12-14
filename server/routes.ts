@@ -21,6 +21,8 @@ import {
   insertComplianceAlertSchema, insertComplianceAuditTrailSchema, insertCompliancePolicySchema,
   insertPolicyAcknowledgmentSchema, insertRegulatoryUpdateSchema, insertComplianceMetricsSchema,
   insertEVerifyCaseSchema, insertEVerifyCaseHistorySchema,
+  insertHrTicketSchema, insertHrTicketCommentSchema, insertHrTicketStatusHistorySchema,
+  hrTickets, hrTicketComments, hrTicketStatusHistory,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -9507,11 +9509,9 @@ export function registerRoutes(app: Express) {
       }
 
       const eVerifyCase = await storage.getEVerifyCaseByNewHireId(req.params.newHireId);
-      if (!eVerifyCase) {
-        return res.status(404).json({ error: 'E-Verify case not found for this new hire' });
-      }
-
-      res.json(eVerifyCase);
+      // Return null (HTTP 200) when no case exists - this allows frontend to show "Create Case" button
+      // instead of displaying an error state
+      res.json(eVerifyCase || null);
     } catch (error: any) {
       console.error('Error fetching E-Verify case by new hire:', error);
       res.status(500).json({ error: 'Failed to fetch E-Verify case', details: error.message });
@@ -9649,6 +9649,340 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error fetching E-Verify case history:', error);
       res.status(500).json({ error: 'Failed to fetch E-Verify case history', details: error.message });
+    }
+  });
+
+  // ============================================================================
+  // HR TICKETING SYSTEM ROUTES
+  // ============================================================================
+
+  // GET /api/hr-tickets - Get tickets (employees see their own, HR sees all)
+  app.get('/api/hr-tickets', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const isHr = await canManageAnnouncements(userId);
+      
+      let tickets;
+      if (isHr) {
+        // HR/Product Owner can see all tickets
+        tickets = await storage.getHrTickets();
+      } else {
+        // Regular employees only see their own tickets
+        tickets = await storage.getHrTicketsBySubmitterId(userId);
+      }
+
+      res.json(tickets);
+    } catch (error: any) {
+      console.error('Error fetching HR tickets:', error);
+      res.status(500).json({ error: 'Failed to fetch HR tickets', details: error.message });
+    }
+  });
+
+  // GET /api/hr-tickets/:id - Get single ticket (with authorization check)
+  app.get('/api/hr-tickets/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const ticket = await storage.getHrTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Ticket not found' });
+      }
+
+      const isHr = await canManageAnnouncements(userId);
+      
+      // Check authorization: HR can view all, others only their own
+      if (!isHr && ticket.submitterId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      res.json(ticket);
+    } catch (error: any) {
+      console.error('Error fetching HR ticket:', error);
+      res.status(500).json({ error: 'Failed to fetch HR ticket', details: error.message });
+    }
+  });
+
+  // POST /api/hr-tickets - Create new ticket (any authenticated user)
+  app.post('/api/hr-tickets', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Extract only valid fields for ticket creation (prevent nested arrays/invalid fields)
+      const { subject, description, category, priority } = req.body;
+      
+      // Validate the request body with only allowed fields
+      const parseResult = insertHrTicketSchema.safeParse({
+        subject,
+        description,
+        category,
+        priority,
+        submitterId: userId
+      });
+
+      if (!parseResult.success) {
+        return res.status(400).json({ error: 'Invalid ticket data', details: parseResult.error.issues });
+      }
+
+      const ticket = await storage.createHrTicket(parseResult.data);
+      
+      // Record the initial status in history
+      await storage.createHrTicketStatusHistory({
+        ticketId: ticket.id,
+        changedById: userId,
+        previousStatus: null,
+        newStatus: 'Open',
+        changeNote: 'Ticket created'
+      });
+
+      // Send notification to HR staff about the new ticket
+      const submitterProfile = await storage.getProfileById(userId);
+      const submitterName = submitterProfile 
+        ? `${submitterProfile.firstName || ''} ${submitterProfile.lastName || ''}`.trim() || submitterProfile.email 
+        : 'Unknown User';
+      
+      notificationService.sendTicketSubmittedNotification(ticket, submitterName);
+
+      res.status(201).json(ticket);
+    } catch (error: any) {
+      console.error('Error creating HR ticket:', error);
+      res.status(500).json({ error: 'Failed to create HR ticket', details: error.message });
+    }
+  });
+
+  // PATCH /api/hr-tickets/:id - Update ticket
+  app.patch('/api/hr-tickets/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const ticket = await storage.getHrTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Ticket not found' });
+      }
+
+      const isHr = await canManageAnnouncements(userId);
+      const isSubmitter = ticket.submitterId === userId;
+
+      // Authorization check
+      if (!isHr && !isSubmitter) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Store previous values for change tracking
+      const previousAssigneeId = ticket.assigneeId;
+      const previousStatus = ticket.status;
+      
+      // Determine allowed fields based on role
+      let allowedUpdates: Record<string, any> = {};
+      
+      if (isHr) {
+        // HR can update all valid ticket fields - explicitly whitelist to prevent invalid field injection
+        const { 
+          subject, description, category, priority, status, 
+          assigneeId, resolution, resolvedById, resolvedAt, closedAt 
+        } = req.body;
+        
+        // Build updates object with only valid fields (filter undefined)
+        const hrFields = { 
+          subject, description, category, priority, status, 
+          assigneeId, resolution, resolvedById, resolvedAt, closedAt 
+        };
+        allowedUpdates = Object.fromEntries(
+          Object.entries(hrFields).filter(([_, v]) => v !== undefined)
+        );
+        
+        // Track status changes in history
+        if (status && status !== ticket.status) {
+          await storage.createHrTicketStatusHistory({
+            ticketId: ticket.id,
+            changedById: userId,
+            previousStatus: ticket.status,
+            newStatus: status,
+            changeNote: req.body.statusChangeNote || null
+          });
+        }
+      } else if (isSubmitter) {
+        // Submitter can only update limited fields - reject attempts to modify restricted fields
+        const restrictedFields = ['status', 'assigneeId', 'resolution', 'resolvedById', 'resolvedAt', 'closedAt'];
+        const attemptedRestrictedFields = restrictedFields.filter(field => req.body[field] !== undefined);
+        
+        if (attemptedRestrictedFields.length > 0) {
+          return res.status(403).json({ 
+            error: 'Access denied', 
+            message: `You cannot modify: ${attemptedRestrictedFields.join(', ')}` 
+          });
+        }
+        
+        // Extract only allowed submitter fields
+        const { description, subject, category, priority } = req.body;
+        const submitterFields = { description, subject, category, priority };
+        
+        // Filter out undefined values
+        allowedUpdates = Object.fromEntries(
+          Object.entries(submitterFields).filter(([_, v]) => v !== undefined)
+        );
+      }
+
+      const updatedTicket = await storage.updateHrTicket(req.params.id, allowedUpdates);
+
+      // Send notifications for status and assignee changes
+      const updaterProfile = await storage.getProfileById(userId);
+      const updaterName = updaterProfile 
+        ? `${updaterProfile.firstName || ''} ${updaterProfile.lastName || ''}`.trim() || updaterProfile.email 
+        : 'Unknown User';
+
+      // Notify submitter if status changed
+      if (req.body.status && req.body.status !== previousStatus && updatedTicket) {
+        notificationService.sendTicketStatusChangedNotification(updatedTicket, previousStatus, req.body.status, updaterName);
+      }
+
+      // Notify new assignee if assignee changed
+      if (req.body.assigneeId && req.body.assigneeId !== previousAssigneeId && updatedTicket) {
+        const assigneeProfile = await storage.getProfileById(req.body.assigneeId);
+        const assigneeName = assigneeProfile 
+          ? `${assigneeProfile.firstName || ''} ${assigneeProfile.lastName || ''}`.trim() || assigneeProfile.email 
+          : 'Unknown User';
+        
+        // Get submitter name for the email
+        const submitterProfile = await storage.getProfileById(ticket.submitterId);
+        const submitterName = submitterProfile 
+          ? `${submitterProfile.firstName || ''} ${submitterProfile.lastName || ''}`.trim() || submitterProfile.email 
+          : 'Unknown User';
+        
+        notificationService.sendTicketAssignedNotification(updatedTicket, assigneeName, updaterName, submitterName);
+      }
+
+      res.json(updatedTicket);
+    } catch (error: any) {
+      console.error('Error updating HR ticket:', error);
+      res.status(500).json({ error: 'Failed to update HR ticket', details: error.message });
+    }
+  });
+
+  // GET /api/hr-tickets/:id/comments - Get comments (filter internal notes for non-HR)
+  app.get('/api/hr-tickets/:id/comments', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const ticket = await storage.getHrTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Ticket not found' });
+      }
+
+      const isHr = await canManageAnnouncements(userId);
+      
+      // Check authorization
+      if (!isHr && ticket.submitterId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const comments = await storage.getHrTicketComments(req.params.id);
+      
+      // Filter out internal notes for non-HR users
+      const filteredComments = isHr 
+        ? comments 
+        : comments.filter(c => !c.isInternal);
+
+      res.json(filteredComments);
+    } catch (error: any) {
+      console.error('Error fetching ticket comments:', error);
+      res.status(500).json({ error: 'Failed to fetch ticket comments', details: error.message });
+    }
+  });
+
+  // POST /api/hr-tickets/:id/comments - Add comment (internal notes only for HR)
+  app.post('/api/hr-tickets/:id/comments', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const ticket = await storage.getHrTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Ticket not found' });
+      }
+
+      const isHr = await canManageAnnouncements(userId);
+      
+      // Check authorization
+      if (!isHr && ticket.submitterId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Only HR can add internal notes
+      if (req.body.isInternal && !isHr) {
+        return res.status(403).json({ error: 'Only HR can add internal notes' });
+      }
+
+      const parseResult = insertHrTicketCommentSchema.safeParse({
+        ticketId: req.params.id,
+        authorId: userId,
+        content: req.body.content,
+        isInternal: isHr ? (req.body.isInternal || false) : false
+      });
+
+      if (!parseResult.success) {
+        return res.status(400).json({ error: 'Invalid comment data', details: parseResult.error.issues });
+      }
+
+      const comment = await storage.createHrTicketComment(parseResult.data);
+
+      // Send comment notification
+      const authorProfile = await storage.getProfileById(userId);
+      const authorName = authorProfile 
+        ? `${authorProfile.firstName || ''} ${authorProfile.lastName || ''}`.trim() || authorProfile.email 
+        : 'Unknown User';
+
+      notificationService.sendTicketCommentNotification(ticket, comment, authorName, isHr);
+
+      res.status(201).json(comment);
+    } catch (error: any) {
+      console.error('Error creating ticket comment:', error);
+      res.status(500).json({ error: 'Failed to create ticket comment', details: error.message });
+    }
+  });
+
+  // GET /api/hr-tickets/:id/history - Get status history
+  app.get('/api/hr-tickets/:id/history', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const ticket = await storage.getHrTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ error: 'Ticket not found' });
+      }
+
+      const isHr = await canManageAnnouncements(userId);
+      
+      // Check authorization
+      if (!isHr && ticket.submitterId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      const history = await storage.getHrTicketStatusHistory(req.params.id);
+      res.json(history);
+    } catch (error: any) {
+      console.error('Error fetching ticket history:', error);
+      res.status(500).json({ error: 'Failed to fetch ticket history', details: error.message });
     }
   });
 }

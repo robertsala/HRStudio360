@@ -47,6 +47,7 @@ import CollaboratorModal from './modals/CollaboratorModal';
 import JobManagementModal from './modals/JobManagementModal';
 import StudioAIChatModal from './modals/StudioAIChatModal';
 import AgentActivityModal from './modals/AgentActivityModal';
+import HRTicketDashboard from './hr-tickets/HRTicketDashboard';
 import { mapEmployeeFromBackend } from '../lib/employeeDataMapper';
 import EVerifyDashboardWidget from './dashboard/EVerifyDashboardWidget';
 
@@ -89,7 +90,8 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
     jobManagement: false,
     studioAIChat: false,
     agentActivity: false,
-    addressChangeApproval: false
+    addressChangeApproval: false,
+    hrTicketDashboard: false
   });
 
   // Chat-specific state
@@ -1475,6 +1477,12 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
           <AddressChangeApprovalModal
             isOpen={modals.addressChangeApproval}
             onClose={() => closeModal('addressChangeApproval')}
+          />
+        )}
+        {modals.hrTicketDashboard && (
+          <HRTicketDashboard
+            isOpen={modals.hrTicketDashboard}
+            onClose={() => closeModal('hrTicketDashboard')}
           />
         )}
 

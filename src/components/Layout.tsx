@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, GraduationCap, Clock, Inbox, UserX, Sparkles, Timer, Shield } from 'lucide-react';
+import { Users, Search, Bell, User, LogOut, Menu, X, Home, Calendar, BarChart3, Settings, FileText, UserPlus, DollarSign, Heart, GraduationCap, Clock, Inbox, UserX, Sparkles, Timer, Shield, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SignInModal from './SignInModal';
 import ThemeToggle from './ThemeToggle';
@@ -46,6 +46,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
       '/training': 'training',
       '/settings': 'settings',
       '/compliance': 'compliance',
+      '/hr-support': 'hrSupport',
       '/chat': 'dashboard',
       '/inbox': 'dashboard',
       '/ai-assistant': 'dashboard',
@@ -296,6 +297,11 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView = 'landing', onNa
     { id: 'compliance', label: t('sidebar.compliance') || 'Compliance', icon: Shield, action: () => {
         setActiveSidebarItem('compliance');
         setLocation('/compliance');
+      }
+    },
+    { id: 'hrSupport', label: t('sidebar.hrSupport') || 'HR Support', icon: MessageCircle, action: () => {
+        setActiveSidebarItem('hrSupport');
+        setLocation('/hr-support');
       }
     },
     { id: 'settings', label: t('sidebar.settings'), icon: Settings, action: () => onOpenModal?.('systemSettings') }
