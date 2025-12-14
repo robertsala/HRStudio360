@@ -620,16 +620,5 @@ export async function seedProductionDatabase(options: { force?: boolean } = {}) 
   }
 }
 
-// Only run if this file is executed directly (not imported as module)
-if (import.meta.url === `file://${process.argv[1]}`) {
-  seedProductionDatabase()
-    .then((result) => {
-      console.log('\n🎉 Production seeding completed successfully!');
-      console.log(JSON.stringify(result, null, 2));
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('\n💥 Production seeding failed:', error);
-      process.exit(1);
-    });
-}
+// CLI execution moved to a separate script to prevent process.exit from being bundled
+// Run with: npx tsx server/seed-production.ts
