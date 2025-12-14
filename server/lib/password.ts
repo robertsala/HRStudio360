@@ -1,15 +1,30 @@
-import argon2 from 'argon2';
+// Argon2 with graceful fallback for production environments
+// where native modules may fail to load
+
+let argon2: typeof import('argon2') | null = null;
+let argon2LoadError: string | null = null;
+
+// Attempt to load argon2 - if it fails, we'll use a fallback
+try {
+  argon2 = await import('argon2');
+  console.log('[Password] ✅ argon2 native module loaded successfully');
+} catch (err: any) {
+  argon2LoadError = err?.message || 'Unknown error loading argon2';
+  console.error('[Password] ⚠️ Failed to load argon2 native module:', argon2LoadError);
+  console.error('[Password] Stack trace:', err?.stack);
+  console.error('[Password] The server will continue but password operations will fail gracefully');
+}
 
 /**
  * Argon2id password hashing configuration for security audits
  * Settings based on OWASP recommendations
  */
-const ARGON2_OPTIONS = {
+const ARGON2_OPTIONS = argon2 ? {
   type: argon2.argon2id,
   memoryCost: 2 ** 16, // 65536 KiB (~65 MB)
   timeCost: 3,         // Number of iterations
   parallelism: 1       // Number of threads
-};
+} : null;
 
 /**
  * Common weak passwords to deny
@@ -93,21 +108,50 @@ export function validatePassword(
 
 /**
  * Hash a password using Argon2id
+ * Throws an error if argon2 is not available
  */
 export async function hashPassword(password: string): Promise<string> {
+  if (!argon2 || !ARGON2_OPTIONS) {
+    console.error('[Password] Cannot hash password: argon2 module not available');
+    console.error('[Password] Original load error:', argon2LoadError);
+    throw new Error('Password hashing service unavailable. The argon2 native module failed to load. Please contact system administrator.');
+  }
   return argon2.hash(password, ARGON2_OPTIONS);
 }
 
 /**
  * Verify a password against its hash
+ * Returns false if argon2 is not available (fails safely)
  */
 export async function verifyPassword(hash: string, password: string): Promise<boolean> {
+  if (!argon2) {
+    console.error('[Password] Cannot verify password: argon2 module not available');
+    console.error('[Password] Original load error:', argon2LoadError);
+    // For security, return false if we can't verify (deny access)
+    return false;
+  }
+  
   try {
     return await argon2.verify(hash, password);
   } catch (error) {
     // Invalid hash format or other error
+    console.error('[Password] Verification error:', error);
     return false;
   }
+}
+
+/**
+ * Check if argon2 is available for password operations
+ */
+export function isArgon2Available(): boolean {
+  return argon2 !== null;
+}
+
+/**
+ * Get the argon2 load error if it failed
+ */
+export function getArgon2LoadError(): string | null {
+  return argon2LoadError;
 }
 
 /**
