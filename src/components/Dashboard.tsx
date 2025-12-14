@@ -48,6 +48,7 @@ import JobManagementModal from './modals/JobManagementModal';
 import StudioAIChatModal from './modals/StudioAIChatModal';
 import AgentActivityModal from './modals/AgentActivityModal';
 import { mapEmployeeFromBackend } from '../lib/employeeDataMapper';
+import EVerifyDashboardWidget from './dashboard/EVerifyDashboardWidget';
 
 const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; openMyProfile: () => void }>((_props, ref) => {
   const { t } = useTranslation();
@@ -1012,6 +1013,11 @@ const Dashboard = React.forwardRef<{ openModal: (modalName: string) => void; ope
                       </p>
                     </div>
                   </div>
+                ))}
+
+                {/* E-Verify Status Widget - HR/Product Owner Only */}
+                {renderWidget('everify-status', () => (
+                  <EVerifyDashboardWidget onViewAll={() => setLocation('/onboarding')} />
                 ))}
 
                 {/* KPI Dashboard - HR/Product Owner Only */}

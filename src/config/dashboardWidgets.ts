@@ -101,6 +101,15 @@ export const DASHBOARD_WIDGETS: WidgetDefinition[] = [
     defaultDisplayOrder: 33,
     isActive: true
   },
+  {
+    widgetId: 'everify-status',
+    widgetName: 'E-Verify Status',
+    widgetDescription: 'E-Verify case tracking with pending and overdue cases',
+    category: 'notifications',
+    defaultVisibleForRoles: ['HR', 'Product Owner'],
+    defaultDisplayOrder: 34,
+    isActive: true
+  },
 
   // Analytics & Insights (HR & Manager focus, order 21-30)
   {
