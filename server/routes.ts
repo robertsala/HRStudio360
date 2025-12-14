@@ -20,6 +20,7 @@ import {
   insertComplianceFrameworkSchema, insertComplianceControlSchema, insertComplianceEvidenceSchema,
   insertComplianceAlertSchema, insertComplianceAuditTrailSchema, insertCompliancePolicySchema,
   insertPolicyAcknowledgmentSchema, insertRegulatoryUpdateSchema, insertComplianceMetricsSchema,
+  insertEVerifyCaseSchema, insertEVerifyCaseHistorySchema,
   profiles,
   authCredentials,
   passwordResetTokens,
@@ -42,6 +43,7 @@ import {
 import { sendCollaboratorInviteEmail, sendCollaboratorAcceptedEmail } from './emailService.js';
 import { sendAutoFixNotificationEmail, notificationService } from './notification-service.js';
 import { seedProductionDatabase } from './seed-production.js';
+import { calculateSubmissionDeadline } from './storage.js';
 import { hashPassword, verifyPassword, validatePassword, isAccountLocked } from './lib/password.js';
 import { generateOTPCode, generateSessionToken, hashCode, verifyCode, maskPhoneNumber, maskEmail, isChallengeExpired, calculateChallengeExpiry, formatPhoneE164, isValidPhoneNumber, isValidEmail, generateBackupCodes } from './lib/mfa.js';
 import { sendEmailOTP, sendSMSOTP } from './mfaService.js';
@@ -9387,6 +9389,266 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error fetching compliance dashboard:', error);
       res.status(500).json({ error: 'Failed to fetch compliance dashboard', details: error.message });
+    }
+  });
+
+  // ========== E-VERIFY CASE MANAGEMENT ==========
+
+  // Helper function to check if user can access E-Verify data (HR or Product Owner only)
+  async function canAccessEVerify(userId: string): Promise<boolean> {
+    try {
+      const profile = await storage.getProfileById(userId);
+      if (!profile) return false;
+      return profile.department === 'HR' || profile.role === 'Product Owner';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // GET /api/e-verify/cases - Get all E-Verify cases (HR only)
+  app.get('/api/e-verify/cases', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      const cases = await storage.getEVerifyCases();
+      res.json(cases);
+    } catch (error: any) {
+      console.error('Error fetching E-Verify cases:', error);
+      res.status(500).json({ error: 'Failed to fetch E-Verify cases', details: error.message });
+    }
+  });
+
+  // GET /api/e-verify/cases/pending - Get cases needing action
+  app.get('/api/e-verify/cases/pending', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      const cases = await storage.getPendingEVerifyCases();
+      res.json(cases);
+    } catch (error: any) {
+      console.error('Error fetching pending E-Verify cases:', error);
+      res.status(500).json({ error: 'Failed to fetch pending E-Verify cases', details: error.message });
+    }
+  });
+
+  // GET /api/e-verify/cases/overdue - Get overdue cases
+  app.get('/api/e-verify/cases/overdue', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      const cases = await storage.getOverdueEVerifyCases();
+      res.json(cases);
+    } catch (error: any) {
+      console.error('Error fetching overdue E-Verify cases:', error);
+      res.status(500).json({ error: 'Failed to fetch overdue E-Verify cases', details: error.message });
+    }
+  });
+
+  // GET /api/e-verify/cases/:id - Get single case by ID
+  app.get('/api/e-verify/cases/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      const eVerifyCase = await storage.getEVerifyCaseById(req.params.id);
+      if (!eVerifyCase) {
+        return res.status(404).json({ error: 'E-Verify case not found' });
+      }
+
+      res.json(eVerifyCase);
+    } catch (error: any) {
+      console.error('Error fetching E-Verify case:', error);
+      res.status(500).json({ error: 'Failed to fetch E-Verify case', details: error.message });
+    }
+  });
+
+  // GET /api/e-verify/cases/new-hire/:newHireId - Get case for specific new hire
+  app.get('/api/e-verify/cases/new-hire/:newHireId', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      const eVerifyCase = await storage.getEVerifyCaseByNewHireId(req.params.newHireId);
+      if (!eVerifyCase) {
+        return res.status(404).json({ error: 'E-Verify case not found for this new hire' });
+      }
+
+      res.json(eVerifyCase);
+    } catch (error: any) {
+      console.error('Error fetching E-Verify case by new hire:', error);
+      res.status(500).json({ error: 'Failed to fetch E-Verify case', details: error.message });
+    }
+  });
+
+  // POST /api/e-verify/cases - Create new E-Verify case
+  app.post('/api/e-verify/cases', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      // Validate required fields
+      const { i9FormId, newHireId, hireDate } = req.body;
+      if (!i9FormId || !newHireId || !hireDate) {
+        return res.status(400).json({ error: 'i9FormId, newHireId, and hireDate are required' });
+      }
+
+      // Calculate submission deadline (3 business days from hire date)
+      const hireDateObj = new Date(hireDate);
+      const submissionDeadline = calculateSubmissionDeadline(hireDateObj);
+
+      // Prepare case data with calculated deadline
+      const caseData = {
+        ...req.body,
+        submissionDeadline: submissionDeadline.toISOString().split('T')[0],
+        createdBy: userId,
+        lastUpdatedBy: userId,
+        status: req.body.status || 'pending',
+        requiresAction: true
+      };
+
+      const parsed = insertEVerifyCaseSchema.safeParse(caseData);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid E-Verify case data', details: parsed.error.errors });
+      }
+
+      const newCase = await storage.createEVerifyCase(parsed.data);
+
+      // Create initial history entry
+      await storage.createEVerifyCaseHistoryEntry({
+        caseId: newCase.id,
+        previousStatus: null,
+        newStatus: newCase.status,
+        changeReason: 'Case created',
+        changedBy: userId,
+        systemGenerated: false
+      });
+
+      res.status(201).json(newCase);
+    } catch (error: any) {
+      console.error('Error creating E-Verify case:', error);
+      res.status(500).json({ error: 'Failed to create E-Verify case', details: error.message });
+    }
+  });
+
+  // PATCH /api/e-verify/cases/:id - Update case
+  app.patch('/api/e-verify/cases/:id', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      const existingCase = await storage.getEVerifyCaseById(req.params.id);
+      if (!existingCase) {
+        return res.status(404).json({ error: 'E-Verify case not found' });
+      }
+
+      const previousStatus = existingCase.status;
+      const updates = {
+        ...req.body,
+        lastUpdatedBy: userId,
+        updatedAt: new Date()
+      };
+
+      const updatedCase = await storage.updateEVerifyCase(req.params.id, updates);
+      if (!updatedCase) {
+        return res.status(500).json({ error: 'Failed to update E-Verify case' });
+      }
+
+      // Log status change to history if status was updated
+      if (req.body.status && req.body.status !== previousStatus) {
+        await storage.createEVerifyCaseHistoryEntry({
+          caseId: req.params.id,
+          previousStatus: previousStatus,
+          newStatus: req.body.status,
+          changeReason: req.body.changeReason || 'Status updated',
+          changedBy: userId,
+          details: req.body.details || null,
+          systemGenerated: false
+        });
+      }
+
+      res.json(updatedCase);
+    } catch (error: any) {
+      console.error('Error updating E-Verify case:', error);
+      res.status(500).json({ error: 'Failed to update E-Verify case', details: error.message });
+    }
+  });
+
+  // GET /api/e-verify/cases/:id/history - Get case status history
+  app.get('/api/e-verify/cases/:id/history', async (req, res) => {
+    try {
+      const userId = requireAuth(req);
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const hasAccess = await canAccessEVerify(userId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied. HR or Product Owner role required.' });
+      }
+
+      // Verify the case exists
+      const eVerifyCase = await storage.getEVerifyCaseById(req.params.id);
+      if (!eVerifyCase) {
+        return res.status(404).json({ error: 'E-Verify case not found' });
+      }
+
+      const history = await storage.getEVerifyCaseHistory(req.params.id);
+      res.json(history);
+    } catch (error: any) {
+      console.error('Error fetching E-Verify case history:', error);
+      res.status(500).json({ error: 'Failed to fetch E-Verify case history', details: error.message });
     }
   });
 }
