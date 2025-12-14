@@ -68,6 +68,15 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **User Impersonation**: "View As" feature for HR/Product Owner to impersonate employees for troubleshooting.
 -   **Tutorial System**: Role-based tutorials integrated into the Training module with interactive checklists and progress tracking.
 -   **AI-Assisted Tax Configuration**: Enterprise-grade multi-state tax data integration with AI-powered jurisdiction suggestions and human approval workflows.
+-   **HR Ticketing System**: Complete employee support ticket system for HR inquiries:
+    -   **Database**: 3 tables (hr_tickets, hr_ticket_comments, hr_ticket_status_history) with proper indexes
+    -   **Ticket Management**: Ticket number format HR-YYYY-NNNNN, categories (Payroll, Benefits, Time Off, Workplace, Policy, Training, Technical, Other), priorities (Low, Medium, High, Urgent), statuses (Open, In Progress, Pending, Resolved, Closed)
+    -   **Employee Interface**: HR Support page (/hr-support) with ticket submission form and "My Tickets" tracking view with comment threads and status history
+    -   **HR Dashboard**: Full management dashboard with stats, filters, ticket assignment, internal notes, and status updates
+    -   **Authorization**: Role-based access - employees can only view/modify their own tickets; HR/Product Owner can manage all tickets
+    -   **Notifications**: In-app notifications for ticket events (submission, status changes, comments, assignment)
+    -   **Email Notifications**: HTML email templates via Resend for ticket submitted, status changed, and ticket assigned events
+    -   **Navigation**: Sidebar item "HR Support" with MessageCircle icon, accessible from any page
 -   **Enterprise Compliance Hub**: Full-page compliance management system tracking SOC2, GDPR, HIPAA, and ISO27001 frameworks:
     -   **Database**: 9 tables (frameworks, controls, evidence, alerts, audit trail, policies, acknowledgments, regulatory updates, metrics)
     -   **Dashboard**: Real-time compliance scores, framework status, alert summaries, and trends
