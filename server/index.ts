@@ -270,18 +270,27 @@ async function bootstrap() {
     res.status(status).json({ error: message });
   });
 
-  // Bootstrap database (non-blocking)
-  try {
-    await storage.ensureDefaultAccessLevels();
-    console.log('✅ Access levels initialized');
-  } catch (err) {
-    console.error('Failed to initialize access levels (non-fatal):', err);
-    // Don't throw - this is non-blocking
-  }
-
-  // Mark as fully ready
+  // Mark as fully ready BEFORE database operations
+  // This ensures the app can serve requests even if DB is slow/unavailable
   isReady = true;
   console.log('='.repeat(60));
   console.log('✅ Application fully initialized and ready');
   console.log('='.repeat(60));
+
+  // Bootstrap database with timeout (non-blocking, runs after app is ready)
+  const dbTimeout = 10000; // 10 second timeout for database operations
+  const timeoutPromise = new Promise<void>((_, reject) => 
+    setTimeout(() => reject(new Error('Database operation timed out')), dbTimeout)
+  );
+
+  try {
+    await Promise.race([
+      storage.ensureDefaultAccessLevels(),
+      timeoutPromise
+    ]);
+    console.log('✅ Access levels initialized');
+  } catch (err: any) {
+    console.warn(`⚠️ Database initialization skipped: ${err?.message || 'Unknown error'}`);
+    console.warn('   App is running but some features may be limited until database is available');
+  }
 }
