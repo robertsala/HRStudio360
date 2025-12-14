@@ -34,11 +34,12 @@ The frontend is a React 18 single-page application (SPA) with a modal-based inte
 -   **Applicant Tracking System (ATS)**: Features a public career portal with resume upload and AI-powered auto-fill. The backend supports job postings, applications, candidates, interview stages, and offer letters with a Kanban-style interface.
 -   **Payroll System**: Features a guided 5-step payroll wizard with an AI Payroll Assistant and interactive timesheet navigation.
 -   **Onboarding System**: Comprehensive end-to-end onboarding infrastructure including:
-    -   **Database**: Complete schema for checklists, tasks, I-9 forms (federal compliance), state tax forms, and onboarding documents
-    -   **API**: 25+ RESTful endpoints for onboarding workflows, form submissions, and document management
-    -   **Components**: 4 production-ready form components (I-9 Section 1 & 2, Massachusetts M-4, document upload with object storage)
+    -   **Database**: Complete schema for checklists, tasks, I-9 forms (federal compliance), state tax forms, onboarding documents, and E-Verify cases
+    -   **API**: 30+ RESTful endpoints for onboarding workflows, form submissions, document management, and E-Verify case management
+    -   **Components**: 5 production-ready form components (I-9 Section 1 & 2, Massachusetts M-4, document upload with object storage, E-Verify status tracking)
     -   **Modal Interface**: Fully integrated NewHireOnboardingModal with 4-tab navigation (Overview, Forms & Compliance, Documents, Tasks), role-based access control, real-time progress tracking, and hierarchical TanStack Query cache invalidation
     -   **Federal Compliance**: Complete I-9 verification workflow supporting all 50 states and US territories with conditional validation (List A OR List B+C documents)
+    -   **E-Verify Integration**: Full case management system with 3-business-day deadline calculation, status tracking (pending/submitted/authorized/TNC), case history, deadline alerts, and dashboard widget for HR/Product Owners showing pending/overdue cases
 -   **Navigation Architecture**: Hybrid page/modal navigation system that works from any page:
     -   **TIER 1 Pages**: Full-screen pages (Benefits, Employees, Hiring, Chat, Leave, Performance, etc.) routed via `PAGE_ROUTES` in App.tsx
     -   **Legacy Modals**: Dashboard inline modals (Payroll, Reports, Events, Offboarding, TimeAttendance) opened via `?openModal=` query parameter
