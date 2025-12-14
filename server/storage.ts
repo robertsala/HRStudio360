@@ -60,7 +60,9 @@ import type {
   CompliancePolicy, InsertCompliancePolicy,
   PolicyAcknowledgment, InsertPolicyAcknowledgment,
   RegulatoryUpdate, InsertRegulatoryUpdate,
-  ComplianceMetrics, InsertComplianceMetrics
+  ComplianceMetrics, InsertComplianceMetrics,
+  EVerifyCase, InsertEVerifyCase,
+  EVerifyCaseHistory, InsertEVerifyCaseHistory
 } from '../shared/schema.js';
 import { 
   profiles, authCredentials, addressChangeRequests, announcements, employees, leaveRequests, leaveBalances,
@@ -81,7 +83,8 @@ import {
   accessLevels, employeeAccessAssignments,
   callSessions, callParticipants, callSignaling,
   complianceFrameworks, complianceControls, complianceEvidence, complianceAlerts,
-  complianceAuditTrail, compliancePolicies, policyAcknowledgments, regulatoryUpdates, complianceMetrics
+  complianceAuditTrail, compliancePolicies, policyAcknowledgments, regulatoryUpdates, complianceMetrics,
+  eVerifyCases, eVerifyCaseHistory
 } from '../shared/schema.js';
 import { eq, gte, and, desc, or, sql as drizzleSql, isNull, isNotNull, lte, notInArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -557,6 +560,24 @@ export interface IStorage {
   // Compliance Metrics
   createComplianceMetrics(metrics: InsertComplianceMetrics): Promise<ComplianceMetrics>;
   getLatestComplianceMetrics(frameworkId?: string): Promise<ComplianceMetrics[]>;
+
+  // ============================================================================
+  // E-VERIFY CASE MANAGEMENT
+  // ============================================================================
+
+  // E-Verify Cases CRUD
+  getEVerifyCases(): Promise<EVerifyCase[]>;
+  getEVerifyCaseById(id: string): Promise<EVerifyCase | undefined>;
+  getEVerifyCaseByNewHireId(newHireId: string): Promise<EVerifyCase | undefined>;
+  getEVerifyCasesByStatus(status: string): Promise<EVerifyCase[]>;
+  getPendingEVerifyCases(): Promise<EVerifyCase[]>;
+  getOverdueEVerifyCases(): Promise<EVerifyCase[]>;
+  createEVerifyCase(eVerifyCase: InsertEVerifyCase): Promise<EVerifyCase>;
+  updateEVerifyCase(id: string, updates: Partial<InsertEVerifyCase>): Promise<EVerifyCase | undefined>;
+
+  // E-Verify Case History
+  getEVerifyCaseHistory(caseId: string): Promise<EVerifyCaseHistory[]>;
+  createEVerifyCaseHistoryEntry(entry: InsertEVerifyCaseHistory): Promise<EVerifyCaseHistory>;
 }
 
 // Database storage implementation
@@ -3819,6 +3840,89 @@ export class DbStorage implements IStorage {
       .orderBy(desc(complianceMetrics.metricDate))
       .limit(50);
   }
+
+  // ============================================================================
+  // E-VERIFY CASE MANAGEMENT
+  // ============================================================================
+
+  async getEVerifyCases(): Promise<EVerifyCase[]> {
+    return db.select().from(eVerifyCases).orderBy(desc(eVerifyCases.createdAt));
+  }
+
+  async getEVerifyCaseById(id: string): Promise<EVerifyCase | undefined> {
+    const result = await db.select().from(eVerifyCases).where(eq(eVerifyCases.id, id));
+    return result[0];
+  }
+
+  async getEVerifyCaseByNewHireId(newHireId: string): Promise<EVerifyCase | undefined> {
+    const result = await db.select().from(eVerifyCases).where(eq(eVerifyCases.newHireId, newHireId));
+    return result[0];
+  }
+
+  async getEVerifyCasesByStatus(status: string): Promise<EVerifyCase[]> {
+    return db.select().from(eVerifyCases)
+      .where(eq(eVerifyCases.status, status))
+      .orderBy(desc(eVerifyCases.createdAt));
+  }
+
+  async getPendingEVerifyCases(): Promise<EVerifyCase[]> {
+    return db.select().from(eVerifyCases)
+      .where(eq(eVerifyCases.requiresAction, true))
+      .orderBy(desc(eVerifyCases.createdAt));
+  }
+
+  async getOverdueEVerifyCases(): Promise<EVerifyCase[]> {
+    return db.select().from(eVerifyCases)
+      .where(eq(eVerifyCases.isOverdue, true))
+      .orderBy(desc(eVerifyCases.createdAt));
+  }
+
+  async createEVerifyCase(eVerifyCase: InsertEVerifyCase): Promise<EVerifyCase> {
+    const result = await db.insert(eVerifyCases).values(eVerifyCase).returning();
+    return result[0];
+  }
+
+  async updateEVerifyCase(id: string, updates: Partial<InsertEVerifyCase>): Promise<EVerifyCase | undefined> {
+    const result = await db
+      .update(eVerifyCases)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(eVerifyCases.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // E-Verify Case History
+  async getEVerifyCaseHistory(caseId: string): Promise<EVerifyCaseHistory[]> {
+    return db.select().from(eVerifyCaseHistory)
+      .where(eq(eVerifyCaseHistory.caseId, caseId))
+      .orderBy(desc(eVerifyCaseHistory.changedAt));
+  }
+
+  async createEVerifyCaseHistoryEntry(entry: InsertEVerifyCaseHistory): Promise<EVerifyCaseHistory> {
+    const result = await db.insert(eVerifyCaseHistory).values(entry).returning();
+    return result[0];
+  }
 }
 
 export const storage = new DbStorage();
+
+/**
+ * Calculate the submission deadline for E-Verify cases.
+ * Deadline is 3 business days from the hire date (skipping weekends).
+ * @param hireDate - The employee's first day of work
+ * @returns Date representing the submission deadline
+ */
+export function calculateSubmissionDeadline(hireDate: Date): Date {
+  const deadline = new Date(hireDate);
+  let businessDaysAdded = 0;
+  
+  while (businessDaysAdded < 3) {
+    deadline.setDate(deadline.getDate() + 1);
+    const dayOfWeek = deadline.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      businessDaysAdded++;
+    }
+  }
+  
+  return deadline;
+}

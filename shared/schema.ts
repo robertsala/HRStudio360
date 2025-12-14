@@ -2613,6 +2613,97 @@ export const complianceMetrics = pgTable('compliance_metrics', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// ============================================================================
+// E-VERIFY CASE MANAGEMENT SYSTEM
+// ============================================================================
+
+// E-Verify Cases - Comprehensive tracking for employment verification
+export const eVerifyCases = pgTable('e_verify_cases', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  i9FormId: uuid('i9_form_id').references(() => i9Forms.id, { onDelete: 'cascade' }).notNull(),
+  newHireId: uuid('new_hire_id').references(() => newHires.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Case identification
+  caseNumber: text('case_number'), // E-Verify case number (assigned by system)
+  
+  // Status tracking - follows E-Verify official statuses
+  status: text('status').default('pending').notNull(),
+  // Statuses: pending, submitted, employment_authorized, ssa_tnc_issued, dhs_tnc_issued, 
+  // tnc_contested, tnc_resolved_authorized, tnc_resolved_final_nonconfirmation, 
+  // closed_case_authorized, closed_case_unauthorized, case_in_continuance
+  
+  // Timeline tracking (critical for 3-business-day compliance)
+  hireDate: date('hire_date').notNull(), // Employee's first day of work
+  i9CompletionDate: date('i9_completion_date'), // When I-9 was fully completed
+  submissionDeadline: date('submission_deadline').notNull(), // 3 business days from hire
+  submittedAt: timestamp('submitted_at'), // When case was submitted to E-Verify
+  
+  // Photo matching (required for List B documents with E-Verify)
+  photoMatchRequired: boolean('photo_match_required').default(false),
+  photoMatchStatus: text('photo_match_status'), // pending, matched, no_match, photo_not_displayed
+  
+  // SSA (Social Security Administration) verification
+  ssaVerificationStatus: text('ssa_verification_status'), // verified, tnc, pending
+  ssaTncDate: timestamp('ssa_tnc_date'), // When SSA TNC was issued
+  ssaReferralDate: timestamp('ssa_referral_date'), // When employee was referred to SSA
+  
+  // DHS (Department of Homeland Security) verification
+  dhsVerificationStatus: text('dhs_verification_status'), // verified, tnc, pending
+  dhsTncDate: timestamp('dhs_tnc_date'), // When DHS TNC was issued
+  dhsReferralDate: timestamp('dhs_referral_date'), // When employee was referred to DHS
+  
+  // TNC (Tentative Nonconfirmation) handling
+  tncIssued: boolean('tnc_issued').default(false),
+  tncType: text('tnc_type'), // ssa, dhs, both
+  tncContested: boolean('tnc_contested'), // Did employee contest the TNC?
+  tncContestedDate: timestamp('tnc_contested_date'),
+  tncReferralDeadline: date('tnc_referral_deadline'), // 8 federal business days from TNC
+  tncResolutionDate: timestamp('tnc_resolution_date'),
+  tncResolution: text('tnc_resolution'), // authorized, final_nonconfirmation
+  
+  // Case closure
+  closedAt: timestamp('closed_at'),
+  closureReason: text('closure_reason'), // authorized, unauthorized, case_deleted, administrative_closure
+  
+  // Additional case information
+  additionalInformation: text('additional_information'), // Notes, special circumstances
+  employerCaseNote: text('employer_case_note'), // Internal notes for HR
+  
+  // Compliance flags
+  isOverdue: boolean('is_overdue').default(false), // Past submission deadline
+  requiresAction: boolean('requires_action').default(true), // Needs attention
+  lastActionRequired: text('last_action_required'), // Description of what's needed
+  
+  // Audit trail
+  createdBy: uuid('created_by').references(() => profiles.id),
+  lastUpdatedBy: uuid('last_updated_by').references(() => profiles.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => ({
+  newHireIdx: index('e_verify_cases_new_hire_idx').on(table.newHireId),
+  statusIdx: index('e_verify_cases_status_idx').on(table.status),
+  deadlineIdx: index('e_verify_cases_deadline_idx').on(table.submissionDeadline)
+}));
+
+// E-Verify Case History - Audit log for all case status changes
+export const eVerifyCaseHistory = pgTable('e_verify_case_history', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  caseId: uuid('case_id').references(() => eVerifyCases.id, { onDelete: 'cascade' }).notNull(),
+  
+  previousStatus: text('previous_status'),
+  newStatus: text('new_status').notNull(),
+  changeReason: text('change_reason'),
+  changedBy: uuid('changed_by').references(() => profiles.id),
+  changedAt: timestamp('changed_at').defaultNow(),
+  
+  // Additional details about the change
+  details: json('details'), // Flexible JSON for any additional data
+  systemGenerated: boolean('system_generated').default(false) // Was this an automatic status update?
+}, (table) => ({
+  caseIdx: index('e_verify_case_history_case_idx').on(table.caseId),
+  changedAtIdx: index('e_verify_case_history_changed_at_idx').on(table.changedAt)
+}));
+
 // Insert schemas for Compliance tables
 export const insertComplianceFrameworkSchema = createInsertSchema(complianceFrameworks).omit({
   id: true,
@@ -2688,3 +2779,19 @@ export const insertComplianceMetricsSchema = createInsertSchema(complianceMetric
 });
 export type InsertComplianceMetrics = z.infer<typeof insertComplianceMetricsSchema>;
 export type ComplianceMetrics = typeof complianceMetrics.$inferSelect;
+
+// Insert schemas for E-Verify tables
+export const insertEVerifyCaseSchema = createInsertSchema(eVerifyCases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertEVerifyCase = z.infer<typeof insertEVerifyCaseSchema>;
+export type EVerifyCase = typeof eVerifyCases.$inferSelect;
+
+export const insertEVerifyCaseHistorySchema = createInsertSchema(eVerifyCaseHistory).omit({
+  id: true,
+  changedAt: true
+});
+export type InsertEVerifyCaseHistory = z.infer<typeof insertEVerifyCaseHistorySchema>;
+export type EVerifyCaseHistory = typeof eVerifyCaseHistory.$inferSelect;
