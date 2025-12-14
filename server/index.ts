@@ -278,19 +278,33 @@ async function bootstrap() {
   console.log('='.repeat(60));
 
   // Bootstrap database with timeout (non-blocking, runs after app is ready)
+  // We fire-and-forget with proper error handling to avoid unhandled rejections
   const dbTimeout = 10000; // 10 second timeout for database operations
-  const timeoutPromise = new Promise<void>((_, reject) => 
-    setTimeout(() => reject(new Error('Database operation timed out')), dbTimeout)
-  );
-
-  try {
-    await Promise.race([
-      storage.ensureDefaultAccessLevels(),
-      timeoutPromise
-    ]);
-    console.log('✅ Access levels initialized');
-  } catch (err: any) {
-    console.warn(`⚠️ Database initialization skipped: ${err?.message || 'Unknown error'}`);
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    console.warn('⚠️ Database initialization timed out after 10 seconds');
     console.warn('   App is running but some features may be limited until database is available');
-  }
+  }, dbTimeout);
+
+  // Run DB init with proper error handling for both timeout and late rejections
+  storage.ensureDefaultAccessLevels()
+    .then(() => {
+      clearTimeout(timeoutId);
+      if (!timedOut) {
+        console.log('✅ Access levels initialized');
+      } else {
+        console.log('✅ Access levels initialized (late, after timeout)');
+      }
+    })
+    .catch((err: any) => {
+      clearTimeout(timeoutId);
+      const msg = err?.message || 'Unknown error';
+      if (!timedOut) {
+        console.warn(`⚠️ Database initialization failed: ${msg}`);
+      } else {
+        console.warn(`⚠️ Database initialization failed (late, after timeout): ${msg}`);
+      }
+      console.warn('   App is running but some features may be limited');
+    });
 }
